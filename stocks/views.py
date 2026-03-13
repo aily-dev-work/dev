@@ -69,6 +69,8 @@ class WatchStockViewSet(viewsets.ModelViewSet):
             "name": stock.name,
             "buy_score": score_result.buy_score,
             "sell_score": score_result.sell_score,
+            "score_bias": score_result.bias,
+            "score_strength": score_result.strength,
             "score_breakdown": {
                 "buy": score_result.breakdown_buy,
                 "sell": score_result.breakdown_sell,

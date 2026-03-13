@@ -15,6 +15,8 @@ class ScoreResult:
     breakdown_sell: Dict[str, float]
     insufficient_data: bool
     insufficient_reason: Optional[str]
+    bias: str
+    strength: str
 
 
 def _clamp(score: float, min_value: float = 0.0, max_value: float = 100.0) -> float:
@@ -30,6 +32,7 @@ BUY_WEIGHTS: Dict[str, float] = {
     "above_ma25": 10.0,
     "above_ma75": 10.0,
     "near_high_20": 10.0,
+    "near_low_20": 10.0,
 }
 
 SELL_WEIGHTS: Dict[str, float] = {
@@ -40,6 +43,7 @@ SELL_WEIGHTS: Dict[str, float] = {
     "below_ma25": 10.0,
     "below_ma75": 10.0,
     "near_low_20": 10.0,
+    "near_high_20": 10.0,
 }
 
 
@@ -136,30 +140,30 @@ def score_from_technical(summary: TechnicalSummary) -> ScoreResult:
         insufficient_reasons.append("ma75_or_latest_missing")
 
     # ---------- 20日高値・安値との位置関係 ----------
-    # high_20 付近に近づいている（上昇基調） → 買い加点
-    # low_20 付近に近づきそう（弱い） → 売り加点
+    # 高値圏（high_20 付近）は利確・売り警戒 → 売り加点
+    # 安値圏（low_20 付近）は反発期待 → 買い加点
     if latest_close is not None and hl.high_20 is not None and hl.low_20 is not None:
         price_range = hl.high_20 - hl.low_20
         if price_range > 0:
             # 0〜1 のレンジに正規化（low_20:0, high_20:1）
             pos = float((latest_close - hl.low_20) / price_range)
-            # high_20 の 70%以上の位置 → 「高値圏に近い」とみなす
-            if pos >= 0.7:
-                breakdown_buy["near_high_20"] = BUY_WEIGHTS["near_high_20"]
+            # high_20 の 80%以上の位置 → 「高値圏に近い」とみなす → 売り加点
+            if pos >= 0.8:
+                breakdown_sell["near_high_20"] = SELL_WEIGHTS["near_high_20"]
             else:
-                breakdown_buy["near_high_20"] = 0.0
-            # low_20 の 30%未満の位置 → 「安値圏に近い」とみなす
-            if pos <= 0.3:
-                breakdown_sell["near_low_20"] = SELL_WEIGHTS["near_low_20"]
+                breakdown_sell["near_high_20"] = 0.0
+            # low_20 の 20%未満の位置 → 「安値圏に近い」とみなす → 買い加点
+            if pos <= 0.2:
+                breakdown_buy["near_low_20"] = BUY_WEIGHTS["near_low_20"]
             else:
-                breakdown_sell["near_low_20"] = 0.0
+                breakdown_buy["near_low_20"] = 0.0
         else:
-            breakdown_buy["near_high_20"] = 0.0
-            breakdown_sell["near_low_20"] = 0.0
+            breakdown_buy["near_low_20"] = 0.0
+            breakdown_sell["near_high_20"] = 0.0
             insufficient_reasons.append("high_low_range_zero")
     else:
-        breakdown_buy["near_high_20"] = 0.0
-        breakdown_sell["near_low_20"] = 0.0
+        breakdown_buy["near_low_20"] = 0.0
+        breakdown_sell["near_high_20"] = 0.0
         insufficient_reasons.append("high_20_or_low_20_or_latest_missing")
 
     # 合計スコア計算＆クランプ
@@ -168,6 +172,24 @@ def score_from_technical(summary: TechnicalSummary) -> ScoreResult:
 
     buy_score = _clamp(raw_buy)
     sell_score = _clamp(raw_sell)
+
+    # バイアスと強度を判定
+    diff = buy_score - sell_score
+    abs_diff = abs(diff)
+
+    if abs_diff < 10:
+        bias = "neutral"
+    elif diff >= 10:
+        bias = "buy"
+    else:
+        bias = "sell"
+
+    if abs_diff < 15:
+        strength = "weak"
+    elif abs_diff < 30:
+        strength = "normal"
+    else:
+        strength = "strong"
 
     insufficient_data = len(insufficient_reasons) > 0
     reason_text = ", ".join(sorted(set(insufficient_reasons))) if insufficient_reasons else None
@@ -179,5 +201,7 @@ def score_from_technical(summary: TechnicalSummary) -> ScoreResult:
         breakdown_sell=breakdown_sell,
         insufficient_data=insufficient_data,
         insufficient_reason=reason_text,
+        bias=bias,
+        strength=strength,
     )
 
