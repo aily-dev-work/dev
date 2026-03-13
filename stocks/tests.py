@@ -628,6 +628,87 @@ class ScoreProfileProposalApplyTests(TestCase):
         self.assertIsNone(proposal.applied_score_profile_id)
 
 
+class ScoreProfileActivationTests(TestCase):
+    def setUp(self) -> None:
+        self.base_profile = ScoreProfile.objects.create(
+            name="BaseActive",
+            version="v1",
+            is_active=True,
+            description="initial active profile",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        self.candidate_profile = ScoreProfile.objects.create(
+            name="Candidate",
+            version="v2",
+            is_active=False,
+            description="candidate profile",
+            weights_json={"buy": {"x": 1.0}, "sell": {"y": 2.0}},
+            thresholds_json={"bias": {"a": 1.0}},
+        )
+
+    def test_activate_inactive_profile_switches_active_and_deactivates_others(self) -> None:
+        url = f"/api/v1/score-profiles/{self.candidate_profile.id}/activate/"
+        response = self.client.post(url, data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+
+        self.base_profile.refresh_from_db()
+        self.candidate_profile.refresh_from_db()
+
+        self.assertFalse(self.base_profile.is_active)
+        self.assertTrue(self.candidate_profile.is_active)
+        self.assertEqual(
+            ScoreProfile.objects.filter(is_active=True).count(),
+            1,
+        )
+
+    def test_activate_already_active_profile_is_idempotent(self) -> None:
+        url = f"/api/v1/score-profiles/{self.base_profile.id}/activate/"
+        response = self.client.post(url, data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+
+        self.base_profile.refresh_from_db()
+        self.candidate_profile.refresh_from_db()
+
+        self.assertTrue(self.base_profile.is_active)
+        self.assertFalse(self.candidate_profile.is_active)
+        self.assertEqual(
+            ScoreProfile.objects.filter(is_active=True).count(),
+            1,
+        )
+
+    def test_activate_not_found_returns_404(self) -> None:
+        url = "/api/v1/score-profiles/999999/activate/"
+        response = self.client.post(url, data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 404)
+
+    def test_activate_normalizes_when_multiple_active_exist(self) -> None:
+        # 擬似的に複数 active を作る
+        other = ScoreProfile.objects.create(
+            name="OtherActive",
+            version="v3",
+            is_active=True,
+            description="another active profile",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+
+        url = f"/api/v1/score-profiles/{self.candidate_profile.id}/activate/"
+        response = self.client.post(url, data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+
+        self.base_profile.refresh_from_db()
+        self.candidate_profile.refresh_from_db()
+        other.refresh_from_db()
+
+        self.assertTrue(self.candidate_profile.is_active)
+        self.assertFalse(self.base_profile.is_active)
+        self.assertFalse(other.is_active)
+        self.assertEqual(
+            ScoreProfile.objects.filter(is_active=True).count(),
+            1,
+        )
+
 
 class ScoreCalculationCompatibilityTests(TestCase):
     """

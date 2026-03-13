@@ -35,6 +35,7 @@ from .services.profile_proposal_review import (
     validate_status,
 )
 from .services.profile_apply import apply_proposal_to_new_profile
+from .services.profile_activation import activate_score_profile
 
 
 class WatchStockViewSet(viewsets.ModelViewSet):
@@ -350,6 +351,32 @@ class ScoreProfileViewSet(viewsets.ViewSet):
         現在アクティブな ScoreProfile を返す。
         """
         profile = get_active_score_profile()
+        data = {
+            "id": profile.id,
+            "name": profile.name,
+            "version": profile.version,
+            "is_active": profile.is_active,
+            "description": profile.description,
+            "weights_json": profile.weights_json,
+            "thresholds_json": profile.thresholds_json,
+            "created_at": profile.created_at.isoformat() if profile.created_at else None,
+            "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="activate")
+    def activate(self, request, pk=None):
+        """
+        指定 ScoreProfile を active に切り替える。
+        エンドポイント: POST /api/v1/score-profiles/<id>/activate/
+        """
+        try:
+            profile = ScoreProfile.objects.get(pk=pk)
+        except ScoreProfile.DoesNotExist:
+            return Response({"detail": "ScoreProfile not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        profile = activate_score_profile(profile)
+
         data = {
             "id": profile.id,
             "name": profile.name,
