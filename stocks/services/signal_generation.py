@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Optional
 
 from ..models import TradingSignal, WatchStock
+from .scoring_profile import get_active_score_profile
 from .signal_scoring import ScoreResult
 from .technical_analysis import TechnicalSummary
 
@@ -51,6 +52,9 @@ def generate_trading_signal(
     else:
         technical_position = None
 
+    # 使用した ScoreProfile を取得（フェーズ8の active profile）
+    profile = get_active_score_profile()
+
     defaults = {
         "signal_type": signal_type,
         "buy_score": Decimal(str(score.buy_score)),
@@ -68,6 +72,9 @@ def generate_trading_signal(
         "trend_mid": summary.signals.trend_mid,
         "trend_long": summary.signals.trend_long,
         "volume_trend": summary.signals.volume_trend,
+        "score_profile": profile,
+        "score_profile_name": profile.name,
+        "score_profile_version": profile.version,
     }
 
     signal, _created = TradingSignal.objects.update_or_create(

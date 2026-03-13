@@ -150,6 +150,7 @@ class WatchStockViewSet(viewsets.ModelViewSet):
             results.append(
                 {
                     "id": s.id,
+                    "stock_id": s.stock_id,
                     "signal_date": s.signal_date.isoformat(),
                     "signal_type": s.signal_type,
                     "buy_score": float(s.buy_score),
@@ -157,6 +158,9 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     "score_bias": s.score_bias,
                     "score_strength": s.score_strength,
                     "signal_price": str(s.signal_price) if s.signal_price is not None else None,
+                    "score_profile_id": s.score_profile_id,
+                    "score_profile_name": s.score_profile_name,
+                    "score_profile_version": s.score_profile_version,
                     "created_at": s.created_at.isoformat(),
                 }
             )

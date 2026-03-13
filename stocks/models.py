@@ -142,6 +142,28 @@ class TradingSignal(models.Model):
     trend_long = models.CharField(max_length=16, null=True, blank=True)
     volume_trend = models.CharField(max_length=16, null=True, blank=True)
 
+    # フェーズ9: このシグナルがどの ScoreProfile で生成されたかを追跡するための情報
+    score_profile = models.ForeignKey(
+        "ScoreProfile",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="signals",
+        help_text="このシグナル生成時に使用したスコアプロファイル",
+    )
+    score_profile_name = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="生成時点の ScoreProfile.name スナップショット",
+    )
+    score_profile_version = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text="生成時点の ScoreProfile.version スナップショット",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -7,6 +7,7 @@ from django.test import TestCase
 from .models import ScoreProfile, SignalOutcome, TradingSignal, WatchStock
 from .services.signal_dataset import build_signal_queryset, signals_to_dataset
 from .services.scoring_profile import get_active_score_profile, get_active_scoring_config
+from .services.signal_generation import generate_trading_signal
 from .services.signal_scoring import score_from_technical, ScoreResult
 from .services.technical_analysis import AverageVolume, HighLow, MovingAverages, TechnicalSignals, TechnicalSummary
 
@@ -450,3 +451,145 @@ class ScoreCalculationCompatibilityTests(TestCase):
         self.assertEqual(expected.strength, actual.strength)
         self.assertEqual(expected.breakdown_buy, actual.breakdown_buy)
         self.assertEqual(expected.breakdown_sell, actual.breakdown_sell)
+
+
+class TradingSignalScoreProfileTests(TestCase):
+    """
+    フェーズ9: TradingSignal に ScoreProfile 情報が保存されることを確認するテスト。
+    """
+
+    def setUp(self) -> None:
+        ScoreProfile.objects.all().delete()
+        self.profile = ScoreProfile.objects.create(
+            name="Phase9 profile",
+            version="v1",
+            is_active=True,
+            description="for tests",
+            weights_json={
+                "buy": {
+                    "trend_long_up": 20.0,
+                    "trend_mid_up": 15.0,
+                    "trend_short_up": 10.0,
+                },
+                "sell": {
+                    "trend_long_down": 20.0,
+                    "trend_mid_down": 15.0,
+                    "trend_short_down": 10.0,
+                },
+            },
+            thresholds_json={
+                "bias": {"neutral_abs_diff_lt": 10.0},
+                "strength": {"weak_abs_diff_lt": 15.0, "normal_abs_diff_lt": 30.0},
+            },
+        )
+
+    def test_generate_trading_signal_saves_score_profile_info(self) -> None:
+        stock = WatchStock.objects.create(ticker="P9", name="Phase9", market="JP")
+        summary = TechnicalSummary(
+            stock=stock,
+            latest_date="2026-03-13",
+            latest_close=Decimal("100.0000"),
+            moving_averages=MovingAverages(
+                ma5=Decimal("100.0000"),
+                ma25=Decimal("100.0000"),
+                ma75=Decimal("100.0000"),
+            ),
+            high_low=HighLow(
+                high_20=Decimal("110.0000"),
+                low_20=Decimal("90.0000"),
+            ),
+            average_volume=AverageVolume(
+                avg_volume_5=1000.0,
+                avg_volume_20=1000.0,
+            ),
+            signals=TechnicalSignals(
+                trend_short="flat",
+                trend_mid="flat",
+                trend_long="flat",
+                volume_trend="normal",
+            ),
+        )
+
+        score = score_from_technical(summary)
+        signal = generate_trading_signal(stock, summary, score)
+
+        self.assertEqual(signal.score_profile_id, self.profile.id)
+        self.assertEqual(signal.score_profile_name, self.profile.name)
+        self.assertEqual(signal.score_profile_version, self.profile.version)
+
+    def test_dataset_contains_score_profile_fields(self) -> None:
+        stock = WatchStock.objects.create(ticker="P9D", name="Phase9D", market="JP")
+        summary = TechnicalSummary(
+            stock=stock,
+            latest_date="2026-03-14",
+            latest_close=Decimal("200.0000"),
+            moving_averages=MovingAverages(
+                ma5=Decimal("190.0000"),
+                ma25=Decimal("180.0000"),
+                ma75=Decimal("170.0000"),
+            ),
+            high_low=HighLow(
+                high_20=Decimal("210.0000"),
+                low_20=Decimal("190.0000"),
+            ),
+            average_volume=AverageVolume(
+                avg_volume_5=2000.0,
+                avg_volume_20=2000.0,
+            ),
+            signals=TechnicalSignals(
+                trend_short="up",
+                trend_mid="up",
+                trend_long="up",
+                volume_trend="high",
+            ),
+        )
+
+        score = score_from_technical(summary)
+        signal = generate_trading_signal(stock, summary, score)
+
+        qs = build_signal_queryset({})
+        rows = signals_to_dataset(qs)
+        row = next(r for r in rows if r["signal_id"] == signal.id)
+
+        self.assertEqual(row["score_profile_id"], self.profile.id)
+        self.assertEqual(row["score_profile_name"], self.profile.name)
+        self.assertEqual(row["score_profile_version"], self.profile.version)
+
+    def test_score_profile_set_null_keeps_snapshot_fields(self) -> None:
+        stock = WatchStock.objects.create(ticker="P9N", name="Phase9N", market="JP")
+        summary = TechnicalSummary(
+            stock=stock,
+            latest_date="2026-03-15",
+            latest_close=Decimal("300.0000"),
+            moving_averages=MovingAverages(
+                ma5=Decimal("290.0000"),
+                ma25=Decimal("280.0000"),
+                ma75=Decimal("270.0000"),
+            ),
+            high_low=HighLow(
+                high_20=Decimal("310.0000"),
+                low_20=Decimal("290.0000"),
+            ),
+            average_volume=AverageVolume(
+                avg_volume_5=3000.0,
+                avg_volume_20=3000.0,
+            ),
+            signals=TechnicalSignals(
+                trend_short="up",
+                trend_mid="up",
+                trend_long="up",
+                volume_trend="normal",
+            ),
+        )
+
+        score = score_from_technical(summary)
+        signal = generate_trading_signal(stock, summary, score)
+
+        # プロファイルを削除（FK は SET_NULL）
+        self.profile.delete()
+        signal.refresh_from_db()
+
+        self.assertIsNone(signal.score_profile)
+        # name/version のスナップショットは残る
+        self.assertEqual(signal.score_profile_name, "Phase9 profile")
+        self.assertEqual(signal.score_profile_version, "v1")
