@@ -41,6 +41,7 @@ from .services.profile_apply import apply_proposal_to_new_profile
 from .services.profile_activation import activate_score_profile
 from .services.profile_rollback import RollbackNotAllowedError, rollback_to_previous_profile
 from .services.profile_review_targets import (
+    DEFAULT_MIN_EVALUATED_COUNT,
     DEFAULT_STALE_DAYS,
     DEFAULT_THRESHOLD_SUCCESS_RATE,
     get_review_targets,
@@ -605,7 +606,7 @@ class ScoreProfileViewSet(viewsets.ViewSet):
         """
         レビュー対象の抽出。
         エンドポイント: GET /api/v1/score-profiles/review-targets/
-        クエリ: signal_date_from, signal_date_to, threshold_success_rate, stale_days
+        クエリ: signal_date_from, signal_date_to, threshold_success_rate, stale_days, min_evaluated_count
         """
         q = request.query_params
         signal_date_from = q.get("signal_date_from") or None
@@ -618,12 +619,17 @@ class ScoreProfileViewSet(viewsets.ViewSet):
             stale_days = int(q.get("stale_days") or DEFAULT_STALE_DAYS)
         except (TypeError, ValueError):
             stale_days = DEFAULT_STALE_DAYS
+        try:
+            min_evaluated_count = int(q.get("min_evaluated_count") or DEFAULT_MIN_EVALUATED_COUNT)
+        except (TypeError, ValueError):
+            min_evaluated_count = DEFAULT_MIN_EVALUATED_COUNT
 
         data = get_review_targets(
             signal_date_from=signal_date_from,
             signal_date_to=signal_date_to,
             threshold_success_rate=threshold_success_rate,
             stale_days=stale_days,
+            min_evaluated_count=min_evaluated_count,
         )
         return Response(data, status=status.HTTP_200_OK)
 

@@ -1765,6 +1765,7 @@ class ScoreProfileReviewTargetsAPITests(TestCase):
 
     def test_review_targets_underperforming_profiles(self) -> None:
         # success_rate が低い profile: 2件中0件成功 → h20 success_rate 0
+        # min_evaluated_count=2 なら underperforming、デフォルト 5 なら含まれない
         low_profile = ScoreProfile.objects.create(
             name="LowRate",
             version="v1",
@@ -1800,13 +1801,195 @@ class ScoreProfileReviewTargetsAPITests(TestCase):
             )
         response = self.client.get(
             "/api/v1/score-profiles/review-targets/",
-            data={"threshold_success_rate": "0.5", "signal_date_from": "2026-02-01", "signal_date_to": "2026-02-28"},
+            data={
+                "threshold_success_rate": "0.5",
+                "min_evaluated_count": "2",
+                "signal_date_from": "2026-02-01",
+                "signal_date_to": "2026-02-28",
+            },
         )
         self.assertEqual(response.status_code, 200)
         body = response.json()
         under = body["underperforming_profiles"]
         ids = [p["id"] for p in under]
         self.assertIn(low_profile.id, ids)
+
+    def test_review_targets_underperforming_excluded_when_below_min_evaluated_count(self) -> None:
+        # 上記と同じ 2 件のみの low-rate profile。デフォルト min_evaluated_count=5 では underperforming に含まれない
+        low_profile = ScoreProfile.objects.create(
+            name="LowRateFew",
+            version="v1",
+            is_active=False,
+            description="",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        for i in range(2):
+            sig = TradingSignal.objects.create(
+                stock=self.stock,
+                signal_date=date(2026, 2, 10 + i),
+                signal_type="buy",
+                buy_score=10,
+                sell_score=5,
+                score_bias="buy",
+                score_strength="weak",
+                signal_price="100.0000",
+                latest_close="100.0000",
+                ma25="100.0000",
+                ma75="100.0000",
+                high_20="110.0000",
+                low_20="90.0000",
+                score_profile=low_profile,
+                score_profile_name=low_profile.name,
+                score_profile_version=low_profile.version,
+            )
+            SignalOutcome.objects.create(
+                signal=sig,
+                base_price="100.0000",
+                return_20d=Decimal("-0.10"),
+                success_20d=False,
+            )
+        response = self.client.get(
+            "/api/v1/score-profiles/review-targets/",
+            data={
+                "threshold_success_rate": "0.5",
+                "signal_date_from": "2026-02-01",
+                "signal_date_to": "2026-02-28",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        under = body["underperforming_profiles"]
+        ids = [p["id"] for p in under]
+        self.assertNotIn(low_profile.id, ids)
+
+    def test_review_targets_underperforming_included_when_meets_min_evaluated_count(self) -> None:
+        # 5 件以上評価があり success_rate が閾値未満 → underperforming に含まれる
+        low_profile = ScoreProfile.objects.create(
+            name="LowRateEnough",
+            version="v1",
+            is_active=False,
+            description="",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        for i in range(5):
+            sig = TradingSignal.objects.create(
+                stock=self.stock,
+                signal_date=date(2026, 2, 20 + i),
+                signal_type="buy",
+                buy_score=10,
+                sell_score=5,
+                score_bias="buy",
+                score_strength="weak",
+                signal_price="100.0000",
+                latest_close="100.0000",
+                ma25="100.0000",
+                ma75="100.0000",
+                high_20="110.0000",
+                low_20="90.0000",
+                score_profile=low_profile,
+                score_profile_name=low_profile.name,
+                score_profile_version=low_profile.version,
+            )
+            SignalOutcome.objects.create(
+                signal=sig,
+                base_price="100.0000",
+                return_20d=Decimal("-0.10"),
+                success_20d=False,
+            )
+        response = self.client.get(
+            "/api/v1/score-profiles/review-targets/",
+            data={
+                "threshold_success_rate": "0.5",
+                "min_evaluated_count": "5",
+                "signal_date_from": "2026-02-01",
+                "signal_date_to": "2026-02-28",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        under = body["underperforming_profiles"]
+        ids = [p["id"] for p in under]
+        self.assertIn(low_profile.id, ids)
+
+    def test_review_targets_min_evaluated_count_param_changes_result(self) -> None:
+        # 同じ 2 件の low-rate profile で、min_evaluated_count=2 なら含まれる、5 なら含まれない
+        low_profile = ScoreProfile.objects.create(
+            name="LowRateParam",
+            version="v1",
+            is_active=False,
+            description="",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        for i in range(2):
+            sig = TradingSignal.objects.create(
+                stock=self.stock,
+                signal_date=date(2026, 2, 15 + i),
+                signal_type="buy",
+                buy_score=10,
+                sell_score=5,
+                score_bias="buy",
+                score_strength="weak",
+                signal_price="100.0000",
+                latest_close="100.0000",
+                ma25="100.0000",
+                ma75="100.0000",
+                high_20="110.0000",
+                low_20="90.0000",
+                score_profile=low_profile,
+                score_profile_name=low_profile.name,
+                score_profile_version=low_profile.version,
+            )
+            SignalOutcome.objects.create(
+                signal=sig,
+                base_price="100.0000",
+                return_20d=Decimal("-0.10"),
+                success_20d=False,
+            )
+        r2 = self.client.get(
+            "/api/v1/score-profiles/review-targets/",
+            data={
+                "threshold_success_rate": "0.5",
+                "min_evaluated_count": "2",
+                "signal_date_from": "2026-02-01",
+                "signal_date_to": "2026-02-28",
+            },
+        )
+        self.assertEqual(r2.status_code, 200)
+        self.assertIn(low_profile.id, [p["id"] for p in r2.json()["underperforming_profiles"]])
+
+        r5 = self.client.get(
+            "/api/v1/score-profiles/review-targets/",
+            data={
+                "threshold_success_rate": "0.5",
+                "min_evaluated_count": "5",
+                "signal_date_from": "2026-02-01",
+                "signal_date_to": "2026-02-28",
+            },
+        )
+        self.assertEqual(r5.status_code, 200)
+        self.assertNotIn(low_profile.id, [p["id"] for p in r5.json()["underperforming_profiles"]])
+
+    def test_review_targets_no_data_profile_not_underperforming(self) -> None:
+        # シグナルが無い（データが無い）profile は underperforming に含まれない
+        no_data_profile = ScoreProfile.objects.create(
+            name="NoData",
+            version="v1",
+            is_active=False,
+            description="",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        response = self.client.get(
+            "/api/v1/score-profiles/review-targets/",
+            data={"threshold_success_rate": "0.5"},
+        )
+        self.assertEqual(response.status_code, 200)
+        under = response.json()["underperforming_profiles"]
+        ids = [p["id"] for p in under]
+        self.assertNotIn(no_data_profile.id, ids)
 
     def test_review_targets_stale_active_profiles(self) -> None:
         # 直近の activated_at が stale_days より前の履歴を作る（create 後 update で日付を上書き）

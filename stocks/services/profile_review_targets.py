@@ -17,6 +17,7 @@ from .signal_summary import build_summary_queryset, summarize_signals
 # デフォルト判定閾値（将来の見直し用に定数化）
 DEFAULT_THRESHOLD_SUCCESS_RATE = 0.5
 DEFAULT_STALE_DAYS = 30
+DEFAULT_MIN_EVALUATED_COUNT = 5
 
 
 def _profile_summary(
@@ -37,17 +38,24 @@ def _is_underperforming(
     profile: ScoreProfile,
     params: Dict[str, Any],
     threshold_success_rate: float,
+    min_evaluated_count: int,
 ) -> bool:
     """
-    underperforming 判定: h20.success_rate が閾値未満の signal_type が1つでもあれば True。
-    データが無い（evaluated_count=0）の場合は underperforming と見なさない。
+    underperforming 判定: いずれかの signal_type で
+    h20.evaluated_count >= min_evaluated_count かつ h20.success_rate < threshold_success_rate
+    なら True。
+    データが無い、または evaluated_count が不足している場合は underperforming と見なさない。
     """
     rows = _profile_summary(profile, params)
     for row in rows:
         h20 = row.get("h20") or {}
         sr = h20.get("success_rate")
         evaluated = h20.get("evaluated_count", 0)
-        if evaluated > 0 and sr is not None and sr < threshold_success_rate:
+        if (
+            evaluated >= min_evaluated_count
+            and sr is not None
+            and sr < threshold_success_rate
+        ):
             return True
     return False
 
@@ -77,6 +85,7 @@ def get_review_targets(
     signal_date_to: Optional[str] = None,
     threshold_success_rate: float = DEFAULT_THRESHOLD_SUCCESS_RATE,
     stale_days: int = DEFAULT_STALE_DAYS,
+    min_evaluated_count: int = DEFAULT_MIN_EVALUATED_COUNT,
 ) -> Dict[str, Any]:
     """
     レビュー対象を抽出する。
@@ -120,9 +129,11 @@ def get_review_targets(
                 "is_active": current.is_active,
             })
 
-    # underperforming: 全 profile を対象に閾値未満かチェック
+    # underperforming: 全 profile を対象に閾値未満かつ最低評価件数以上かチェック
     for profile in ScoreProfile.objects.all():
-        if _is_underperforming(profile, params, threshold_success_rate):
+        if _is_underperforming(
+            profile, params, threshold_success_rate, min_evaluated_count
+        ):
             result["underperforming_profiles"].append({
                 "id": profile.id,
                 "name": profile.name,

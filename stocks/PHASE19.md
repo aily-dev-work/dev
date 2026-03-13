@@ -53,6 +53,7 @@
 - `signal_date_from`: シグナル日付の開始（summary の絞り込み）
 - `signal_date_to`: シグナル日付の終了
 - `threshold_success_rate`: underperforming 判定の閾値（h20.success_rate がこの値未満なら underperforming）。デフォルト 0.5
+- `min_evaluated_count`: underperforming 判定に必要な h20 の最低 evaluated_count。この件数未満の signal_type はノイズとして underperforming に含めない。デフォルト 5
 - `stale_days`: この日数以上 active のままなら stale。デフォルト 30
 
 **返却内容:**
@@ -94,8 +95,9 @@
 ### 4.1 underperforming
 
 - 指定期間の summary で、その profile の **いずれかの signal_type** について  
-  **h20.success_rate が threshold_success_rate 未満** なら underperforming。
-- データが無い（evaluated_count=0）場合は underperforming と見なさない。
+  **h20.evaluated_count >= min_evaluated_count** かつ  
+  **h20.success_rate < threshold_success_rate** の場合のみ underperforming とする。
+- データが無い（evaluated_count=0）、または evaluated_count が min_evaluated_count 未満の場合は underperforming に含めない（評価件数が少なすぎるケースをノイズとして除外する）。
 
 ### 4.2 stale
 
@@ -149,9 +151,9 @@ Invoke-RestMethod `
   -Uri "http://127.0.0.1:8000/api/v1/score-profiles/review-targets/" `
   -Method Get
 
-# パラメータ付き
+# パラメータ付き（min_evaluated_count で最低評価件数を指定）
 Invoke-RestMethod `
-  -Uri "http://127.0.0.1:8000/api/v1/score-profiles/review-targets/?stale_days=30&threshold_success_rate=0.5" `
+  -Uri "http://127.0.0.1:8000/api/v1/score-profiles/review-targets/?stale_days=30&threshold_success_rate=0.5&min_evaluated_count=5" `
   -Method Get
 
 # profile 比較（base=1, candidate=2）
