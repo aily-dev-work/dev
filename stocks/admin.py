@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import StockPriceDaily, TradingSignal, WatchStock
+from .models import SignalOutcome, StockPriceDaily, TradingSignal, WatchStock
 
 
 @admin.register(WatchStock)
@@ -43,3 +43,22 @@ class TradingSignalAdmin(admin.ModelAdmin):
     list_filter = ("stock", "signal_type", "score_bias", "score_strength")
     search_fields = ("stock__ticker", "stock__name")
     ordering = ("-signal_date", "-created_at")
+
+
+@admin.register(SignalOutcome)
+class SignalOutcomeAdmin(admin.ModelAdmin):
+    list_display = (
+        "signal",
+        "eval_status",
+        "base_price",
+        "return_5d",
+        "success_5d",
+        "return_10d",
+        "success_10d",
+        "return_20d",
+        "success_20d",
+        "updated_at",
+    )
+    list_filter = ("eval_status", "success_5d", "success_10d", "success_20d")
+    search_fields = ("signal__stock__ticker", "signal__stock__name")
+    ordering = ("-updated_at",)

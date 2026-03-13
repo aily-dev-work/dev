@@ -156,22 +156,29 @@ d:\dev\
     urls.py
     wsgi.py
     asgi.py
-  stocks/             # 株価監視アプリ（フェーズ1〜4）
-    models.py         # WatchStock, StockPriceDaily
-    admin.py          # WatchStockAdmin, StockPriceDailyAdmin
-    views.py          # WatchStockViewSet, StockPriceDailyViewSet（+ technical アクション）
+  stocks/             # 株価監視アプリ（フェーズ1〜6）
+    models.py         # WatchStock, StockPriceDaily, TradingSignal, SignalOutcome
+    admin.py          # Admin for all models
+    views.py          # ViewSets（stocks, stock-prices, signals）
     serializers.py    # WatchStockSerializer, StockPriceDailySerializer
-    urls.py           # /api/v1/stocks/, /api/v1/stock-prices/
+    urls.py           # /api/v1/stocks/, /api/v1/stock-prices/, /api/v1/signals/
     services/
       technical_analysis.py  # テクニカル指標計算ロジック
       signal_scoring.py      # 買い/売りスコア計算ロジック
+      signal_generation.py   # TradingSignal 生成
+      signal_evaluation.py   # SignalOutcome 評価
     PHASE1.md         # フェーズ1まとめ
     PHASE2.md         # フェーズ2まとめ
     PHASE3.md         # フェーズ3まとめ
     PHASE4.md         # フェーズ4まとめ
+    PHASE5.md         # フェーズ5まとめ
+    PHASE6.md         # フェーズ6まとめ
     migrations/
       0001_initial.py
       0002_stockpricedaily.py
+      0003_tradingsignal.py
+      0004_tradingsignal_technical_position.py
+      0005_signaloutcome.py
   db.sqlite3          # 開発用 DB（作成後）
 ```
 

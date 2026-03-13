@@ -155,3 +155,46 @@ class TradingSignal(models.Model):
 
     def __str__(self) -> str:
         return f"{self.stock.ticker} {self.signal_date} {self.signal_type}"
+
+
+class SignalOutcome(models.Model):
+    """
+    TradingSignal ごとの結果検証データ。
+    5/10/20 営業日後の価格とリターン、成否を保持する。
+    """
+
+    signal = models.OneToOneField(
+        TradingSignal,
+        related_name="outcome",
+        on_delete=models.CASCADE,
+    )
+
+    base_price = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
+    eval_status = models.CharField(max_length=16, default="pending")  # pending / partial / completed
+
+    # 5 営業日後
+    date_5d = models.DateField(null=True, blank=True)
+    close_5d = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
+    return_5d = models.DecimalField(max_digits=8, decimal_places=4, null=True, blank=True)
+    success_5d = models.BooleanField(null=True, blank=True)
+
+    # 10 営業日後
+    date_10d = models.DateField(null=True, blank=True)
+    close_10d = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
+    return_10d = models.DecimalField(max_digits=8, decimal_places=4, null=True, blank=True)
+    success_10d = models.BooleanField(null=True, blank=True)
+
+    # 20 営業日後
+    date_20d = models.DateField(null=True, blank=True)
+    close_20d = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
+    return_20d = models.DecimalField(max_digits=8, decimal_places=4, null=True, blank=True)
+    success_20d = models.BooleanField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self) -> str:
+        return f"Outcome for signal {self.signal_id}"

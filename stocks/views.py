@@ -2,8 +2,9 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import StockPriceDaily, TradingSignal, WatchStock
+from .models import SignalOutcome, StockPriceDaily, TradingSignal, WatchStock
 from .serializers import StockPriceDailySerializer, WatchStockSerializer
+from .services.signal_evaluation import evaluate_signal
 from .services.signal_generation import generate_trading_signal
 from .services.signal_scoring import score_from_technical
 from .services.technical_analysis import calculate_technical_summary
@@ -185,4 +186,98 @@ class StockPriceDailyViewSet(viewsets.ModelViewSet):
             qs = qs.filter(stock__ticker=ticker)
 
         return qs
+
+
+class SignalViewSet(viewsets.ViewSet):
+    """
+    TradingSignal 単位の評価 / 結果取得用 ViewSet。
+    """
+
+    def _get_signal(self, pk: str) -> TradingSignal:
+        return TradingSignal.objects.select_related("stock").get(pk=pk)
+
+    @action(detail=True, methods=["post"], url_path="evaluate")
+    def evaluate(self, request, pk=None):
+        """
+        指定 TradingSignal を評価して SignalOutcome を保存する。
+        """
+        signal = self._get_signal(pk)
+        outcome = evaluate_signal(signal)
+
+        data = {
+            "signal_id": signal.id,
+            "stock_id": signal.stock.id,
+            "ticker": signal.stock.ticker,
+            "signal_type": signal.signal_type,
+            "signal_date": signal.signal_date.isoformat(),
+            "base_price": str(outcome.base_price) if outcome.base_price is not None else None,
+            "eval_status": outcome.eval_status,
+            "outcomes": {
+                "5d": {
+                    "date": outcome.date_5d.isoformat() if outcome.date_5d else None,
+                    "close": str(outcome.close_5d) if outcome.close_5d is not None else None,
+                    "return": str(outcome.return_5d) if outcome.return_5d is not None else None,
+                    "success": outcome.success_5d,
+                },
+                "10d": {
+                    "date": outcome.date_10d.isoformat() if outcome.date_10d else None,
+                    "close": str(outcome.close_10d) if outcome.close_10d is not None else None,
+                    "return": str(outcome.return_10d) if outcome.return_10d is not None else None,
+                    "success": outcome.success_10d,
+                },
+                "20d": {
+                    "date": outcome.date_20d.isoformat() if outcome.date_20d else None,
+                    "close": str(outcome.close_20d) if outcome.close_20d is not None else None,
+                    "return": str(outcome.return_20d) if outcome.return_20d is not None else None,
+                    "success": outcome.success_20d,
+                },
+            },
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["get"], url_path="outcome")
+    def outcome(self, request, pk=None):
+        """
+        指定 TradingSignal の Outcome を返す。
+        未評価の場合は 404 を返す。
+        """
+        signal = self._get_signal(pk)
+        try:
+            outcome = signal.outcome
+        except SignalOutcome.DoesNotExist:
+            return Response(
+                {"detail": "Outcome not evaluated yet."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        data = {
+            "signal_id": signal.id,
+            "stock_id": signal.stock.id,
+            "ticker": signal.stock.ticker,
+            "signal_type": signal.signal_type,
+            "signal_date": signal.signal_date.isoformat(),
+            "base_price": str(outcome.base_price) if outcome.base_price is not None else None,
+            "eval_status": outcome.eval_status,
+            "outcomes": {
+                "5d": {
+                    "date": outcome.date_5d.isoformat() if outcome.date_5d else None,
+                    "close": str(outcome.close_5d) if outcome.close_5d is not None else None,
+                    "return": str(outcome.return_5d) if outcome.return_5d is not None else None,
+                    "success": outcome.success_5d,
+                },
+                "10d": {
+                    "date": outcome.date_10d.isoformat() if outcome.date_10d else None,
+                    "close": str(outcome.close_10d) if outcome.close_10d is not None else None,
+                    "return": str(outcome.return_10d) if outcome.return_10d is not None else None,
+                    "success": outcome.success_10d,
+                },
+                "20d": {
+                    "date": outcome.date_20d.isoformat() if outcome.date_20d else None,
+                    "close": str(outcome.close_20d) if outcome.close_20d is not None else None,
+                    "return": str(outcome.return_20d) if outcome.return_20d is not None else None,
+                    "success": outcome.success_20d,
+                },
+            },
+        }
+        return Response(data, status=status.HTTP_200_OK)
 
