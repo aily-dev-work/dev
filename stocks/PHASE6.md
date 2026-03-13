@@ -93,10 +93,10 @@ def evaluate_signal(signal: TradingSignal) -> SignalOutcome:
 5. **success 判定**
    - 上記「成功判定ルール」に従い、`success_N` を決定。
 6. **eval_status 判定**
-   - `date_5d`, `date_10d`, `date_20d` のいずれかが埋まっているかで判定:
-     - 3つとも `None` → `"pending"`
-     - 一部のみ `None` → `"partial"`
-     - 3つとも埋まっている → `"completed"`
+   - `return_5d`, `return_10d`, `return_20d` の有無で判定:
+     - 3つとも `null` → `"pending"`
+     - 1つ以上は非 `null` だが、3つすべてではない → `"partial"`
+     - 3つとも非 `null` → `"completed"`
 7. **保存**
    - `SignalOutcome.objects.update_or_create(signal=signal, defaults={...})` で保存し、`SignalOutcome` を返す。
 

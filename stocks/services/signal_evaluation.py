@@ -64,16 +64,19 @@ def evaluate_signal(signal: TradingSignal) -> SignalOutcome:
     r10 = _horizon(h10)
     r20 = _horizon(h20)
 
-    # eval_status 判定
-    filled = [
-        r5.date is not None,
-        r10.date is not None,
-        r20.date is not None,
-    ]
-    if any(filled):
-        eval_status = "completed" if all(filled) else "partial"
-    else:
+    # eval_status 判定: return_* の有無を基準にする
+    has_5 = r5.ret is not None
+    has_10 = r10.ret is not None
+    has_20 = r20.ret is not None
+    any_ret = has_5 or has_10 or has_20
+    all_ret = has_5 and has_10 and has_20
+
+    if not any_ret:
         eval_status = "pending"
+    elif all_ret:
+        eval_status = "completed"
+    else:
+        eval_status = "partial"
 
     outcome, _created = SignalOutcome.objects.update_or_create(
         signal=signal,
