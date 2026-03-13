@@ -9,6 +9,10 @@ from .services.analysis_package import (
     build_analysis_package_for_active_profile,
     build_analysis_package_for_profile,
 )
+from .services.ai_profile_review import (
+    build_ai_review_for_active_profile,
+    build_ai_review_for_profile,
+)
 from .services.signal_summary import build_summary_queryset, summarize_signals
 from .services.scoring_profile import get_active_score_profile
 from .services.signal_evaluation import evaluate_signal
@@ -361,4 +365,40 @@ class ScoreProfileViewSet(viewsets.ViewSet):
         profile = ScoreProfile.objects.get(pk=pk)
         package = build_analysis_package_for_profile(profile, request.query_params)
         return Response(package, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], url_path="current/ai-review")
+    def current_ai_review(self, request):
+        """
+        現在アクティブな ScoreProfile を対象に、
+        analysis-package をもとに AI による改善提案を取得する。
+
+        この API 自体は AI の提案を DB に保存したり、自動適用したりはしない。
+        """
+        user_note = request.data.get("user_note")
+        try:
+            result = build_ai_review_for_active_profile(request.query_params, user_note=user_note)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        except ImproperlyConfigured as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        return Response(result, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="ai-review")
+    def ai_review(self, request, pk=None):
+        """
+        指定 ScoreProfile (id) を対象に、
+        analysis-package をもとに AI による改善提案を取得する。
+        """
+        user_note = request.data.get("user_note")
+        profile = ScoreProfile.objects.get(pk=pk)
+
+        try:
+            result = build_ai_review_for_profile(profile, request.query_params, user_note=user_note)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        except ImproperlyConfigured as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        return Response(result, status=status.HTTP_200_OK)
 

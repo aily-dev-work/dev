@@ -171,6 +171,7 @@ d:\dev\
       signal_dataset.py        # TradingSignal + SignalOutcome のフラットデータ
       signal_summary.py        # ScoreProfile / signal_type 別 summary 集計
       analysis_package.py      # AI 分析入力パッケージ構築
+      ai_profile_review.py     # ScoreProfile の AI レビュー（提案のみ）
     PHASE1.md         # フェーズ1まとめ
     PHASE2.md         # フェーズ2まとめ
     PHASE3.md         # フェーズ3まとめ
@@ -182,6 +183,7 @@ d:\dev\
     PHASE9.md         # フェーズ9まとめ（TradingSignal と ScoreProfile のひも付け）
     PHASE10.md        # フェーズ10まとめ（ScoreProfile 別シグナル集計 API）
     PHASE11.md        # フェーズ11まとめ（AI 分析入力パッケージ API）
+    PHASE12.md        # フェーズ12まとめ（ScoreProfile AI レビュー API）
     migrations/
       0001_initial.py
       0002_stockpricedaily.py

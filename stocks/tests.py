@@ -1,10 +1,16 @@
 from datetime import date
 from decimal import Decimal
+import json
 
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 
 from .models import ScoreProfile, SignalOutcome, TradingSignal, WatchStock
+from .services.ai_profile_review import (
+    build_ai_review_for_active_profile,
+    build_ai_review_for_profile,
+    _call_openai_with_package,
+)
 from .services.analysis_package import (
     build_analysis_package_for_active_profile,
     build_analysis_package_for_profile,
@@ -970,3 +976,131 @@ class AnalysisPackageTests(TestCase):
         package = build_analysis_package_for_active_profile(params)
         tp = package["target_profile"]
         self.assertEqual(tp["id"], self.profile.id)
+
+
+class AIProfileReviewTests(TestCase):
+    """
+    フェーズ12: ai_profile_review service のテスト。
+    """
+
+    def setUp(self) -> None:
+        ScoreProfile.objects.all().delete()
+        self.profile = ScoreProfile.objects.create(
+            name="AIProfile",
+            version="v1",
+            is_active=True,
+            description="for ai review tests",
+            weights_json={"buy": {"trend_long_up": 10.0}, "sell": {}},
+            thresholds_json={"bias": {"neutral_abs_diff_lt": 10.0}, "strength": {}},
+        )
+        self.stock = WatchStock.objects.create(ticker="AIR", name="AIReviewStock", market="JP")
+
+        self.signal = TradingSignal.objects.create(
+            stock=self.stock,
+            signal_date=date(2026, 3, 20),
+            signal_type="buy",
+            buy_score=10,
+            sell_score=5,
+            score_bias="buy",
+            score_strength="weak",
+            signal_price="100.0000",
+            latest_close="100.0000",
+            score_profile=self.profile,
+            score_profile_name=self.profile.name,
+            score_profile_version=self.profile.version,
+        )
+        SignalOutcome.objects.create(
+            signal=self.signal,
+            base_price="100.0000",
+            return_5d=Decimal("0.10"),
+            success_5d=True,
+        )
+
+    def test_ai_review_for_profile_uses_analysis_package_and_returns_expected_keys(self) -> None:
+        # _call_openai_with_package を一時的に差し替える
+        from .services import ai_profile_review
+
+        calls = {}
+
+        def fake_call(package, user_note=None):
+            # analysis-package の target_profile.id が期待通りであることを確認
+            calls["package"] = package
+            calls["user_note"] = user_note
+            return json.dumps(
+                {
+                    "target_profile": package["target_profile"],
+                    "analysis_summary": "dummy summary",
+                    "issues": ["issue1", "issue2"],
+                    "improvement_hypotheses": ["hypothesis1"],
+                    "suggested_weights_json": package["config"]["weights_json"],
+                    "suggested_thresholds_json": package["config"]["thresholds_json"],
+                    "cautions": ["use carefully"],
+                }
+            )
+
+        original = ai_profile_review._call_openai_with_package
+        ai_profile_review._call_openai_with_package = fake_call
+        try:
+            params = {"ticker": "AIR", "limit": "5"}
+            result = build_ai_review_for_profile(self.profile, params, user_note="note")
+        finally:
+            ai_profile_review._call_openai_with_package = original
+
+        # analysis-package の target_profile.id が正しく渡っていること
+        self.assertEqual(calls["package"]["target_profile"]["id"], self.profile.id)
+        self.assertEqual(calls["user_note"], "note")
+
+        # 期待キーが返ってくること
+        for key in [
+            "target_profile",
+            "analysis_summary",
+            "issues",
+            "improvement_hypotheses",
+            "suggested_weights_json",
+            "suggested_thresholds_json",
+            "cautions",
+        ]:
+            self.assertIn(key, result)
+
+    def test_ai_review_invalid_json_raises(self) -> None:
+        from .services import ai_profile_review
+
+        def bad_call(package, user_note=None):
+            return "not-json"
+
+        original = ai_profile_review._call_openai_with_package
+        ai_profile_review._call_openai_with_package = bad_call
+        try:
+            with self.assertRaises(ValueError):
+                build_ai_review_for_profile(self.profile, {"ticker": "AIR"}, user_note=None)
+        finally:
+            ai_profile_review._call_openai_with_package = original
+
+    def test_ai_review_for_active_profile_uses_active_profile(self) -> None:
+        from .services import ai_profile_review
+
+        called_ids = []
+
+        def fake_call(package, user_note=None):
+            called_ids.append(package["target_profile"]["id"])
+            return json.dumps(
+                {
+                    "target_profile": package["target_profile"],
+                    "analysis_summary": "ok",
+                    "issues": [],
+                    "improvement_hypotheses": [],
+                    "suggested_weights_json": package["config"]["weights_json"],
+                    "suggested_thresholds_json": package["config"]["thresholds_json"],
+                    "cautions": [],
+                }
+            )
+
+        original = ai_profile_review._call_openai_with_package
+        ai_profile_review._call_openai_with_package = fake_call
+        try:
+            result = build_ai_review_for_active_profile({"ticker": "AIR"}, user_note=None)
+        finally:
+            ai_profile_review._call_openai_with_package = original
+
+        self.assertEqual(called_ids[0], self.profile.id)
+        self.assertEqual(result["target_profile"]["id"], self.profile.id)
