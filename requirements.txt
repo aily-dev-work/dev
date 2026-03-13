@@ -1,0 +1,7 @@
+# Django 6.x (latest stable)
+Django>=6.0,<7
+# Django REST Framework
+djangorestframework>=3.16,<4
+
+# 将来 MariaDB に切り替える場合:
+# mysqlclient>=2.2

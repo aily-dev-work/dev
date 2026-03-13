@@ -1,0 +1,13 @@
+# 最小構成: Django 起動確認・ローカル開発用
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+    environment:
+      - DJANGO_DEBUG=1
