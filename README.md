@@ -156,14 +156,17 @@ d:\dev\
     urls.py
     wsgi.py
     asgi.py
-  stocks/             # 株価監視アプリ（フェーズ1/2）
+  stocks/             # 株価監視アプリ（フェーズ1〜3）
     models.py         # WatchStock, StockPriceDaily
     admin.py          # WatchStockAdmin, StockPriceDailyAdmin
-    views.py          # WatchStockViewSet, StockPriceDailyViewSet
+    views.py          # WatchStockViewSet, StockPriceDailyViewSet（+ technical アクション）
     serializers.py    # WatchStockSerializer, StockPriceDailySerializer
     urls.py           # /api/v1/stocks/, /api/v1/stock-prices/
+    services/
+      technical_analysis.py  # テクニカル指標計算ロジック
     PHASE1.md         # フェーズ1まとめ
     PHASE2.md         # フェーズ2まとめ
+    PHASE3.md         # フェーズ3まとめ
     migrations/
       0001_initial.py
       0002_stockpricedaily.py
