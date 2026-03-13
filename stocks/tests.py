@@ -513,6 +513,121 @@ class ScoreProfileProposalReviewAPITests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class ScoreProfileProposalApplyTests(TestCase):
+    def setUp(self) -> None:
+        self.profile = ScoreProfile.objects.create(
+            name="BaseProfile",
+            version="v1",
+            is_active=True,
+            description="for apply tests",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={"bias": {}, "strength": {}},
+        )
+        self.accepted_proposal = ScoreProfileProposal.objects.create(
+            score_profile=self.profile,
+            proposal_name="p-accepted",
+            status=ScoreProfileProposal.STATUS_ACCEPTED,
+            score_profile_name_snapshot=self.profile.name,
+            score_profile_version_snapshot=self.profile.version,
+            source_filters_json={},
+            analysis_summary="summary",
+            issues_json=[],
+            improvement_hypotheses_json=[],
+            suggested_weights_json={"buy": {"x": 1.0}, "sell": {"y": 2.0}},
+            suggested_thresholds_json={"bias": {"a": 1.0}},
+            cautions_json=[],
+            raw_ai_response_json={},
+        )
+
+    def test_apply_creates_new_score_profile(self) -> None:
+        url = f"/api/v1/proposals/{self.accepted_proposal.id}/apply/"
+        response = self.client.post(url, data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+
+        body = response.json()
+        self.assertFalse(body["is_active"])
+        self.assertEqual(body["weights_json"], self.accepted_proposal.suggested_weights_json)
+        self.assertEqual(body["thresholds_json"], self.accepted_proposal.suggested_thresholds_json)
+
+        self.accepted_proposal.refresh_from_db()
+        self.assertIsNotNone(self.accepted_proposal.applied_score_profile_id)
+
+    def test_apply_sets_applied_profile_info_visible_in_detail(self) -> None:
+        url = f"/api/v1/proposals/{self.accepted_proposal.id}/apply/"
+        response = self.client.post(url, data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+
+        detail_url = f"/api/v1/proposals/{self.accepted_proposal.id}/"
+        response = self.client.get(detail_url)
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIsNotNone(body["applied_score_profile_id"])
+        self.assertIsNotNone(body["applied_score_profile_name"])
+        self.assertIsNotNone(body["applied_score_profile_version"])
+
+    def test_apply_not_found_returns_404(self) -> None:
+        url = "/api/v1/proposals/999999/apply/"
+        response = self.client.post(url, data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 404)
+
+    def test_apply_rejects_non_accepted_status(self) -> None:
+        for status_value in [
+            ScoreProfileProposal.STATUS_DRAFT,
+            ScoreProfileProposal.STATUS_REVIEWED,
+            ScoreProfileProposal.STATUS_REJECTED,
+        ]:
+            proposal = ScoreProfileProposal.objects.create(
+                score_profile=self.profile,
+                proposal_name=f"p-{status_value}",
+                status=status_value,
+                score_profile_name_snapshot=self.profile.name,
+                score_profile_version_snapshot=self.profile.version,
+                source_filters_json={},
+                analysis_summary="summary",
+                issues_json=[],
+                improvement_hypotheses_json=[],
+                suggested_weights_json={"buy": {"x": 1.0}, "sell": {"y": 2.0}},
+                suggested_thresholds_json={"bias": {"a": 1.0}},
+                cautions_json=[],
+                raw_ai_response_json={},
+            )
+            url = f"/api/v1/proposals/{proposal.id}/apply/"
+            response = self.client.post(url, data={}, content_type="application/json")
+            self.assertEqual(response.status_code, 409)
+            proposal.refresh_from_db()
+            self.assertIsNone(proposal.applied_score_profile_id)
+
+    def test_apply_rejects_when_already_applied(self) -> None:
+        url = f"/api/v1/proposals/{self.accepted_proposal.id}/apply/"
+        response = self.client.post(url, data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+
+        response = self.client.post(url, data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 409)
+
+    def test_apply_rejects_empty_suggested_payload(self) -> None:
+        proposal = ScoreProfileProposal.objects.create(
+            score_profile=self.profile,
+            proposal_name="p-empty",
+            status=ScoreProfileProposal.STATUS_ACCEPTED,
+            score_profile_name_snapshot=self.profile.name,
+            score_profile_version_snapshot=self.profile.version,
+            source_filters_json={},
+            analysis_summary="summary",
+            issues_json=[],
+            improvement_hypotheses_json=[],
+            suggested_weights_json={},
+            suggested_thresholds_json={},
+            cautions_json=[],
+            raw_ai_response_json={},
+        )
+        url = f"/api/v1/proposals/{proposal.id}/apply/"
+        response = self.client.post(url, data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 409)
+        proposal.refresh_from_db()
+        self.assertIsNone(proposal.applied_score_profile_id)
+
+
 class ScoreCalculationCompatibilityTests(TestCase):
     """
     旧ハードコードロジックと ScoreProfile ベースのロジックの結果が一致することをテストする。

@@ -2,7 +2,7 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 
 from .models import (
     ScoreProfile,
@@ -34,6 +34,7 @@ from .services.profile_proposal_review import (
     update_review_fields,
     validate_status,
 )
+from .services.profile_apply import apply_proposal_to_new_profile
 
 
 class WatchStockViewSet(viewsets.ModelViewSet):
@@ -584,6 +585,14 @@ class ProposalViewSet(viewsets.ViewSet):
             "suggested_thresholds_json": proposal.suggested_thresholds_json,
             "cautions": proposal.cautions_json,
             "raw_ai_response_json": proposal.raw_ai_response_json,
+            "review_note": proposal.review_note,
+            "applied_score_profile_id": proposal.applied_score_profile_id,
+            "applied_score_profile_name": (
+                proposal.applied_score_profile.name if proposal.applied_score_profile else None
+            ),
+            "applied_score_profile_version": (
+                proposal.applied_score_profile.version if proposal.applied_score_profile else None
+            ),
             "created_at": proposal.created_at.isoformat() if proposal.created_at else None,
             "updated_at": proposal.updated_at.isoformat() if proposal.updated_at else None,
         }
@@ -664,6 +673,38 @@ class ProposalViewSet(viewsets.ViewSet):
 
         proposal.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["post"], url_path="apply")
+    def apply(self, request, pk=None):
+        """
+        accepted 済み proposal から新しい ScoreProfile を生成する。
+        エンドポイント: POST /api/v1/proposals/<id>/apply/
+        """
+        try:
+            proposal = ScoreProfileProposal.objects.get(pk=pk)
+        except ScoreProfileProposal.DoesNotExist:
+            return Response(
+                {"detail": "ScoreProfileProposal not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            profile = apply_proposal_to_new_profile(proposal)
+        except ValidationError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+
+        data = {
+            "id": profile.id,
+            "name": profile.name,
+            "version": profile.version,
+            "is_active": profile.is_active,
+            "description": profile.description,
+            "weights_json": profile.weights_json,
+            "thresholds_json": profile.thresholds_json,
+            "created_at": profile.created_at.isoformat() if profile.created_at else None,
+            "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
+        }
+        return Response(data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"], url_path="ai-review")
     def ai_review(self, request, pk=None):

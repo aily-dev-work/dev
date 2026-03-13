@@ -173,6 +173,7 @@ d:\dev\
       analysis_package.py      # AI 分析入力パッケージ構築
       ai_profile_review.py     # ScoreProfile の AI レビュー（提案のみ、OpenAI 連携）
       profile_proposal.py      # AI レビュー結果を ScoreProfileProposal として保存
+      profile_apply.py         # accepted proposal から新しい ScoreProfile を生成
     PHASE1.md         # フェーズ1まとめ
     PHASE2.md         # フェーズ2まとめ
     PHASE3.md         # フェーズ3まとめ
@@ -187,6 +188,7 @@ d:\dev\
     PHASE12.md        # フェーズ12まとめ（ScoreProfile AI レビュー API）
     PHASE13.md        # フェーズ13まとめ（AI 提案の保存 API）
     PHASE14.md        # フェーズ14まとめ（proposal レビュー管理 API）
+    PHASE15.md        # フェーズ15まとめ（accepted proposal から ScoreProfile 生成）
     migrations/
       0001_initial.py
       0002_stockpricedaily.py

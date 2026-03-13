@@ -335,6 +335,15 @@ class ScoreProfileProposal(models.Model):
         help_text="人間によるレビューコメントやメモ",
     )
 
+    applied_score_profile = models.ForeignKey(
+        "ScoreProfile",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="source_proposals",
+        help_text="この proposal から生成された ScoreProfile（なければ NULL）",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
