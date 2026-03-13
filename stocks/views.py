@@ -2,6 +2,8 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from django.core.exceptions import ImproperlyConfigured
+
 from .models import ScoreProfile, SignalOutcome, StockPriceDaily, TradingSignal, WatchStock
 from .serializers import StockPriceDailySerializer, WatchStockSerializer
 from .services.signal_dataset import build_signal_queryset, signals_to_dataset
@@ -391,7 +393,10 @@ class ScoreProfileViewSet(viewsets.ViewSet):
         analysis-package をもとに AI による改善提案を取得する。
         """
         user_note = request.data.get("user_note")
-        profile = ScoreProfile.objects.get(pk=pk)
+        try:
+            profile = ScoreProfile.objects.get(pk=pk)
+        except ScoreProfile.DoesNotExist:
+            return Response({"detail": "ScoreProfile not found."}, status=status.HTTP_404_NOT_FOUND)
 
         try:
             result = build_ai_review_for_profile(profile, request.query_params, user_note=user_note)

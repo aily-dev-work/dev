@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Any, Dict, Mapping, Optional
 
 from django.core.exceptions import ImproperlyConfigured
@@ -11,6 +12,12 @@ from .analysis_package import (
     build_analysis_package_for_profile,
 )
 from .scoring_profile import get_active_score_profile
+
+try:
+    # 新しい OpenAI Python クライアント (>=1.x) を想定
+    from openai import OpenAI  # type: ignore[import]
+except ImportError:  # pragma: no cover - 実環境でのみ評価
+    OpenAI = None  # type: ignore[assignment]
 
 
 EXPECTED_KEYS = {
@@ -29,23 +36,83 @@ def _call_openai_with_package(
     user_note: Optional[str] = None,
 ) -> str:
     """
-    OpenAI などの外部 AI API を呼び出すためのフック。
+    OpenAI などの外部 AI API を呼び出すための実装。
 
-    実運用ではここで OpenAI クライアントを初期化し、
-    analysis_package と user_note をプロンプトに含めて JSON 文字列を返す。
-
-    このリポジトリではテスト時に monkeypatch されることを前提とし、
-    デフォルト実装は設定不足エラーを送出する。
+    必要な環境変数:
+    - OPENAI_API_KEY: API キー（必須）
+    - OPENAI_MODEL: 利用するモデル名（例: "gpt-4.1-mini"。未指定時は "gpt-4.1-mini"）
+    - OPENAI_BASE_URL: オプション。自前プロキシなどを利用する場合。
     """
-    raise ImproperlyConfigured(
-        "AI client is not configured. Please implement _call_openai_with_package "
-        "with a real OpenAI (or other) client before using this feature in production."
+    api_key = os.getenv("OPENAI_API_KEY")
+    model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+    base_url = os.getenv("OPENAI_BASE_URL")
+
+    if OpenAI is None:
+        raise ImproperlyConfigured(
+            "openai Python client is not installed. "
+            "Install the 'openai' package and configure OPENAI_API_KEY."
+        )
+
+    if not api_key:
+        raise ImproperlyConfigured(
+            "OPENAI_API_KEY is not set. "
+            "Set OPENAI_API_KEY (and optionally OPENAI_MODEL / OPENAI_BASE_URL) in the environment."
+        )
+
+    client_kwargs: Dict[str, Any] = {"api_key": api_key}
+    if base_url:
+        client_kwargs["base_url"] = base_url
+
+    client = OpenAI(**client_kwargs)  # type: ignore[call-arg]
+
+    system_prompt = (
+        "You are an expert quantitative trader and ML engineer. "
+        "You receive a JSON package containing a trading signal profile configuration, "
+        "its historical performance summary, and recent signal-level data. "
+        "Your task is to review the current ScoreProfile, identify issues and hypotheses, "
+        "and propose improved weights_json and thresholds_json.\n\n"
+        "You MUST respond with a single JSON object ONLY, without any surrounding text. "
+        "The JSON MUST contain the keys:\n"
+        "  - target_profile (object)\n"
+        "  - analysis_summary (string)\n"
+        "  - issues (array)\n"
+        "  - improvement_hypotheses (array)\n"
+        "  - suggested_weights_json (object)\n"
+        "  - suggested_thresholds_json (object)\n"
+        "  - cautions (array)\n"
+        "Do not include Markdown or natural language outside of JSON."
     )
+
+    user_payload: Dict[str, Any] = {
+        "analysis_package": analysis_package,
+    }
+    if user_note:
+        user_payload["user_note"] = user_note
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {
+            "role": "user",
+            "content": json.dumps(user_payload, ensure_ascii=False),
+        },
+    ]
+
+    completion = client.chat.completions.create(  # type: ignore[attr-defined]
+        model=model,
+        messages=messages,
+        response_format={"type": "json_object"},
+    )
+
+    content = completion.choices[0].message.content  # type: ignore[assignment]
+    if not content:
+        raise ValueError("AI response content is empty.")
+
+    return content
 
 
 def _parse_ai_response(raw_text: str) -> Dict[str, Any]:
     """
-    AI からの応答文字列を JSON として解析し、期待キーの存在を検証する。
+    AI からの応答文字列を JSON として解析し、期待キーと型を検証する。
     """
     try:
         data = json.loads(raw_text)
@@ -58,6 +125,22 @@ def _parse_ai_response(raw_text: str) -> Dict[str, Any]:
     missing = EXPECTED_KEYS - data.keys()
     if missing:
         raise ValueError(f"AI response is missing expected keys: {sorted(missing)}")
+
+    # 型検証
+    if not isinstance(data["target_profile"], dict):
+        raise ValueError("AI response field 'target_profile' must be an object.")
+    if not isinstance(data["analysis_summary"], str):
+        raise ValueError("AI response field 'analysis_summary' must be a string.")
+    if not isinstance(data["issues"], list):
+        raise ValueError("AI response field 'issues' must be a list.")
+    if not isinstance(data["improvement_hypotheses"], list):
+        raise ValueError("AI response field 'improvement_hypotheses' must be a list.")
+    if not isinstance(data["suggested_weights_json"], dict):
+        raise ValueError("AI response field 'suggested_weights_json' must be an object.")
+    if not isinstance(data["suggested_thresholds_json"], dict):
+        raise ValueError("AI response field 'suggested_thresholds_json' must be an object.")
+    if not isinstance(data["cautions"], list):
+        raise ValueError("AI response field 'cautions' must be a list.")
 
     return data
 

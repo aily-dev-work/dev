@@ -9,7 +9,6 @@ from .models import ScoreProfile, SignalOutcome, TradingSignal, WatchStock
 from .services.ai_profile_review import (
     build_ai_review_for_active_profile,
     build_ai_review_for_profile,
-    _call_openai_with_package,
 )
 from .services.analysis_package import (
     build_analysis_package_for_active_profile,
@@ -1076,6 +1075,56 @@ class AIProfileReviewTests(TestCase):
         finally:
             ai_profile_review._call_openai_with_package = original
 
+    def test_ai_review_missing_keys_raises(self) -> None:
+        from .services import ai_profile_review
+
+        def bad_call(package, user_note=None):
+            # 必須キーの一部を欠落させる
+            return json.dumps(
+                {
+                    "target_profile": package["target_profile"],
+                    "analysis_summary": "summary",
+                    # "issues" 欠落
+                    "improvement_hypotheses": [],
+                    "suggested_weights_json": package["config"]["weights_json"],
+                    "suggested_thresholds_json": package["config"]["thresholds_json"],
+                    "cautions": [],
+                }
+            )
+
+        original = ai_profile_review._call_openai_with_package
+        ai_profile_review._call_openai_with_package = bad_call
+        try:
+            with self.assertRaises(ValueError):
+                build_ai_review_for_profile(self.profile, {"ticker": "AIR"}, user_note=None)
+        finally:
+            ai_profile_review._call_openai_with_package = original
+
+    def test_ai_review_type_mismatch_raises(self) -> None:
+        from .services import ai_profile_review
+
+        def bad_call(package, user_note=None):
+            # issues を文字列にして型不正を起こす
+            return json.dumps(
+                {
+                    "target_profile": package["target_profile"],
+                    "analysis_summary": "summary",
+                    "issues": "not-a-list",
+                    "improvement_hypotheses": [],
+                    "suggested_weights_json": package["config"]["weights_json"],
+                    "suggested_thresholds_json": package["config"]["thresholds_json"],
+                    "cautions": [],
+                }
+            )
+
+        original = ai_profile_review._call_openai_with_package
+        ai_profile_review._call_openai_with_package = bad_call
+        try:
+            with self.assertRaises(ValueError):
+                build_ai_review_for_profile(self.profile, {"ticker": "AIR"}, user_note=None)
+        finally:
+            ai_profile_review._call_openai_with_package = original
+
     def test_ai_review_for_active_profile_uses_active_profile(self) -> None:
         from .services import ai_profile_review
 
@@ -1104,3 +1153,46 @@ class AIProfileReviewTests(TestCase):
 
         self.assertEqual(called_ids[0], self.profile.id)
         self.assertEqual(result["target_profile"]["id"], self.profile.id)
+
+
+class AIProfileReviewViewTests(TestCase):
+    """
+    フェーズ12.1: ai-review ビューの HTTP レベル挙動テスト。
+    """
+
+    def setUp(self) -> None:
+        ScoreProfile.objects.all().delete()
+        self.profile = ScoreProfile.objects.create(
+            name="ViewProfile",
+            version="v1",
+            is_active=True,
+            description="for view tests",
+            weights_json={},
+            thresholds_json={},
+        )
+
+    def test_ai_review_current_returns_503_when_not_configured(self) -> None:
+        # _call_openai_with_package をデフォルトのままにしておくと ImproperlyConfigured → 503 になるはず
+        response = self.client.post("/api/v1/score-profiles/current/ai-review/", data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 503)
+
+    def test_ai_review_id_not_found_returns_404(self) -> None:
+        response = self.client.post("/api/v1/score-profiles/999999/ai-review/", data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 404)
+
+    def test_ai_review_view_returns_502_on_bad_json(self) -> None:
+        # _call_openai_with_package を不正 JSON を返すように差し替え
+        from .services import ai_profile_review
+
+        def bad_call(package, user_note=None):
+            return "not-json"
+
+        original = ai_profile_review._call_openai_with_package
+        ai_profile_review._call_openai_with_package = bad_call
+        try:
+            url = f"/api/v1/score-profiles/{self.profile.id}/ai-review/"
+            response = self.client.post(url, data={}, content_type="application/json")
+        finally:
+            ai_profile_review._call_openai_with_package = original
+
+        self.assertEqual(response.status_code, 502)

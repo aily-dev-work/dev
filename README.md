@@ -171,7 +171,7 @@ d:\dev\
       signal_dataset.py        # TradingSignal + SignalOutcome のフラットデータ
       signal_summary.py        # ScoreProfile / signal_type 別 summary 集計
       analysis_package.py      # AI 分析入力パッケージ構築
-      ai_profile_review.py     # ScoreProfile の AI レビュー（提案のみ）
+      ai_profile_review.py     # ScoreProfile の AI レビュー（提案のみ、OpenAI 連携）
     PHASE1.md         # フェーズ1まとめ
     PHASE2.md         # フェーズ2まとめ
     PHASE3.md         # フェーズ3まとめ
