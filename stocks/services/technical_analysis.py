@@ -100,16 +100,14 @@ def calculate_technical_summary(stock: WatchStock) -> TechnicalSummary:
 
     moving_averages = MovingAverages(ma5=ma5, ma25=ma25, ma75=ma75)
 
-    # 直近20営業日の高値・安値
-    closes_20 = closes[:20] if len(closes) >= 1 else closes
-    if len(closes) >= 1:
-        high_20 = max(closes_20) if len(closes) >= 1 else None
-        low_20 = min(closes_20) if len(closes) >= 1 else None
-    else:
-        high_20 = None
-        low_20 = None
+    # 直近20営業日の高値・安値（OHLC の high/low ベース）
+    high_prices_20 = [p.high_price for p in prices[:20]]
+    low_prices_20 = [p.low_price for p in prices[:20]]
 
-    high_low = HighLow(high_20=high_20 if len(closes) >= 1 else None, low_20=low_20 if len(closes) >= 1 else None)
+    high_20 = max(high_prices_20) if high_prices_20 else None
+    low_20 = min(low_prices_20) if low_prices_20 else None
+
+    high_low = HighLow(high_20=high_20, low_20=low_20)
 
     # 出来高平均
     volumes = [p.volume for p in prices]
