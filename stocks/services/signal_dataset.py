@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional
 
 from django.db.models import Q
@@ -47,7 +46,11 @@ def build_signal_queryset(params) -> Iterable[TradingSignal]:
     if score_strength:
         qs = qs.filter(score_strength=score_strength)
     if eval_status:
-        qs = qs.filter(outcome__eval_status=eval_status)
+        if eval_status == "pending":
+            # pending の場合は outcome 未作成も含める
+            qs = qs.filter(Q(outcome__eval_status="pending") | Q(outcome__isnull=True))
+        else:
+            qs = qs.filter(outcome__eval_status=eval_status)
 
     if date_from:
         qs = qs.filter(signal_date__gte=date_from)
@@ -72,6 +75,11 @@ def signals_to_dataset(signals: Iterable[TradingSignal]) -> List[Dict[str, Any]]
         except SignalOutcome.DoesNotExist:  # type: ignore[attr-defined]
             o = None
 
+        if o is None:
+            eval_status = "pending"
+        else:
+            eval_status = o.eval_status
+
         row: Dict[str, Any] = {
             "signal_id": s.id,
             "stock_id": s.stock.id,
@@ -95,7 +103,7 @@ def signals_to_dataset(signals: Iterable[TradingSignal]) -> List[Dict[str, Any]]
             "trend_long": s.trend_long,
             "volume_trend": s.volume_trend,
             "base_price": _str_or_none(o.base_price) if o else None,
-            "eval_status": o.eval_status if o else None,
+            "eval_status": eval_status,
             "date_5d": _iso_or_none(o.date_5d) if o else None,
             "close_5d": _str_or_none(o.close_5d) if o else None,
             "return_5d": _str_or_none(o.return_5d) if o else None,
