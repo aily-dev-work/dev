@@ -1,9 +1,14 @@
 from datetime import date
+from decimal import Decimal
 
+from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 
-from .models import SignalOutcome, TradingSignal, WatchStock
+from .models import ScoreProfile, SignalOutcome, TradingSignal, WatchStock
 from .services.signal_dataset import build_signal_queryset, signals_to_dataset
+from .services.scoring_profile import get_active_score_profile, get_active_scoring_config
+from .services.signal_scoring import score_from_technical, ScoreResult
+from .services.technical_analysis import AverageVolume, HighLow, MovingAverages, TechnicalSignals, TechnicalSummary
 
 
 class SignalDatasetServiceTests(TestCase):
@@ -144,3 +149,304 @@ class SignalDatasetServiceTests(TestCase):
         self.assertNotIn(self.signal_no_outcome.id, ids_completed)
         self.assertNotIn(self.signal_pending.id, ids_completed)
         self.assertNotIn(self.signal_partial.id, ids_completed)
+
+
+class ScoreProfileServiceTests(TestCase):
+    def test_get_active_score_profile_raises_when_none(self) -> None:
+        ScoreProfile.objects.all().delete()
+        with self.assertRaises(ImproperlyConfigured):
+            get_active_score_profile()
+
+    def test_get_active_score_profile_raises_when_multiple(self) -> None:
+        ScoreProfile.objects.create(
+            name="p1",
+            version="v1",
+            is_active=True,
+            description="",
+            weights_json={},
+            thresholds_json={},
+        )
+        ScoreProfile.objects.create(
+            name="p2",
+            version="v2",
+            is_active=True,
+            description="",
+            weights_json={},
+            thresholds_json={},
+        )
+
+        with self.assertRaises(ImproperlyConfigured):
+            get_active_score_profile()
+
+    def test_get_active_score_profile_success(self) -> None:
+        ScoreProfile.objects.all().delete()
+        profile = ScoreProfile.objects.create(
+            name="default",
+            version="v1",
+            is_active=True,
+            description="",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+
+        got = get_active_score_profile()
+        self.assertEqual(got.id, profile.id)
+
+
+class ScoreCalculationCompatibilityTests(TestCase):
+    """
+    旧ハードコードロジックと ScoreProfile ベースのロジックの結果が一致することをテストする。
+    """
+
+    def setUp(self) -> None:
+        ScoreProfile.objects.all().delete()
+        # 初期プロファイル（migration と同じ内容）
+        weights = {
+            "buy": {
+                "trend_long_up": 20.0,
+                "trend_mid_up": 15.0,
+                "trend_short_up": 10.0,
+                "volume_high": 10.0,
+                "above_ma25": 10.0,
+                "above_ma75": 10.0,
+                "near_high_20": 10.0,
+                "near_low_20": 10.0,
+            },
+            "sell": {
+                "trend_long_down": 20.0,
+                "trend_mid_down": 15.0,
+                "trend_short_down": 10.0,
+                "volume_low": 10.0,
+                "below_ma25": 10.0,
+                "below_ma75": 10.0,
+                "near_low_20": 10.0,
+                "near_high_20": 10.0,
+            },
+        }
+        thresholds = {
+            "bias": {
+                "neutral_abs_diff_lt": 10.0,
+            },
+            "strength": {
+                "weak_abs_diff_lt": 15.0,
+                "normal_abs_diff_lt": 30.0,
+            },
+        }
+        ScoreProfile.objects.create(
+            name="Default scoring profile",
+            version="v1",
+            is_active=True,
+            description="",
+            weights_json=weights,
+            thresholds_json=thresholds,
+        )
+
+    def _old_logic_score(self, summary: TechnicalSummary) -> ScoreResult:
+        """
+        旧 signal_scoring.py のロジックをテスト内に再現し、期待値を計算する。
+        """
+        BUY_WEIGHTS = {
+            "trend_long_up": 20.0,
+            "trend_mid_up": 15.0,
+            "trend_short_up": 10.0,
+            "volume_high": 10.0,
+            "above_ma25": 10.0,
+            "above_ma75": 10.0,
+            "near_high_20": 10.0,
+            "near_low_20": 10.0,
+        }
+        SELL_WEIGHTS = {
+            "trend_long_down": 20.0,
+            "trend_mid_down": 15.0,
+            "trend_short_down": 10.0,
+            "volume_low": 10.0,
+            "below_ma25": 10.0,
+            "below_ma75": 10.0,
+            "near_low_20": 10.0,
+            "near_high_20": 10.0,
+        }
+
+        def clamp(score: float, min_value: float = 0.0, max_value: float = 100.0) -> float:
+            return max(min(score, max_value), min_value)
+
+        breakdown_buy: dict[str, float] = {}
+        breakdown_sell: dict[str, float] = {}
+        insufficient_reasons: list[str] = []
+
+        signals = summary.signals
+        ma = summary.moving_averages
+        hl = summary.high_low
+        latest_close: Optional[Decimal] = summary.latest_close
+
+        # トレンド系
+        if signals.trend_long == "up":
+            breakdown_buy["trend_long_up"] = BUY_WEIGHTS["trend_long_up"]
+        else:
+            breakdown_buy["trend_long_up"] = 0.0
+        if signals.trend_long == "down":
+            breakdown_sell["trend_long_down"] = SELL_WEIGHTS["trend_long_down"]
+        else:
+            breakdown_sell["trend_long_down"] = 0.0
+
+        if signals.trend_mid == "up":
+            breakdown_buy["trend_mid_up"] = BUY_WEIGHTS["trend_mid_up"]
+        else:
+            breakdown_buy["trend_mid_up"] = 0.0
+        if signals.trend_mid == "down":
+            breakdown_sell["trend_mid_down"] = SELL_WEIGHTS["trend_mid_down"]
+        else:
+            breakdown_sell["trend_mid_down"] = 0.0
+
+        if signals.trend_short == "up":
+            breakdown_buy["trend_short_up"] = BUY_WEIGHTS["trend_short_up"]
+        else:
+            breakdown_buy["trend_short_up"] = 0.0
+        if signals.trend_short == "down":
+            breakdown_sell["trend_short_down"] = SELL_WEIGHTS["trend_short_down"]
+        else:
+            breakdown_sell["trend_short_down"] = 0.0
+
+        # 出来高
+        if signals.volume_trend == "high":
+            breakdown_buy["volume_high"] = BUY_WEIGHTS["volume_high"]
+        else:
+            breakdown_buy["volume_high"] = 0.0
+
+        if signals.volume_trend == "low":
+            breakdown_sell["volume_low"] = SELL_WEIGHTS["volume_low"]
+        else:
+            breakdown_sell["volume_low"] = 0.0
+
+        if signals.volume_trend is None:
+            insufficient_reasons.append("volume_trend_missing")
+
+        # ma25
+        if latest_close is not None and ma.ma25 is not None:
+            if latest_close > ma.ma25:
+                breakdown_buy["above_ma25"] = BUY_WEIGHTS["above_ma25"]
+                breakdown_sell["below_ma25"] = 0.0
+            elif latest_close < ma.ma25:
+                breakdown_sell["below_ma25"] = SELL_WEIGHTS["below_ma25"]
+                breakdown_buy["above_ma25"] = 0.0
+            else:
+                breakdown_buy["above_ma25"] = 0.0
+                breakdown_sell["below_ma25"] = 0.0
+        else:
+            breakdown_buy["above_ma25"] = 0.0
+            breakdown_sell["below_ma25"] = 0.0
+            insufficient_reasons.append("ma25_or_latest_missing")
+
+        # ma75
+        if latest_close is not None and ma.ma75 is not None:
+            if latest_close > ma.ma75:
+                breakdown_buy["above_ma75"] = BUY_WEIGHTS["above_ma75"]
+                breakdown_sell["below_ma75"] = 0.0
+            elif latest_close < ma.ma75:
+                breakdown_sell["below_ma75"] = SELL_WEIGHTS["below_ma75"]
+                breakdown_buy["above_ma75"] = 0.0
+            else:
+                breakdown_buy["above_ma75"] = 0.0
+                breakdown_sell["below_ma75"] = 0.0
+        else:
+            breakdown_buy["above_ma75"] = 0.0
+            breakdown_sell["below_ma75"] = 0.0
+            insufficient_reasons.append("ma75_or_latest_missing")
+
+        # high_20 / low_20
+        if latest_close is not None and hl.high_20 is not None and hl.low_20 is not None:
+            price_range = hl.high_20 - hl.low_20
+            if price_range > 0:
+                pos = float((latest_close - hl.low_20) / price_range)
+                if pos >= 0.8:
+                    breakdown_sell["near_high_20"] = SELL_WEIGHTS["near_high_20"]
+                else:
+                    breakdown_sell["near_high_20"] = 0.0
+                if pos <= 0.2:
+                    breakdown_buy["near_low_20"] = BUY_WEIGHTS["near_low_20"]
+                else:
+                    breakdown_buy["near_low_20"] = 0.0
+            else:
+                breakdown_buy["near_low_20"] = 0.0
+                breakdown_sell["near_high_20"] = 0.0
+                insufficient_reasons.append("high_low_range_zero")
+        else:
+            breakdown_buy["near_low_20"] = 0.0
+            breakdown_sell["near_high_20"] = 0.0
+            insufficient_reasons.append("high_20_or_low_20_or_latest_missing")
+
+        raw_buy = sum(breakdown_buy.values())
+        raw_sell = sum(breakdown_sell.values())
+
+        buy_score = clamp(raw_buy)
+        sell_score = clamp(raw_sell)
+
+        diff = buy_score - sell_score
+        abs_diff = abs(diff)
+
+        if abs_diff < 10:
+            bias = "neutral"
+        elif diff >= 10:
+            bias = "buy"
+        else:
+            bias = "sell"
+
+        if abs_diff < 15:
+            strength = "weak"
+        elif abs_diff < 30:
+            strength = "normal"
+        else:
+            strength = "strong"
+
+        insufficient_data = len(insufficient_reasons) > 0
+        reason_text = ", ".join(sorted(set(insufficient_reasons))) if insufficient_reasons else None
+
+        return ScoreResult(
+            buy_score=buy_score,
+            sell_score=sell_score,
+            breakdown_buy=breakdown_buy,
+            breakdown_sell=breakdown_sell,
+            insufficient_data=insufficient_data,
+            insufficient_reason=reason_text,
+            bias=bias,
+            strength=strength,
+        )
+
+    def test_score_from_technical_compatible_with_old_logic(self) -> None:
+        """
+        代表的な1ケースで、新ロジックと旧ロジックの結果が完全一致することを確認する。
+        """
+        stock = WatchStock.objects.create(ticker="COMP", name="Compat", market="JP")
+        summary = TechnicalSummary(
+            stock=stock,
+            latest_date="2026-03-13",
+            latest_close=Decimal("2520.0000"),
+            moving_averages=MovingAverages(
+                ma5=Decimal("2500.0000"),
+                ma25=Decimal("2480.0000"),
+                ma75=Decimal("2400.0000"),
+            ),
+            high_low=HighLow(
+                high_20=Decimal("2550.0000"),
+                low_20=Decimal("2400.0000"),
+            ),
+            average_volume=AverageVolume(
+                avg_volume_5=1000000.0,
+                avg_volume_20=800000.0,
+            ),
+            signals=TechnicalSignals(
+                trend_short="up",
+                trend_mid="up",
+                trend_long="up",
+                volume_trend="normal",
+            ),
+        )
+
+        expected = self._old_logic_score(summary)
+        actual = score_from_technical(summary)
+
+        self.assertEqual(expected.buy_score, actual.buy_score)
+        self.assertEqual(expected.sell_score, actual.sell_score)
+        self.assertEqual(expected.bias, actual.bias)
+        self.assertEqual(expected.strength, actual.strength)
+        self.assertEqual(expected.breakdown_buy, actual.breakdown_buy)
+        self.assertEqual(expected.breakdown_sell, actual.breakdown_sell)

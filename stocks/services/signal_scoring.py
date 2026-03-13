@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
+from .scoring_profile import get_active_scoring_config
 from .technical_analysis import TechnicalSummary
 
 
@@ -23,35 +24,17 @@ def _clamp(score: float, min_value: float = 0.0, max_value: float = 100.0) -> fl
     return max(min(score, max_value), min_value)
 
 
-# 初版の重み定義（後で調整しやすいようにまとめておく）
-BUY_WEIGHTS: Dict[str, float] = {
-    "trend_long_up": 20.0,
-    "trend_mid_up": 15.0,
-    "trend_short_up": 10.0,
-    "volume_high": 10.0,
-    "above_ma25": 10.0,
-    "above_ma75": 10.0,
-    "near_high_20": 10.0,
-    "near_low_20": 10.0,
-}
-
-SELL_WEIGHTS: Dict[str, float] = {
-    "trend_long_down": 20.0,
-    "trend_mid_down": 15.0,
-    "trend_short_down": 10.0,
-    "volume_low": 10.0,
-    "below_ma25": 10.0,
-    "below_ma75": 10.0,
-    "near_low_20": 10.0,
-    "near_high_20": 10.0,
-}
-
-
 def score_from_technical(summary: TechnicalSummary) -> ScoreResult:
     """
-    フェーズ3の TechnicalSummary から買い/売りスコアを計算する。
-    データ不足の場合でも 0〜100 の範囲でスコアを返しつつ、insufficient_data フラグを立てる。
+    TechnicalSummary から買い/売りスコアを計算する。
+    重み・閾値は ScoreProfile（DB）のアクティブ設定から取得する。
     """
+    config = get_active_scoring_config()
+    buy_weights = config.buy_weights
+    sell_weights = config.sell_weights
+    bias_thresholds = config.bias_thresholds
+    strength_thresholds = config.strength_thresholds
+
     breakdown_buy: Dict[str, float] = {}
     breakdown_sell: Dict[str, float] = {}
     insufficient_reasons = []
@@ -64,42 +47,42 @@ def score_from_technical(summary: TechnicalSummary) -> ScoreResult:
     # ---------- トレンド系 ----------
     # long
     if signals.trend_long == "up":
-        breakdown_buy["trend_long_up"] = BUY_WEIGHTS["trend_long_up"]
+        breakdown_buy["trend_long_up"] = buy_weights.get("trend_long_up", 0.0)
     else:
         breakdown_buy["trend_long_up"] = 0.0
     if signals.trend_long == "down":
-        breakdown_sell["trend_long_down"] = SELL_WEIGHTS["trend_long_down"]
+        breakdown_sell["trend_long_down"] = sell_weights.get("trend_long_down", 0.0)
     else:
         breakdown_sell["trend_long_down"] = 0.0
 
     # mid
     if signals.trend_mid == "up":
-        breakdown_buy["trend_mid_up"] = BUY_WEIGHTS["trend_mid_up"]
+        breakdown_buy["trend_mid_up"] = buy_weights.get("trend_mid_up", 0.0)
     else:
         breakdown_buy["trend_mid_up"] = 0.0
     if signals.trend_mid == "down":
-        breakdown_sell["trend_mid_down"] = SELL_WEIGHTS["trend_mid_down"]
+        breakdown_sell["trend_mid_down"] = sell_weights.get("trend_mid_down", 0.0)
     else:
         breakdown_sell["trend_mid_down"] = 0.0
 
     # short
     if signals.trend_short == "up":
-        breakdown_buy["trend_short_up"] = BUY_WEIGHTS["trend_short_up"]
+        breakdown_buy["trend_short_up"] = buy_weights.get("trend_short_up", 0.0)
     else:
         breakdown_buy["trend_short_up"] = 0.0
     if signals.trend_short == "down":
-        breakdown_sell["trend_short_down"] = SELL_WEIGHTS["trend_short_down"]
+        breakdown_sell["trend_short_down"] = sell_weights.get("trend_short_down", 0.0)
     else:
         breakdown_sell["trend_short_down"] = 0.0
 
     # ---------- 出来高 ----------
     if signals.volume_trend == "high":
-        breakdown_buy["volume_high"] = BUY_WEIGHTS["volume_high"]
+        breakdown_buy["volume_high"] = buy_weights.get("volume_high", 0.0)
     else:
         breakdown_buy["volume_high"] = 0.0
 
     if signals.volume_trend == "low":
-        breakdown_sell["volume_low"] = SELL_WEIGHTS["volume_low"]
+        breakdown_sell["volume_low"] = sell_weights.get("volume_low", 0.0)
     else:
         breakdown_sell["volume_low"] = 0.0
 
@@ -110,10 +93,10 @@ def score_from_technical(summary: TechnicalSummary) -> ScoreResult:
     # ma25
     if latest_close is not None and ma.ma25 is not None:
         if latest_close > ma.ma25:
-            breakdown_buy["above_ma25"] = BUY_WEIGHTS["above_ma25"]
+            breakdown_buy["above_ma25"] = buy_weights.get("above_ma25", 0.0)
             breakdown_sell["below_ma25"] = 0.0
         elif latest_close < ma.ma25:
-            breakdown_sell["below_ma25"] = SELL_WEIGHTS["below_ma25"]
+            breakdown_sell["below_ma25"] = sell_weights.get("below_ma25", 0.0)
             breakdown_buy["above_ma25"] = 0.0
         else:
             breakdown_buy["above_ma25"] = 0.0
@@ -126,10 +109,10 @@ def score_from_technical(summary: TechnicalSummary) -> ScoreResult:
     # ma75
     if latest_close is not None and ma.ma75 is not None:
         if latest_close > ma.ma75:
-            breakdown_buy["above_ma75"] = BUY_WEIGHTS["above_ma75"]
+            breakdown_buy["above_ma75"] = buy_weights.get("above_ma75", 0.0)
             breakdown_sell["below_ma75"] = 0.0
         elif latest_close < ma.ma75:
-            breakdown_sell["below_ma75"] = SELL_WEIGHTS["below_ma75"]
+            breakdown_sell["below_ma75"] = sell_weights.get("below_ma75", 0.0)
             breakdown_buy["above_ma75"] = 0.0
         else:
             breakdown_buy["above_ma75"] = 0.0
@@ -149,12 +132,12 @@ def score_from_technical(summary: TechnicalSummary) -> ScoreResult:
             pos = float((latest_close - hl.low_20) / price_range)
             # high_20 の 80%以上の位置 → 「高値圏に近い」とみなす → 売り加点
             if pos >= 0.8:
-                breakdown_sell["near_high_20"] = SELL_WEIGHTS["near_high_20"]
+                breakdown_sell["near_high_20"] = sell_weights.get("near_high_20", 0.0)
             else:
                 breakdown_sell["near_high_20"] = 0.0
             # low_20 の 20%未満の位置 → 「安値圏に近い」とみなす → 買い加点
             if pos <= 0.2:
-                breakdown_buy["near_low_20"] = BUY_WEIGHTS["near_low_20"]
+                breakdown_buy["near_low_20"] = buy_weights.get("near_low_20", 0.0)
             else:
                 breakdown_buy["near_low_20"] = 0.0
         else:
@@ -177,16 +160,20 @@ def score_from_technical(summary: TechnicalSummary) -> ScoreResult:
     diff = buy_score - sell_score
     abs_diff = abs(diff)
 
-    if abs_diff < 10:
+    neutral_abs_diff_lt = float(bias_thresholds.get("neutral_abs_diff_lt", 10.0))
+    if abs_diff < neutral_abs_diff_lt:
         bias = "neutral"
-    elif diff >= 10:
+    elif diff >= neutral_abs_diff_lt:
         bias = "buy"
     else:
         bias = "sell"
 
-    if abs_diff < 15:
+    weak_abs_diff_lt = float(strength_thresholds.get("weak_abs_diff_lt", 15.0))
+    normal_abs_diff_lt = float(strength_thresholds.get("normal_abs_diff_lt", 30.0))
+
+    if abs_diff < weak_abs_diff_lt:
         strength = "weak"
-    elif abs_diff < 30:
+    elif abs_diff < normal_abs_diff_lt:
         strength = "normal"
     else:
         strength = "strong"

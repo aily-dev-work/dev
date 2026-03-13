@@ -198,3 +198,41 @@ class SignalOutcome(models.Model):
 
     def __str__(self) -> str:
         return f"Outcome for signal {self.signal_id}"
+
+
+class ScoreProfile(models.Model):
+    """
+    買いスコア / 売りスコアの重み・閾値定義を保持するプロファイル。
+    初期状態ではフェーズ4のハードコードと同じ設定を 1件だけ持つ。
+    将来的に AI などから提案された設定を追加・切り替え可能にする。
+    """
+
+    name = models.CharField(max_length=100)
+    version = models.CharField(
+        max_length=32,
+        help_text="バージョン識別子（例: 'v1', '2026-03-13-01' など）",
+    )
+    is_active = models.BooleanField(
+        default=False,
+        help_text="現在のスコア計算に利用する有効プロファイルかどうか",
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="このプロファイルの用途やメモ（任意）",
+    )
+    weights_json = models.JSONField(
+        help_text="買い/売りスコアの重み定義（例: {'buy': {...}, 'sell': {...}}）",
+    )
+    thresholds_json = models.JSONField(
+        help_text="バイアス・強度などの閾値定義",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-is_active", "-updated_at"]
+        verbose_name = "スコア設定プロファイル"
+        verbose_name_plural = "スコア設定プロファイル"
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.version})"

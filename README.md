@@ -156,17 +156,18 @@ d:\dev\
     urls.py
     wsgi.py
     asgi.py
-  stocks/             # 株価監視アプリ（フェーズ1〜7）
-    models.py         # WatchStock, StockPriceDaily, TradingSignal, SignalOutcome
+  stocks/             # 株価監視アプリ（フェーズ1〜8）
+    models.py         # WatchStock, StockPriceDaily, TradingSignal, SignalOutcome, ScoreProfile
     admin.py          # Admin for all models
     views.py          # ViewSets（stocks, stock-prices, signals）
     serializers.py    # WatchStockSerializer, StockPriceDailySerializer
     urls.py           # /api/v1/stocks/, /api/v1/stock-prices/, /api/v1/signals/
     services/
-      technical_analysis.py  # テクニカル指標計算ロジック
-      signal_scoring.py      # 買い/売りスコア計算ロジック
-      signal_generation.py   # TradingSignal 生成
-      signal_evaluation.py   # SignalOutcome 評価
+      technical_analysis.py   # テクニカル指標計算ロジック
+      signal_scoring.py       # 買い/売りスコア計算ロジック（ScoreProfile を参照）
+      signal_generation.py    # TradingSignal 生成
+      signal_evaluation.py    # SignalOutcome 評価
+      scoring_profile.py      # ScoreProfile からスコア設定を取得
     PHASE1.md         # フェーズ1まとめ
     PHASE2.md         # フェーズ2まとめ
     PHASE3.md         # フェーズ3まとめ
@@ -174,12 +175,14 @@ d:\dev\
     PHASE5.md         # フェーズ5まとめ
     PHASE6.md         # フェーズ6まとめ
     PHASE7.md         # フェーズ7まとめ（シグナル + 結果のフラットデータセット）
+    PHASE8.md         # フェーズ8まとめ（スコア設定の外部化）
     migrations/
       0001_initial.py
       0002_stockpricedaily.py
       0003_tradingsignal.py
       0004_tradingsignal_technical_position.py
       0005_signaloutcome.py
+      0006_scoreprofile.py
   db.sqlite3          # 開発用 DB（作成後）
 ```
 

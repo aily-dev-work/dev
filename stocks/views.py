@@ -2,9 +2,10 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import SignalOutcome, StockPriceDaily, TradingSignal, WatchStock
+from .models import ScoreProfile, SignalOutcome, StockPriceDaily, TradingSignal, WatchStock
 from .serializers import StockPriceDailySerializer, WatchStockSerializer
 from .services.signal_dataset import build_signal_queryset, signals_to_dataset
+from .services.scoring_profile import get_active_score_profile
 from .services.signal_evaluation import evaluate_signal
 from .services.signal_generation import generate_trading_signal
 from .services.signal_scoring import score_from_technical
@@ -291,4 +292,29 @@ class SignalViewSet(viewsets.ViewSet):
         qs = build_signal_queryset(request.query_params)
         rows = signals_to_dataset(qs)
         return Response(rows, status=status.HTTP_200_OK)
+
+
+class ScoreProfileViewSet(viewsets.ViewSet):
+    """
+    スコア設定プロファイルを扱う ViewSet（現時点では read-only）。
+    """
+
+    @action(detail=False, methods=["get"], url_path="current")
+    def current(self, request):
+        """
+        現在アクティブな ScoreProfile を返す。
+        """
+        profile = get_active_score_profile()
+        data = {
+            "id": profile.id,
+            "name": profile.name,
+            "version": profile.version,
+            "is_active": profile.is_active,
+            "description": profile.description,
+            "weights_json": profile.weights_json,
+            "thresholds_json": profile.thresholds_json,
+            "created_at": profile.created_at.isoformat() if profile.created_at else None,
+            "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
+        }
+        return Response(data, status=status.HTTP_200_OK)
 
