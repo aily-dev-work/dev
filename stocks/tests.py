@@ -1482,6 +1482,22 @@ class ScoreProfileActivationHistoryAPITests(TestCase):
         # 少なくともフィルタ自体は 200 / 空配列のどちらかで正常に動作することを確認
         self.assertIsInstance(body, list)
 
+    def test_activation_history_list_invalid_activated_from_returns_400(self) -> None:
+        response = self.client.get(
+            "/api/v1/score-profiles/activation-history/",
+            data={"activated_from": "2026-99-99"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Invalid activated_from format", response.json()["detail"])
+
+    def test_activation_history_list_invalid_activated_to_returns_400(self) -> None:
+        response = self.client.get(
+            "/api/v1/score-profiles/activation-history/",
+            data={"activated_to": "not-a-date"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Invalid activated_to format", response.json()["detail"])
+
     def test_activation_history_list_returns_empty_for_nonexistent_profile_filter(self) -> None:
         response = self.client.get(
             "/api/v1/score-profiles/activation-history/",
@@ -1504,6 +1520,10 @@ class ScoreProfileActivationHistoryAPITests(TestCase):
                 for row in body
             )
         )
+
+    def test_activation_history_profile_endpoint_not_found_returns_404(self) -> None:
+        response = self.client.get("/api/v1/score-profiles/999999/activation-history/")
+        self.assertEqual(response.status_code, 404)
 
 
 class AnalysisPackageTests(TestCase):

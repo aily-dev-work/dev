@@ -4,6 +4,7 @@ from rest_framework.response import Response
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import models
+from datetime import date
 
 from .models import (
     ScoreProfile,
@@ -428,20 +429,22 @@ class ScoreProfileViewSet(viewsets.ViewSet):
 
         if activated_from:
             try:
-                qs = qs.filter(activated_at__date__gte=activated_from)
+                activated_from_date = date.fromisoformat(activated_from)
             except ValueError:
                 return Response(
                     {"detail": "Invalid activated_from format. Use YYYY-MM-DD."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            qs = qs.filter(activated_at__date__gte=activated_from_date)
         if activated_to:
             try:
-                qs = qs.filter(activated_at__date__lte=activated_to)
+                activated_to_date = date.fromisoformat(activated_to)
             except ValueError:
                 return Response(
                     {"detail": "Invalid activated_to format. Use YYYY-MM-DD."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            qs = qs.filter(activated_at__date__lte=activated_to_date)
 
         qs = qs.order_by("-activated_at", "-id")
 

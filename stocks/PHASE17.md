@@ -159,6 +159,8 @@ def activate_score_profile(
 ### 4.4 profile ごとの履歴: `GET /api/v1/score-profiles/<id>/activation-history/`
 
 - 実装: `ScoreProfileViewSet.activation_history_for_profile`
+- 存在しない `<id>` の場合:
+  - **404 Not Found**（`{"detail": "ScoreProfile not found."}`）
 - 対象 profile が:
   - `activated_profile` として登場した履歴
   - `previous_profile` として登場した履歴
