@@ -156,18 +156,21 @@ d:\dev\
     urls.py
     wsgi.py
     asgi.py
-  stocks/             # 株価監視アプリ（フェーズ1〜9）
+  stocks/             # 株価監視アプリ（フェーズ1〜11）
     models.py         # WatchStock, StockPriceDaily, TradingSignal, SignalOutcome, ScoreProfile
     admin.py          # Admin for all models
     views.py          # ViewSets（stocks, stock-prices, signals）
     serializers.py    # WatchStockSerializer, StockPriceDailySerializer
     urls.py           # /api/v1/stocks/, /api/v1/stock-prices/, /api/v1/signals/
     services/
-      technical_analysis.py   # テクニカル指標計算ロジック
-      signal_scoring.py       # 買い/売りスコア計算ロジック（ScoreProfile を参照）
-      signal_generation.py    # TradingSignal 生成
-      signal_evaluation.py    # SignalOutcome 評価
-      scoring_profile.py      # ScoreProfile からスコア設定を取得
+      technical_analysis.py    # テクニカル指標計算ロジック
+      signal_scoring.py        # 買い/売りスコア計算ロジック（ScoreProfile を参照）
+      signal_generation.py     # TradingSignal 生成
+      signal_evaluation.py     # SignalOutcome 評価
+      scoring_profile.py       # ScoreProfile からスコア設定を取得
+      signal_dataset.py        # TradingSignal + SignalOutcome のフラットデータ
+      signal_summary.py        # ScoreProfile / signal_type 別 summary 集計
+      analysis_package.py      # AI 分析入力パッケージ構築
     PHASE1.md         # フェーズ1まとめ
     PHASE2.md         # フェーズ2まとめ
     PHASE3.md         # フェーズ3まとめ
@@ -178,6 +181,7 @@ d:\dev\
     PHASE8.md         # フェーズ8まとめ（スコア設定の外部化）
     PHASE9.md         # フェーズ9まとめ（TradingSignal と ScoreProfile のひも付け）
     PHASE10.md        # フェーズ10まとめ（ScoreProfile 別シグナル集計 API）
+    PHASE11.md        # フェーズ11まとめ（AI 分析入力パッケージ API）
     migrations/
       0001_initial.py
       0002_stockpricedaily.py

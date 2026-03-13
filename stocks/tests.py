@@ -5,6 +5,10 @@ from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 
 from .models import ScoreProfile, SignalOutcome, TradingSignal, WatchStock
+from .services.analysis_package import (
+    build_analysis_package_for_active_profile,
+    build_analysis_package_for_profile,
+)
 from .services.signal_dataset import build_signal_queryset, signals_to_dataset
 from .services.scoring_profile import get_active_score_profile, get_active_scoring_config
 from .services.signal_generation import generate_trading_signal
@@ -827,3 +831,142 @@ class SignalSummaryTests(TestCase):
         qs = build_summary_queryset(params)
         rows = summarize_signals(qs)
         self.assertTrue(all(r["signal_type"] == "sell" for r in rows))
+
+
+class AnalysisPackageTests(TestCase):
+    """
+    フェーズ11: analysis-package 用 service のテスト。
+    """
+
+    def setUp(self) -> None:
+        ScoreProfile.objects.all().delete()
+        self.profile = ScoreProfile.objects.create(
+            name="AnalysisProfile",
+            version="v1",
+            is_active=True,
+            description="for analysis package tests",
+            weights_json={"buy": {"trend_long_up": 10.0}, "sell": {}},
+            thresholds_json={"bias": {"neutral_abs_diff_lt": 10.0}, "strength": {}},
+        )
+
+        self.stock = WatchStock.objects.create(ticker="ANL", name="AnalysisStock", market="JP")
+
+        # 3件のシグナル（うち2件だけを analysis package 対象に含めるため、フィルタで絞り込む）
+        self.sig1 = TradingSignal.objects.create(
+            stock=self.stock,
+            signal_date=date(2026, 3, 10),
+            signal_type="buy",
+            buy_score=10,
+            sell_score=5,
+            score_bias="buy",
+            score_strength="weak",
+            signal_price="100.0000",
+            latest_close="100.0000",
+            ma25="100.0000",
+            ma75="100.0000",
+            high_20="110.0000",
+            low_20="90.0000",
+            score_profile=self.profile,
+            score_profile_name=self.profile.name,
+            score_profile_version=self.profile.version,
+        )
+        SignalOutcome.objects.create(
+            signal=self.sig1,
+            base_price="100.0000",
+            return_5d=Decimal("0.10"),
+            success_5d=True,
+        )
+
+        self.sig2 = TradingSignal.objects.create(
+            stock=self.stock,
+            signal_date=date(2026, 3, 11),
+            signal_type="buy",
+            buy_score=20,
+            sell_score=5,
+            score_bias="buy",
+            score_strength="weak",
+            signal_price="110.0000",
+            latest_close="110.0000",
+            ma25="105.0000",
+            ma75="100.0000",
+            high_20="120.0000",
+            low_20="100.0000",
+            score_profile=self.profile,
+            score_profile_name=self.profile.name,
+            score_profile_version=self.profile.version,
+        )
+        SignalOutcome.objects.create(
+            signal=self.sig2,
+            base_price="110.0000",
+            return_5d=Decimal("0.00"),
+            success_5d=False,
+        )
+
+        # 別 ticker（フィルタで除外されることを確認）
+        other_stock = WatchStock.objects.create(ticker="OTHER", name="Other", market="JP")
+        self.sig_other = TradingSignal.objects.create(
+            stock=other_stock,
+            signal_date=date(2026, 3, 12),
+            signal_type="buy",
+            buy_score=30,
+            sell_score=5,
+            score_bias="buy",
+            score_strength="weak",
+            signal_price="200.0000",
+            latest_close="200.0000",
+            score_profile=self.profile,
+            score_profile_name=self.profile.name,
+            score_profile_version=self.profile.version,
+        )
+
+    def test_build_analysis_package_for_profile_basic_structure(self) -> None:
+        params = {"ticker": "ANL", "limit": "10"}
+        package = build_analysis_package_for_profile(self.profile, params)
+
+        # target_profile
+        tp = package["target_profile"]
+        self.assertEqual(tp["id"], self.profile.id)
+        self.assertEqual(tp["name"], self.profile.name)
+        self.assertEqual(tp["version"], self.profile.version)
+        self.assertTrue("is_active" in tp)
+
+        # config
+        cfg = package["config"]
+        self.assertEqual(cfg["weights_json"], self.profile.weights_json)
+        self.assertEqual(cfg["thresholds_json"], self.profile.thresholds_json)
+
+        # filters
+        flt = package["filters"]
+        self.assertEqual(flt["ticker"], "ANL")
+        self.assertEqual(flt["limit"], 10)
+
+        # dataset_rows: ticker=ANL の2件のみ
+        rows = package["dataset_rows"]
+        self.assertEqual(len(rows), 2)
+        self.assertTrue(all(r["ticker"] == "ANL" for r in rows))
+
+        # summary も同じフィルタ条件で profile/name/version 単位に集計されている
+        summary = package["summary"]
+        self.assertTrue(len(summary) >= 1)
+        self.assertTrue(
+            all(
+                r["score_profile_name"] == self.profile.name
+                and r["score_profile_version"] == self.profile.version
+                for r in summary
+            )
+        )
+
+        # notes が固定文として入っている
+        self.assertIn("This package is intended as input for AI-based analysis", package["notes"])
+
+    def test_limit_is_applied(self) -> None:
+        params = {"ticker": "ANL", "limit": "1"}
+        package = build_analysis_package_for_profile(self.profile, params)
+        rows = package["dataset_rows"]
+        self.assertEqual(len(rows), 1)
+
+    def test_active_profile_helper_uses_active_profile(self) -> None:
+        params = {"ticker": "ANL"}
+        package = build_analysis_package_for_active_profile(params)
+        tp = package["target_profile"]
+        self.assertEqual(tp["id"], self.profile.id)

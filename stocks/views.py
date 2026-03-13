@@ -5,6 +5,10 @@ from rest_framework.response import Response
 from .models import ScoreProfile, SignalOutcome, StockPriceDaily, TradingSignal, WatchStock
 from .serializers import StockPriceDailySerializer, WatchStockSerializer
 from .services.signal_dataset import build_signal_queryset, signals_to_dataset
+from .services.analysis_package import (
+    build_analysis_package_for_active_profile,
+    build_analysis_package_for_profile,
+)
 from .services.signal_summary import build_summary_queryset, summarize_signals
 from .services.scoring_profile import get_active_score_profile
 from .services.signal_evaluation import evaluate_signal
@@ -338,4 +342,23 @@ class ScoreProfileViewSet(viewsets.ViewSet):
             "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
         }
         return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="current/analysis-package")
+    def current_analysis_package(self, request):
+        """
+        現在アクティブな ScoreProfile を対象に、
+        AI 分析向けの入力パッケージ（summary + dataset）を返す。
+        """
+        package = build_analysis_package_for_active_profile(request.query_params)
+        return Response(package, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["get"], url_path="analysis-package")
+    def analysis_package(self, request, pk=None):
+        """
+        指定 ScoreProfile (id) を対象に、
+        AI 分析向けの入力パッケージ（summary + dataset）を返す。
+        """
+        profile = ScoreProfile.objects.get(pk=pk)
+        package = build_analysis_package_for_profile(profile, request.query_params)
+        return Response(package, status=status.HTTP_200_OK)
 
