@@ -4,6 +4,7 @@ from rest_framework.response import Response
 
 from .models import SignalOutcome, StockPriceDaily, TradingSignal, WatchStock
 from .serializers import StockPriceDailySerializer, WatchStockSerializer
+from .services.signal_dataset import build_signal_queryset, signals_to_dataset
 from .services.signal_evaluation import evaluate_signal
 from .services.signal_generation import generate_trading_signal
 from .services.signal_scoring import score_from_technical
@@ -190,7 +191,7 @@ class StockPriceDailyViewSet(viewsets.ModelViewSet):
 
 class SignalViewSet(viewsets.ViewSet):
     """
-    TradingSignal 単位の評価 / 結果取得用 ViewSet。
+    TradingSignal 単位の評価 / 結果取得 / データセット取得用 ViewSet。
     """
 
     def _get_signal(self, pk: str) -> TradingSignal:
@@ -280,4 +281,14 @@ class SignalViewSet(viewsets.ViewSet):
             },
         }
         return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="dataset")
+    def dataset(self, request):
+        """
+        TradingSignal + SignalOutcome を結合したフラットな一覧を返す。
+        AI 入力や検証用の 1シグナル=1行データセット。
+        """
+        qs = build_signal_queryset(request.query_params)
+        rows = signals_to_dataset(qs)
+        return Response(rows, status=status.HTTP_200_OK)
 

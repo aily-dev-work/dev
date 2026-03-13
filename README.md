@@ -156,7 +156,7 @@ d:\dev\
     urls.py
     wsgi.py
     asgi.py
-  stocks/             # 株価監視アプリ（フェーズ1〜6）
+  stocks/             # 株価監視アプリ（フェーズ1〜7）
     models.py         # WatchStock, StockPriceDaily, TradingSignal, SignalOutcome
     admin.py          # Admin for all models
     views.py          # ViewSets（stocks, stock-prices, signals）
@@ -173,6 +173,7 @@ d:\dev\
     PHASE4.md         # フェーズ4まとめ
     PHASE5.md         # フェーズ5まとめ
     PHASE6.md         # フェーズ6まとめ
+    PHASE7.md         # フェーズ7まとめ（シグナル + 結果のフラットデータセット）
     migrations/
       0001_initial.py
       0002_stockpricedaily.py
