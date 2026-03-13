@@ -153,9 +153,8 @@ POST /api/v1/score-profiles/<id>/ai-review-and-save/
 GET /api/v1/score-profiles/<id>/proposals/
 ```
 
-- 実装: `ProposalViewSet.list`
-  - `router.register("proposals", ProposalViewSet, basename="proposal")` により、ルーティングは `DefaultRouter` ベース。
-  - `/score-profiles/<id>/proposals/` は nested というより、「ScoreProfileViewSet と proposals 一覧を両方 `/api/v1` 配下に置く」という構成。
+- 実装: `ScoreProfileViewSet.proposals`
+  - `router.register("score-profiles", ScoreProfileViewSet, ...)` に対する `@action(detail=True, url_path="proposals")` として実装。
 - 挙動:
   - 指定 `ScoreProfile` に紐づく `ScoreProfileProposal` を新しい順で一覧返却。
 - 出力例:

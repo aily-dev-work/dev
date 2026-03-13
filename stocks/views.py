@@ -492,19 +492,14 @@ class ScoreProfileViewSet(viewsets.ViewSet):
         }
         return Response(data, status=status.HTTP_201_CREATED)
 
-
-class ProposalViewSet(viewsets.ViewSet):
-    """
-    ScoreProfileProposal の一覧・詳細取得用 ViewSet（read-only）。
-    """
-
-    def list(self, request, score_profile_pk=None):
+    @action(detail=True, methods=["get"], url_path="proposals")
+    def proposals(self, request, pk=None):
         """
-        指定 ScoreProfile に紐づく提案一覧を返す。
-        Route 側で /score-profiles/<id>/proposals/ にマッピングされる想定。
+        指定 ScoreProfile に紐づく ScoreProfileProposal 一覧を返す。
+        エンドポイント: /api/v1/score-profiles/<id>/proposals/
         """
         try:
-            profile = ScoreProfile.objects.get(pk=score_profile_pk)
+            profile = ScoreProfile.objects.get(pk=pk)
         except ScoreProfile.DoesNotExist:
             return Response(
                 {"detail": "ScoreProfile not found."},
@@ -512,6 +507,36 @@ class ProposalViewSet(viewsets.ViewSet):
             )
 
         proposals = profile.proposals.order_by("-created_at")
+        results = []
+        for p in proposals:
+            results.append(
+                {
+                    "id": p.id,
+                    "score_profile_id": p.score_profile_id,
+                    "proposal_name": p.proposal_name,
+                    "status": p.status,
+                    "score_profile_name_snapshot": p.score_profile_name_snapshot,
+                    "score_profile_version_snapshot": p.score_profile_version_snapshot,
+                    "created_at": p.created_at.isoformat() if p.created_at else None,
+                }
+            )
+        return Response(results, status=status.HTTP_200_OK)
+
+
+class ProposalViewSet(viewsets.ViewSet):
+    """
+    ScoreProfileProposal の一覧・詳細取得用 ViewSet（read-only）。
+    """
+
+    def list(self, request):
+        """
+        ScoreProfileProposal の簡易一覧を返す。
+        既存ルーティング `/api/v1/proposals/` を壊さないために保持しているが、
+        プロファイル単位の一覧には `/api/v1/score-profiles/<id>/proposals/` を推奨する。
+        """
+        proposals = ScoreProfileProposal.objects.select_related("score_profile").order_by(
+            "-created_at"
+        )
         results = []
         for p in proposals:
             results.append(

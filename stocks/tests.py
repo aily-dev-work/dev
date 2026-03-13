@@ -248,6 +248,156 @@ class ScoreProfileProposalTests(TestCase):
         self.assertIn("target_profile", proposal.raw_ai_response_json)
 
 
+class ScoreProfileProposalAPITests(TestCase):
+    def setUp(self) -> None:
+        ScoreProfile.objects.all().delete()
+        self.profile = ScoreProfile.objects.create(
+            name="APIProfile",
+            version="v1",
+            is_active=True,
+            description="for proposal api tests",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+
+    def _install_fake_ai(self, *, as_json: bool = True) -> None:
+        from .services import ai_profile_review
+
+        def good_call(package, user_note=None):
+            payload = {
+                "target_profile": {"id": self.profile.id},
+                "analysis_summary": "summary",
+                "issues": ["i1"],
+                "improvement_hypotheses": ["h1"],
+                "suggested_weights_json": {"buy": {}, "sell": {}},
+                "suggested_thresholds_json": {},
+                "cautions": ["c1"],
+            }
+            return json.dumps(payload)
+
+        def bad_call(package, user_note=None):
+            return "not-json"
+
+        self._ai_module = ai_profile_review
+        self._original_call = ai_profile_review._call_openai_with_package
+        ai_profile_review._call_openai_with_package = good_call if as_json else bad_call
+
+    def tearDown(self) -> None:
+        # monkeypatch を戻す（セットされていない場合は何もしない）
+        mod = getattr(self, "_ai_module", None)
+        original = getattr(self, "_original_call", None)
+        if mod is not None and original is not None:
+            mod._call_openai_with_package = original
+
+    def test_current_ai_review_and_save_creates_draft_proposal(self) -> None:
+        self._install_fake_ai(as_json=True)
+        before = ScoreProfileProposal.objects.count()
+
+        response = self.client.post(
+            "/api/v1/score-profiles/current/ai-review-and-save/",
+            data={},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(ScoreProfileProposal.objects.count(), before + 1)
+        proposal = ScoreProfileProposal.objects.latest("id")
+        self.assertEqual(proposal.score_profile_id, self.profile.id)
+        self.assertEqual(proposal.status, ScoreProfileProposal.STATUS_DRAFT)
+
+    def test_score_profile_proposals_list_returns_only_target_profile(self) -> None:
+        other_profile = ScoreProfile.objects.create(
+            name="Other",
+            version="v1",
+            is_active=False,
+            description="",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        p1 = ScoreProfileProposal.objects.create(
+            score_profile=self.profile,
+            proposal_name="p1",
+            status=ScoreProfileProposal.STATUS_DRAFT,
+            score_profile_name_snapshot=self.profile.name,
+            score_profile_version_snapshot=self.profile.version,
+            source_filters_json={},
+            analysis_summary="",
+            issues_json=[],
+            improvement_hypotheses_json=[],
+            suggested_weights_json={},
+            suggested_thresholds_json={},
+            cautions_json=[],
+            raw_ai_response_json={},
+        )
+        ScoreProfileProposal.objects.create(
+            score_profile=other_profile,
+            proposal_name="p2",
+            status=ScoreProfileProposal.STATUS_DRAFT,
+            score_profile_name_snapshot=other_profile.name,
+            score_profile_version_snapshot=other_profile.version,
+            source_filters_json={},
+            analysis_summary="",
+            issues_json=[],
+            improvement_hypotheses_json=[],
+            suggested_weights_json={},
+            suggested_thresholds_json={},
+            cautions_json=[],
+            raw_ai_response_json={},
+        )
+
+        url = f"/api/v1/score-profiles/{self.profile.id}/proposals/"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        ids = [row["id"] for row in response.json()]
+        self.assertIn(p1.id, ids)
+        self.assertEqual(len(ids), 1)
+
+    def test_proposal_detail_returns_data(self) -> None:
+        proposal = ScoreProfileProposal.objects.create(
+            score_profile=self.profile,
+            proposal_name="p-detail",
+            status=ScoreProfileProposal.STATUS_DRAFT,
+            score_profile_name_snapshot=self.profile.name,
+            score_profile_version_snapshot=self.profile.version,
+            source_filters_json={"ticker": "TEST"},
+            analysis_summary="summary",
+            issues_json=["i1"],
+            improvement_hypotheses_json=["h1"],
+            suggested_weights_json={"buy": {}, "sell": {}},
+            suggested_thresholds_json={},
+            cautions_json=["c1"],
+            raw_ai_response_json={},
+        )
+
+        url = f"/api/v1/proposals/{proposal.id}/"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["id"], proposal.id)
+        self.assertEqual(body["score_profile_id"], self.profile.id)
+        self.assertEqual(body["source_filters"]["ticker"], "TEST")
+
+    def test_ai_review_and_save_profile_not_found_does_not_create_proposal(self) -> None:
+        before = ScoreProfileProposal.objects.count()
+        url = "/api/v1/score-profiles/999999/ai-review-and-save/"
+        response = self.client.post(url, data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(ScoreProfileProposal.objects.count(), before)
+
+    def test_ai_review_and_save_does_not_save_on_ai_error(self) -> None:
+        self._install_fake_ai(as_json=False)
+        before = ScoreProfileProposal.objects.count()
+
+        response = self.client.post(
+            "/api/v1/score-profiles/current/ai-review-and-save/",
+            data={},
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(ScoreProfileProposal.objects.count(), before)
+
+
 class ScoreCalculationCompatibilityTests(TestCase):
     """
     旧ハードコードロジックと ScoreProfile ベースのロジックの結果が一致することをテストする。
