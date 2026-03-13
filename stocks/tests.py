@@ -398,6 +398,121 @@ class ScoreProfileProposalAPITests(TestCase):
         self.assertEqual(ScoreProfileProposal.objects.count(), before)
 
 
+class ScoreProfileProposalReviewAPITests(TestCase):
+    def setUp(self) -> None:
+        self.profile = ScoreProfile.objects.create(
+            name="ReviewProfile",
+            version="v1",
+            is_active=True,
+            description="for review api tests",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        self.proposal = ScoreProfileProposal.objects.create(
+            score_profile=self.profile,
+            proposal_name="p-review",
+            status=ScoreProfileProposal.STATUS_DRAFT,
+            score_profile_name_snapshot=self.profile.name,
+            score_profile_version_snapshot=self.profile.version,
+            source_filters_json={},
+            analysis_summary="summary",
+            issues_json=[],
+            improvement_hypotheses_json=[],
+            suggested_weights_json={"buy": {}, "sell": {}},
+            suggested_thresholds_json={},
+            cautions_json=[],
+            raw_ai_response_json={},
+        )
+
+    def test_review_updates_status(self) -> None:
+        url = f"/api/v1/proposals/{self.proposal.id}/review/"
+        body = {"status": ScoreProfileProposal.STATUS_REVIEWED}
+        response = self.client.patch(url, data=json.dumps(body), content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        self.proposal.refresh_from_db()
+        self.assertEqual(self.proposal.status, ScoreProfileProposal.STATUS_REVIEWED)
+
+    def test_review_updates_review_note(self) -> None:
+        url = f"/api/v1/proposals/{self.proposal.id}/review/"
+        body = {"review_note": "Looks good"}
+        response = self.client.patch(url, data=json.dumps(body), content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        self.proposal.refresh_from_db()
+        self.assertEqual(self.proposal.review_note, "Looks good")
+
+    def test_review_updates_status_and_review_note(self) -> None:
+        url = f"/api/v1/proposals/{self.proposal.id}/review/"
+        body = {
+            "status": ScoreProfileProposal.STATUS_REVIEWED,
+            "review_note": "Reviewed and ready",
+        }
+        response = self.client.patch(url, data=json.dumps(body), content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        self.proposal.refresh_from_db()
+        self.assertEqual(self.proposal.status, ScoreProfileProposal.STATUS_REVIEWED)
+        self.assertEqual(self.proposal.review_note, "Reviewed and ready")
+
+    def test_review_rejects_invalid_status(self) -> None:
+        url = f"/api/v1/proposals/{self.proposal.id}/review/"
+        body = {"status": "unknown"}
+        response = self.client.patch(url, data=json.dumps(body), content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+        self.proposal.refresh_from_db()
+        self.assertEqual(self.proposal.status, ScoreProfileProposal.STATUS_DRAFT)
+
+    def test_review_rejects_unsupported_fields(self) -> None:
+        url = f"/api/v1/proposals/{self.proposal.id}/review/"
+        body = {"status": ScoreProfileProposal.STATUS_REVIEWED, "analysis_summary": "hack"}
+        response = self.client.patch(url, data=json.dumps(body), content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+        self.proposal.refresh_from_db()
+        self.assertEqual(self.proposal.status, ScoreProfileProposal.STATUS_DRAFT)
+
+    def test_delete_draft_proposal(self) -> None:
+        url = f"/api/v1/proposals/{self.proposal.id}/"
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(ScoreProfileProposal.objects.filter(id=self.proposal.id).exists())
+
+    def test_delete_rejected_proposal(self) -> None:
+        self.proposal.status = ScoreProfileProposal.STATUS_REJECTED
+        self.proposal.save(update_fields=["status"])
+
+        url = f"/api/v1/proposals/{self.proposal.id}/"
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(ScoreProfileProposal.objects.filter(id=self.proposal.id).exists())
+
+    def test_delete_reviewed_proposal_forbidden(self) -> None:
+        self.proposal.status = ScoreProfileProposal.STATUS_REVIEWED
+        self.proposal.save(update_fields=["status"])
+
+        url = f"/api/v1/proposals/{self.proposal.id}/"
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, 409)
+        self.assertTrue(ScoreProfileProposal.objects.filter(id=self.proposal.id).exists())
+
+    def test_delete_accepted_proposal_forbidden(self) -> None:
+        self.proposal.status = ScoreProfileProposal.STATUS_ACCEPTED
+        self.proposal.save(update_fields=["status"])
+
+        url = f"/api/v1/proposals/{self.proposal.id}/"
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, 409)
+        self.assertTrue(ScoreProfileProposal.objects.filter(id=self.proposal.id).exists())
+
+    def test_review_not_found_returns_404(self) -> None:
+        url = "/api/v1/proposals/999999/review/"
+        body = {"status": ScoreProfileProposal.STATUS_REVIEWED}
+        response = self.client.patch(url, data=json.dumps(body), content_type="application/json")
+        self.assertEqual(response.status_code, 404)
+
+    def test_delete_not_found_returns_404(self) -> None:
+        url = "/api/v1/proposals/999999/"
+        response = self.client.delete(url)
+        self.assertEqual(response.status_code, 404)
+
+
 class ScoreCalculationCompatibilityTests(TestCase):
     """
     旧ハードコードロジックと ScoreProfile ベースのロジックの結果が一致することをテストする。

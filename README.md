@@ -186,6 +186,7 @@ d:\dev\
     PHASE11.md        # フェーズ11まとめ（AI 分析入力パッケージ API）
     PHASE12.md        # フェーズ12まとめ（ScoreProfile AI レビュー API）
     PHASE13.md        # フェーズ13まとめ（AI 提案の保存 API）
+    PHASE14.md        # フェーズ14まとめ（proposal レビュー管理 API）
     migrations/
       0001_initial.py
       0002_stockpricedaily.py

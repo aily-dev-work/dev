@@ -29,6 +29,11 @@ from .services.signal_generation import generate_trading_signal
 from .services.signal_scoring import score_from_technical
 from .services.technical_analysis import calculate_technical_summary
 from .services.profile_proposal import save_profile_proposal
+from .services.profile_proposal_review import (
+    can_delete,
+    update_review_fields,
+    validate_status,
+)
 
 
 class WatchStockViewSet(viewsets.ModelViewSet):
@@ -583,6 +588,82 @@ class ProposalViewSet(viewsets.ViewSet):
             "updated_at": proposal.updated_at.isoformat() if proposal.updated_at else None,
         }
         return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["patch"], url_path="review")
+    def review(self, request, pk=None):
+        """
+        proposal のレビュー情報（status, review_note）のみを更新する。
+        エンドポイント: PATCH /api/v1/proposals/<id>/review/
+        """
+        try:
+            proposal = ScoreProfileProposal.objects.get(pk=pk)
+        except ScoreProfileProposal.DoesNotExist:
+            return Response(
+                {"detail": "ScoreProfileProposal not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        status_value = request.data.get("status")
+        review_note = request.data.get("review_note")
+
+        # 不正なフィールドが含まれていたら 400 にする方針
+        allowed_keys = {"status", "review_note"}
+        extra_keys = set(request.data.keys()) - allowed_keys
+        if extra_keys:
+            return Response(
+                {"detail": f"Unsupported fields for review: {sorted(extra_keys)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if status_value is None and review_note is None:
+            return Response(
+                {"detail": "At least one of 'status' or 'review_note' must be provided."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if status_value is not None:
+            try:
+                validate_status(status_value)
+            except Exception as exc:
+                return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        proposal = update_review_fields(
+            proposal,
+            status=status_value,
+            review_note=review_note,
+        )
+
+        data = {
+            "id": proposal.id,
+            "score_profile_id": proposal.score_profile_id,
+            "status": proposal.status,
+            "review_note": proposal.review_note,
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
+    def destroy(self, request, pk=None):
+        """
+        proposal の削除。
+        ルール:
+        - draft, rejected: 削除可
+        - reviewed, accepted: 削除不可（409 Conflict）
+        """
+        try:
+            proposal = ScoreProfileProposal.objects.get(pk=pk)
+        except ScoreProfileProposal.DoesNotExist:
+            return Response(
+                {"detail": "ScoreProfileProposal not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not can_delete(proposal):
+            return Response(
+                {"detail": f"Proposal with status '{proposal.status}' cannot be deleted."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        proposal.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["post"], url_path="ai-review")
     def ai_review(self, request, pk=None):

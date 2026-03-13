@@ -329,6 +329,12 @@ class ScoreProfileProposal(models.Model):
         help_text="AI から返却された生の JSON 応答（将来の解析用）",
     )
 
+    review_note = models.TextField(
+        blank=True,
+        default="",
+        help_text="人間によるレビューコメントやメモ",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
