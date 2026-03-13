@@ -56,7 +56,7 @@ def _decimal_or_none(values: Iterable[Decimal]) -> Optional[Decimal]:
 def _float_or_none(values: Iterable[Optional[int]]) -> Optional[float]:
     cleaned = [v for v in values if v is not None]
     if not cleaned:
-    return None
+        return None
     return float(sum(cleaned) / len(cleaned))
 
 

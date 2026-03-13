@@ -76,3 +76,74 @@ class StockPriceDaily(models.Model):
 
     def __str__(self) -> str:
         return f"{self.stock.ticker} {self.date} {self.close_price}"
+
+
+class TradingSignal(models.Model):
+    """
+    提案タイミングのスコアとテクニカル状態を保存するモデル。
+    バックテストやAI分析の土台として利用する。
+    """
+
+    stock = models.ForeignKey(
+        WatchStock,
+        on_delete=models.CASCADE,
+        related_name="signals",
+        help_text="対象となる監視銘柄",
+    )
+    signal_date = models.DateField(help_text="シグナル日付（通常 latest_date）")
+    signal_type = models.CharField(
+        max_length=16,
+        choices=(
+            ("buy", "buy"),
+            ("sell", "sell"),
+            ("neutral", "neutral"),
+        ),
+    )
+
+    buy_score = models.DecimalField(max_digits=5, decimal_places=2)
+    sell_score = models.DecimalField(max_digits=5, decimal_places=2)
+    score_bias = models.CharField(max_length=16)
+    score_strength = models.CharField(max_length=16)
+
+    signal_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        help_text="シグナル生成時の価格（通常 latest_close）",
+    )
+
+    latest_close = models.DecimalField(
+        max_digits=12, decimal_places=4, null=True, blank=True
+    )
+    ma25 = models.DecimalField(
+        max_digits=12, decimal_places=4, null=True, blank=True
+    )
+    ma75 = models.DecimalField(
+        max_digits=12, decimal_places=4, null=True, blank=True
+    )
+    high_20 = models.DecimalField(
+        max_digits=12, decimal_places=4, null=True, blank=True
+    )
+    low_20 = models.DecimalField(
+        max_digits=12, decimal_places=4, null=True, blank=True
+    )
+
+    trend_short = models.CharField(max_length=16, null=True, blank=True)
+    trend_mid = models.CharField(max_length=16, null=True, blank=True)
+    trend_long = models.CharField(max_length=16, null=True, blank=True)
+    volume_trend = models.CharField(max_length=16, null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-signal_date", "-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["stock", "signal_date"],
+                name="unique_stock_signal_per_day",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.stock.ticker} {self.signal_date} {self.signal_type}"

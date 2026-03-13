@@ -2,10 +2,11 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import StockPriceDaily, WatchStock
+from .models import StockPriceDaily, TradingSignal, WatchStock
 from .serializers import StockPriceDailySerializer, WatchStockSerializer
-from .services.technical_analysis import calculate_technical_summary
+from .services.signal_generation import generate_trading_signal
 from .services.signal_scoring import score_from_technical
+from .services.technical_analysis import calculate_technical_summary
 
 
 class WatchStockViewSet(viewsets.ModelViewSet):
@@ -98,6 +99,66 @@ class WatchStockViewSet(viewsets.ModelViewSet):
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="generate-signal")
+    def generate_signal(self, request, pk=None):
+        """
+        1銘柄分のテクニカルサマリとスコアから TradingSignal を生成・保存する。
+        """
+        stock = self.get_object()
+        summary = calculate_technical_summary(stock)
+        score_result = score_from_technical(summary)
+        signal = generate_trading_signal(stock, summary, score_result)
+
+        data = {
+            "id": signal.id,
+            "stock_id": stock.id,
+            "signal_date": signal.signal_date.isoformat(),
+            "signal_type": signal.signal_type,
+            "buy_score": float(signal.buy_score),
+            "sell_score": float(signal.sell_score),
+            "score_bias": signal.score_bias,
+            "score_strength": signal.score_strength,
+            "signal_price": str(signal.signal_price) if signal.signal_price is not None else None,
+            "latest_close": str(signal.latest_close) if signal.latest_close is not None else None,
+            "ma25": str(signal.ma25) if signal.ma25 is not None else None,
+            "ma75": str(signal.ma75) if signal.ma75 is not None else None,
+            "high_20": str(signal.high_20) if signal.high_20 is not None else None,
+            "low_20": str(signal.low_20) if signal.low_20 is not None else None,
+            "trend_short": signal.trend_short,
+            "trend_mid": signal.trend_mid,
+            "trend_long": signal.trend_long,
+            "volume_trend": signal.volume_trend,
+            "created_at": signal.created_at.isoformat(),
+        }
+
+        return Response(data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get"], url_path="signals")
+    def signals(self, request, pk=None):
+        """
+        指定銘柄の TradingSignal 履歴を返す。
+        """
+        stock = self.get_object()
+        qs = TradingSignal.objects.filter(stock=stock).order_by("-signal_date", "-created_at")
+
+        results = []
+        for s in qs:
+            results.append(
+                {
+                    "id": s.id,
+                    "signal_date": s.signal_date.isoformat(),
+                    "signal_type": s.signal_type,
+                    "buy_score": float(s.buy_score),
+                    "sell_score": float(s.sell_score),
+                    "score_bias": s.score_bias,
+                    "score_strength": s.score_strength,
+                    "signal_price": str(s.signal_price) if s.signal_price is not None else None,
+                    "created_at": s.created_at.isoformat(),
+                }
+            )
+
+        return Response(results, status=status.HTTP_200_OK)
 
 
 class StockPriceDailyViewSet(viewsets.ModelViewSet):
