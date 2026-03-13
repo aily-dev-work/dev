@@ -2246,6 +2246,10 @@ class ScoreProfileOpsSummaryAPITests(TestCase):
         self.assertEqual(counts["accepted_not_activated_count"], 1)
         self.assertIn("message_lines", body)
         self.assertTrue(body["message_lines"])
+        joined = " ".join(body["message_lines"])
+        self.assertIn(str(self.active_profile.id), joined)
+        self.assertIn(str(self.under_profile.id), joined)
+        self.assertIn(str(self.candidate_profile.id), joined)
 
     def test_ops_summary_underperforming_respects_min_evaluated_count(self) -> None:
         # same under_profile (5件) だが min_evaluated_count により判定結果が変わる

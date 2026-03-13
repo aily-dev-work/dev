@@ -46,7 +46,7 @@ def build_ops_summary(
 
     if current:
         message_lines.append(
-            f"Active profile: {current.get('name')} {current.get('version')}"
+            f"Active profile: {current.get('name')} {current.get('version')} (id={current.get('id')})"
         )
     else:
         message_lines.append("No active profile configured.")
@@ -58,6 +58,8 @@ def build_ops_summary(
         n = counts["stale_active_count"]
         suffix = "profile" if n == 1 else "profiles"
         message_lines.append(f"{n} stale active {suffix} found.")
+        ids = ", ".join(str(p.get("id")) for p in stale)
+        message_lines.append(f"Stale active profile ids: {ids}.")
 
     if counts["underperforming_count"] == 0:
         message_lines.append("No underperforming profiles.")
@@ -65,6 +67,8 @@ def build_ops_summary(
         n = counts["underperforming_count"]
         suffix = "profile" if n == 1 else "profiles"
         message_lines.append(f"{n} underperforming {suffix} found.")
+        ids = ", ".join(str(p.get("id")) for p in under)
+        message_lines.append(f"Underperforming profile ids: {ids}.")
 
     if counts["accepted_not_activated_count"] == 0:
         message_lines.append("No accepted but not activated proposal-derived profiles.")
@@ -74,6 +78,8 @@ def build_ops_summary(
         message_lines.append(
             f"{n} accepted but not activated proposal-derived {suffix} found."
         )
+        ids = ", ".join(str(p.get("id")) for p in accepted)
+        message_lines.append(f"Accepted but not activated profile ids: {ids}.")
 
     return {
         "generated_at": timezone.now().isoformat(),
