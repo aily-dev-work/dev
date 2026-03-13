@@ -1526,6 +1526,178 @@ class ScoreProfileActivationHistoryAPITests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class ScoreProfileRollbackAPITests(TestCase):
+    """
+    フェーズ18: ScoreProfile 手動ロールバック API のテスト。
+    """
+
+    def setUp(self) -> None:
+        ScoreProfile.objects.all().delete()
+        ScoreProfileActivationHistory.objects.all().delete()
+        self.profile_a = ScoreProfile.objects.create(
+            name="ProfileA",
+            version="v1",
+            is_active=True,
+            description="initial active",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        self.profile_b = ScoreProfile.objects.create(
+            name="ProfileB",
+            version="v2",
+            is_active=False,
+            description="candidate",
+            weights_json={"buy": {"x": 1.0}, "sell": {}},
+            thresholds_json={},
+        )
+        # A -> B に切り替え（履歴が1件できる）
+        self.client.post(
+            f"/api/v1/score-profiles/{self.profile_b.id}/activate/",
+            data={},
+            content_type="application/json",
+        )
+        self.profile_a.refresh_from_db()
+        self.profile_b.refresh_from_db()
+        self.assertTrue(self.profile_b.is_active)
+        self.assertFalse(self.profile_a.is_active)
+
+    def test_rollback_restores_previous_profile_as_active(self) -> None:
+        response = self.client.post(
+            "/api/v1/score-profiles/rollback/",
+            data=json.dumps({"note": "rollback test"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["id"], self.profile_a.id)
+        self.assertTrue(body["is_active"])
+
+        self.profile_a.refresh_from_db()
+        self.profile_b.refresh_from_db()
+        self.assertTrue(self.profile_a.is_active)
+        self.assertFalse(self.profile_b.is_active)
+        self.assertEqual(ScoreProfile.objects.filter(is_active=True).count(), 1)
+
+    def test_rollback_adds_activation_history_with_manual_rollback_reason(self) -> None:
+        before = ScoreProfileActivationHistory.objects.count()
+        response = self.client.post(
+            "/api/v1/score-profiles/rollback/",
+            data={},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ScoreProfileActivationHistory.objects.count(), before + 1)
+        history = ScoreProfileActivationHistory.objects.latest("id")
+        self.assertEqual(history.activation_reason, "manual_rollback")
+        self.assertEqual(history.previous_profile_id, self.profile_b.id)
+        self.assertEqual(history.activated_profile_id, self.profile_a.id)
+
+    def test_rollback_note_saved_in_history(self) -> None:
+        self.client.post(
+            "/api/v1/score-profiles/rollback/",
+            data=json.dumps({"note": "reverted due to issue"}),
+            content_type="application/json",
+        )
+        history = ScoreProfileActivationHistory.objects.filter(
+            activation_reason="manual_rollback",
+        ).latest("id")
+        self.assertEqual(history.note, "reverted due to issue")
+
+    def test_rollback_no_active_returns_409(self) -> None:
+        ScoreProfile.objects.all().update(is_active=False)
+        response = self.client.post(
+            "/api/v1/score-profiles/rollback/",
+            data={},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("detail", response.json())
+
+    def test_rollback_no_history_for_current_active_returns_409(self) -> None:
+        # 履歴を全削除し、B が active のままの状態にする（通常の activate では履歴が必ずあるが、DB 直接で再現）
+        ScoreProfileActivationHistory.objects.all().delete()
+        # このとき current active は B だが、B を activated_profile にした履歴が無い
+        response = self.client.post(
+            "/api/v1/score-profiles/rollback/",
+            data={},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+
+    def test_rollback_previous_profile_null_returns_409(self) -> None:
+        # current が A で、A を activated_profile にした履歴が previous_profile=null しか無い場合は戻せない
+        ScoreProfileActivationHistory.objects.all().delete()
+        self.profile_b.is_active = False
+        self.profile_b.save(update_fields=["is_active"])
+        self.profile_a.is_active = True
+        self.profile_a.save(update_fields=["is_active"])
+        # 初回 active 化を表す履歴を手動で1件作成（previous_profile=null, activated_profile=A）
+        ScoreProfileActivationHistory.objects.create(
+            previous_profile=None,
+            activated_profile=self.profile_a,
+            previous_profile_name_snapshot="",
+            previous_profile_version_snapshot="",
+            activated_profile_name_snapshot=self.profile_a.name,
+            activated_profile_version_snapshot=self.profile_a.version,
+            source_proposal_name_snapshot="",
+            activation_reason="manual_activate",
+            note="",
+        )
+        response = self.client.post(
+            "/api/v1/score-profiles/rollback/",
+            data={},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 409)
+
+    def test_rollback_after_multiple_switches_rolls_back_one_step(self) -> None:
+        # B -> A にロールバック済み。再度 A -> B にしてから B -> A にロールバックできる
+        self.client.post(
+            "/api/v1/score-profiles/rollback/",
+            data={},
+            content_type="application/json",
+        )
+        self.client.post(
+            f"/api/v1/score-profiles/{self.profile_b.id}/activate/",
+            data={},
+            content_type="application/json",
+        )
+        response = self.client.post(
+            "/api/v1/score-profiles/rollback/",
+            data={},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.profile_a.refresh_from_db()
+        self.profile_b.refresh_from_db()
+        self.assertTrue(self.profile_a.is_active)
+        self.assertFalse(self.profile_b.is_active)
+
+    def test_rollback_then_current_returns_rolled_back_profile(self) -> None:
+        self.client.post(
+            "/api/v1/score-profiles/rollback/",
+            data={},
+            content_type="application/json",
+        )
+        response = self.client.get("/api/v1/score-profiles/current/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["id"], self.profile_a.id)
+
+    def test_rollback_then_activation_history_shows_manual_rollback(self) -> None:
+        self.client.post(
+            "/api/v1/score-profiles/rollback/",
+            data={},
+            content_type="application/json",
+        )
+        response = self.client.get("/api/v1/score-profiles/activation-history/")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        rollback_entries = [r for r in body if r["activation_reason"] == "manual_rollback"]
+        self.assertGreaterEqual(len(rollback_entries), 1)
+        self.assertEqual(rollback_entries[0]["activated_profile_id"], self.profile_a.id)
+        self.assertEqual(rollback_entries[0]["previous_profile_id"], self.profile_b.id)
+
+
 class AnalysisPackageTests(TestCase):
     """
     フェーズ11: analysis-package 用 service のテスト。

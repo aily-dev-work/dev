@@ -39,6 +39,7 @@ from .services.profile_proposal_review import (
 )
 from .services.profile_apply import apply_proposal_to_new_profile
 from .services.profile_activation import activate_score_profile
+from .services.profile_rollback import RollbackNotAllowedError, rollback_to_previous_profile
 
 
 class WatchStockViewSet(viewsets.ModelViewSet):
@@ -563,6 +564,35 @@ class ScoreProfileViewSet(viewsets.ViewSet):
             )
 
         return Response(results, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], url_path="rollback")
+    def rollback(self, request):
+        """
+        現在 active な ScoreProfile を直前の profile にロールバックする。
+        エンドポイント: POST /api/v1/score-profiles/rollback/
+        入力: note（任意）
+        """
+        note = (request.data or {}).get("note") or ""
+        try:
+            profile = rollback_to_previous_profile(note=note)
+        except RollbackNotAllowedError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        data = {
+            "id": profile.id,
+            "name": profile.name,
+            "version": profile.version,
+            "is_active": profile.is_active,
+            "description": profile.description,
+            "weights_json": profile.weights_json,
+            "thresholds_json": profile.thresholds_json,
+            "created_at": profile.created_at.isoformat() if profile.created_at else None,
+            "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
+        }
+        return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"], url_path="current/analysis-package")
     def current_analysis_package(self, request):
