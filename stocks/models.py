@@ -258,3 +258,84 @@ class ScoreProfile(models.Model):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.version})"
+
+
+class ScoreProfileProposal(models.Model):
+    """
+    AI による ScoreProfile レビュー結果を保存する提案モデル。
+    フェーズ13では draft / reviewed / accepted / rejected の簡易ステータスのみ管理する。
+    """
+
+    STATUS_DRAFT = "draft"
+    STATUS_REVIEWED = "reviewed"
+    STATUS_ACCEPTED = "accepted"
+    STATUS_REJECTED = "rejected"
+
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "draft"),
+        (STATUS_REVIEWED, "reviewed"),
+        (STATUS_ACCEPTED, "accepted"),
+        (STATUS_REJECTED, "rejected"),
+    ]
+
+    score_profile = models.ForeignKey(
+        ScoreProfile,
+        on_delete=models.CASCADE,
+        related_name="proposals",
+        help_text="提案の対象となる ScoreProfile",
+    )
+    proposal_name = models.CharField(
+        max_length=255,
+        help_text="人間が識別しやすい提案名（自動生成されたデフォルト名を含む）",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_DRAFT,
+        help_text="提案のレビュー状態",
+    )
+
+    score_profile_name_snapshot = models.CharField(
+        max_length=100,
+        help_text="提案作成時点の ScoreProfile.name スナップショット",
+    )
+    score_profile_version_snapshot = models.CharField(
+        max_length=32,
+        help_text="提案作成時点の ScoreProfile.version スナップショット",
+    )
+
+    source_filters_json = models.JSONField(
+        help_text="analysis-package 生成時に利用したフィルター条件（ticker, 日付範囲など）",
+    )
+    analysis_summary = models.TextField(
+        help_text="AI による全体サマリテキスト",
+    )
+    issues_json = models.JSONField(
+        help_text="AI が指摘した課題一覧",
+    )
+    improvement_hypotheses_json = models.JSONField(
+        help_text="AI が提案する改善仮説一覧",
+    )
+    suggested_weights_json = models.JSONField(
+        help_text="AI が提案する新しい weights_json",
+    )
+    suggested_thresholds_json = models.JSONField(
+        help_text="AI が提案する新しい thresholds_json",
+    )
+    cautions_json = models.JSONField(
+        help_text="AI が提示する注意点・リスク",
+    )
+    raw_ai_response_json = models.JSONField(
+        help_text="AI から返却された生の JSON 応答（将来の解析用）",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "スコア設定プロファイル提案"
+        verbose_name_plural = "スコア設定プロファイル提案"
+
+    def __str__(self) -> str:
+        return f"Proposal({self.score_profile_name_snapshot} {self.score_profile_version_snapshot} - {self.proposal_name})"

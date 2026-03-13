@@ -4,7 +4,14 @@ from rest_framework.response import Response
 
 from django.core.exceptions import ImproperlyConfigured
 
-from .models import ScoreProfile, SignalOutcome, StockPriceDaily, TradingSignal, WatchStock
+from .models import (
+    ScoreProfile,
+    ScoreProfileProposal,
+    SignalOutcome,
+    StockPriceDaily,
+    TradingSignal,
+    WatchStock,
+)
 from .serializers import StockPriceDailySerializer, WatchStockSerializer
 from .services.signal_dataset import build_signal_queryset, signals_to_dataset
 from .services.analysis_package import (
@@ -21,6 +28,7 @@ from .services.signal_evaluation import evaluate_signal
 from .services.signal_generation import generate_trading_signal
 from .services.signal_scoring import score_from_technical
 from .services.technical_analysis import calculate_technical_summary
+from .services.profile_proposal import save_profile_proposal
 
 
 class WatchStockViewSet(viewsets.ModelViewSet):
@@ -385,6 +393,171 @@ class ScoreProfileViewSet(viewsets.ViewSet):
             return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         return Response(result, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], url_path="current/ai-review-and-save")
+    def current_ai_review_and_save(self, request):
+        """
+        現在アクティブな ScoreProfile を対象に AI レビューを実行し、
+        その結果を ScoreProfileProposal として保存して返す。
+        """
+        user_note = request.data.get("user_note")
+        try:
+            profile = get_active_score_profile()
+        except ImproperlyConfigured as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        try:
+            ai_result = build_ai_review_for_profile(
+                profile, request.query_params, user_note=user_note
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        except ImproperlyConfigured as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        # analysis_package 側と同じキーセットから filters を抽出する
+        filters = {
+            k: v
+            for k, v in request.query_params.items()
+            if k in {"ticker", "signal_date_from", "signal_date_to", "signal_type"}
+            and v not in ("", None)
+        }
+
+        proposal = save_profile_proposal(profile, filters, ai_result)
+
+        data = {
+            "proposal_id": proposal.id,
+            "score_profile_id": proposal.score_profile_id,
+            "proposal_name": proposal.proposal_name,
+            "status": proposal.status,
+            "score_profile_name_snapshot": proposal.score_profile_name_snapshot,
+            "score_profile_version_snapshot": proposal.score_profile_version_snapshot,
+            "created_at": proposal.created_at.isoformat() if proposal.created_at else None,
+            "analysis_summary": proposal.analysis_summary,
+            "issues": proposal.issues_json,
+            "improvement_hypotheses": proposal.improvement_hypotheses_json,
+            "suggested_weights_json": proposal.suggested_weights_json,
+            "suggested_thresholds_json": proposal.suggested_thresholds_json,
+            "cautions": proposal.cautions_json,
+        }
+        return Response(data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="ai-review-and-save")
+    def ai_review_and_save(self, request, pk=None):
+        """
+        指定 ScoreProfile (id) を対象に AI レビューを実行し、
+        その結果を ScoreProfileProposal として保存して返す。
+        """
+        user_note = request.data.get("user_note")
+        try:
+            profile = ScoreProfile.objects.get(pk=pk)
+        except ScoreProfile.DoesNotExist:
+            return Response(
+                {"detail": "ScoreProfile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            ai_result = build_ai_review_for_profile(
+                profile, request.query_params, user_note=user_note
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        except ImproperlyConfigured as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        filters = {
+            k: v
+            for k, v in request.query_params.items()
+            if k in {"ticker", "signal_date_from", "signal_date_to", "signal_type"}
+            and v not in ("", None)
+        }
+
+        proposal = save_profile_proposal(profile, filters, ai_result)
+
+        data = {
+            "proposal_id": proposal.id,
+            "score_profile_id": proposal.score_profile_id,
+            "proposal_name": proposal.proposal_name,
+            "status": proposal.status,
+            "score_profile_name_snapshot": proposal.score_profile_name_snapshot,
+            "score_profile_version_snapshot": proposal.score_profile_version_snapshot,
+            "created_at": proposal.created_at.isoformat() if proposal.created_at else None,
+            "analysis_summary": proposal.analysis_summary,
+            "issues": proposal.issues_json,
+            "improvement_hypotheses": proposal.improvement_hypotheses_json,
+            "suggested_weights_json": proposal.suggested_weights_json,
+            "suggested_thresholds_json": proposal.suggested_thresholds_json,
+            "cautions": proposal.cautions_json,
+        }
+        return Response(data, status=status.HTTP_201_CREATED)
+
+
+class ProposalViewSet(viewsets.ViewSet):
+    """
+    ScoreProfileProposal の一覧・詳細取得用 ViewSet（read-only）。
+    """
+
+    def list(self, request, score_profile_pk=None):
+        """
+        指定 ScoreProfile に紐づく提案一覧を返す。
+        Route 側で /score-profiles/<id>/proposals/ にマッピングされる想定。
+        """
+        try:
+            profile = ScoreProfile.objects.get(pk=score_profile_pk)
+        except ScoreProfile.DoesNotExist:
+            return Response(
+                {"detail": "ScoreProfile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        proposals = profile.proposals.order_by("-created_at")
+        results = []
+        for p in proposals:
+            results.append(
+                {
+                    "id": p.id,
+                    "score_profile_id": p.score_profile_id,
+                    "proposal_name": p.proposal_name,
+                    "status": p.status,
+                    "score_profile_name_snapshot": p.score_profile_name_snapshot,
+                    "score_profile_version_snapshot": p.score_profile_version_snapshot,
+                    "created_at": p.created_at.isoformat() if p.created_at else None,
+                }
+            )
+        return Response(results, status=status.HTTP_200_OK)
+
+    def retrieve(self, request, pk=None):
+        """
+        単一の提案詳細を返す。
+        """
+        try:
+            proposal = ScoreProfileProposal.objects.get(pk=pk)
+        except ScoreProfileProposal.DoesNotExist:
+            return Response(
+                {"detail": "ScoreProfileProposal not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        data = {
+            "id": proposal.id,
+            "score_profile_id": proposal.score_profile_id,
+            "proposal_name": proposal.proposal_name,
+            "status": proposal.status,
+            "score_profile_name_snapshot": proposal.score_profile_name_snapshot,
+            "score_profile_version_snapshot": proposal.score_profile_version_snapshot,
+            "source_filters": proposal.source_filters_json,
+            "analysis_summary": proposal.analysis_summary,
+            "issues": proposal.issues_json,
+            "improvement_hypotheses": proposal.improvement_hypotheses_json,
+            "suggested_weights_json": proposal.suggested_weights_json,
+            "suggested_thresholds_json": proposal.suggested_thresholds_json,
+            "cautions": proposal.cautions_json,
+            "raw_ai_response_json": proposal.raw_ai_response_json,
+            "created_at": proposal.created_at.isoformat() if proposal.created_at else None,
+            "updated_at": proposal.updated_at.isoformat() if proposal.updated_at else None,
+        }
+        return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="ai-review")
     def ai_review(self, request, pk=None):

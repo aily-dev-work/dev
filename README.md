@@ -157,7 +157,7 @@ d:\dev\
     wsgi.py
     asgi.py
   stocks/             # 株価監視アプリ（フェーズ1〜11）
-    models.py         # WatchStock, StockPriceDaily, TradingSignal, SignalOutcome, ScoreProfile
+    models.py         # WatchStock, StockPriceDaily, TradingSignal, SignalOutcome, ScoreProfile, ScoreProfileProposal
     admin.py          # Admin for all models
     views.py          # ViewSets（stocks, stock-prices, signals）
     serializers.py    # WatchStockSerializer, StockPriceDailySerializer
@@ -172,6 +172,7 @@ d:\dev\
       signal_summary.py        # ScoreProfile / signal_type 別 summary 集計
       analysis_package.py      # AI 分析入力パッケージ構築
       ai_profile_review.py     # ScoreProfile の AI レビュー（提案のみ、OpenAI 連携）
+      profile_proposal.py      # AI レビュー結果を ScoreProfileProposal として保存
     PHASE1.md         # フェーズ1まとめ
     PHASE2.md         # フェーズ2まとめ
     PHASE3.md         # フェーズ3まとめ
@@ -184,6 +185,7 @@ d:\dev\
     PHASE10.md        # フェーズ10まとめ（ScoreProfile 別シグナル集計 API）
     PHASE11.md        # フェーズ11まとめ（AI 分析入力パッケージ API）
     PHASE12.md        # フェーズ12まとめ（ScoreProfile AI レビュー API）
+    PHASE13.md        # フェーズ13まとめ（AI 提案の保存 API）
     migrations/
       0001_initial.py
       0002_stockpricedaily.py

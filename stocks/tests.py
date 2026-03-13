@@ -5,7 +5,13 @@ import json
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 
-from .models import ScoreProfile, SignalOutcome, TradingSignal, WatchStock
+from .models import (
+    ScoreProfile,
+    ScoreProfileProposal,
+    SignalOutcome,
+    TradingSignal,
+    WatchStock,
+)
 from .services.ai_profile_review import (
     build_ai_review_for_active_profile,
     build_ai_review_for_profile,
@@ -16,6 +22,7 @@ from .services.analysis_package import (
 )
 from .services.signal_dataset import build_signal_queryset, signals_to_dataset
 from .services.scoring_profile import get_active_score_profile, get_active_scoring_config
+from .services.profile_proposal import save_profile_proposal
 from .services.signal_generation import generate_trading_signal
 from .services.signal_scoring import score_from_technical, ScoreResult
 from .services.signal_summary import build_summary_queryset, summarize_signals
@@ -202,6 +209,43 @@ class ScoreProfileServiceTests(TestCase):
 
         got = get_active_score_profile()
         self.assertEqual(got.id, profile.id)
+
+
+class ScoreProfileProposalTests(TestCase):
+    def setUp(self) -> None:
+        self.profile = ScoreProfile.objects.create(
+            name="Default scoring profile",
+            version="v1",
+            is_active=True,
+            description="",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+
+    def test_save_profile_proposal_creates_draft_proposal(self) -> None:
+        filters = {"ticker": "TEST", "signal_date_from": "2026-03-01"}
+        ai_result = {
+            "target_profile": {"id": self.profile.id},
+            "analysis_summary": "summary",
+            "issues": ["i1"],
+            "improvement_hypotheses": ["h1"],
+            "suggested_weights_json": {"buy": {}, "sell": {}},
+            "suggested_thresholds_json": {},
+            "cautions": ["c1"],
+        }
+
+        proposal = save_profile_proposal(self.profile, filters, ai_result)
+
+        self.assertEqual(proposal.score_profile_id, self.profile.id)
+        self.assertEqual(proposal.status, ScoreProfileProposal.STATUS_DRAFT)
+        self.assertEqual(proposal.score_profile_name_snapshot, self.profile.name)
+        self.assertEqual(proposal.score_profile_version_snapshot, self.profile.version)
+        self.assertEqual(proposal.source_filters_json["ticker"], "TEST")
+        self.assertEqual(proposal.analysis_summary, "summary")
+        self.assertEqual(proposal.issues_json, ["i1"])
+        self.assertEqual(proposal.improvement_hypotheses_json, ["h1"])
+        self.assertEqual(proposal.cautions_json, ["c1"])
+        self.assertIn("target_profile", proposal.raw_ai_response_json)
 
 
 class ScoreCalculationCompatibilityTests(TestCase):
@@ -1190,7 +1234,7 @@ class AIProfileReviewViewTests(TestCase):
         original = ai_profile_review._call_openai_with_package
         ai_profile_review._call_openai_with_package = bad_call
         try:
-            url = f"/api/v1/score-profiles/{self.profile.id}/ai-review/"
+            url = "/api/v1/score-profiles/current/ai-review/"
             response = self.client.post(url, data={}, content_type="application/json")
         finally:
             ai_profile_review._call_openai_with_package = original
