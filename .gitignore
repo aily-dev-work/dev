@@ -37,6 +37,13 @@ build/
 *.egg-info/
 *.egg
 
+# Node / frontend
+node_modules/
+.next/
+npm-debug.log*
+pnpm-lock.yaml
+yarn.lock
+
 # Testing / coverage
 .coverage
 htmlcov/
