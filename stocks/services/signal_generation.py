@@ -36,6 +36,21 @@ def generate_trading_signal(
     else:
         signal_type = "neutral"
 
+    # 20日レンジ内での位置（technical_position）
+    technical_position: Optional[Decimal]
+    if (
+        summary.latest_close is not None
+        and summary.high_low.high_20 is not None
+        and summary.high_low.low_20 is not None
+    ):
+        range_span = summary.high_low.high_20 - summary.high_low.low_20
+        if range_span and range_span != 0:
+            technical_position = (summary.latest_close - summary.high_low.low_20) / range_span
+        else:
+            technical_position = None
+    else:
+        technical_position = None
+
     defaults = {
         "signal_type": signal_type,
         "buy_score": Decimal(str(score.buy_score)),
@@ -48,6 +63,7 @@ def generate_trading_signal(
         "ma75": _decimal_or_none(summary.moving_averages.ma75),
         "high_20": _decimal_or_none(summary.high_low.high_20),
         "low_20": _decimal_or_none(summary.high_low.low_20),
+        "technical_position": _decimal_or_none(technical_position),
         "trend_short": summary.signals.trend_short,
         "trend_mid": summary.signals.trend_mid,
         "trend_long": summary.signals.trend_long,

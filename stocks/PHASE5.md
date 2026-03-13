@@ -36,6 +36,10 @@
 - `ma75`: `DecimalField(12, 4, null=True, blank=True)`
 - `high_20`: `DecimalField(12, 4, null=True, blank=True)`
 - `low_20`: `DecimalField(12, 4, null=True, blank=True)`
+- `technical_position`: `DecimalField(max_digits=5, decimal_places=4, null=True, blank=True)`
+  - 20日レンジ内での価格位置。  
+    `pos = (latest_close - low_20) / (high_20 - low_20)` を 0〜1 に正規化した値。
+  - `high_20` / `low_20` / `latest_close` のいずれかが欠損している、もしくはレンジ幅が 0 の場合は `null`。
 - `trend_short`: `CharField(max_length=16, null=True, blank=True)`
 - `trend_mid`: `CharField(max_length=16, null=True, blank=True)`
 - `trend_long`: `CharField(max_length=16, null=True, blank=True)`
@@ -81,6 +85,7 @@ def generate_trading_signal(
      - `latest_close`
      - `ma25`, `ma75`
      - `high_20`, `low_20`
+     - `technical_position`（20日レンジ内での価格位置。0〜1、計算不能時は null）
      - `trend_short`, `trend_mid`, `trend_long`, `volume_trend`
 
 これにより、1銘柄・1日あたり最大 1 件のシグナルが保存され、  

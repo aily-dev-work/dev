@@ -129,6 +129,14 @@ class TradingSignal(models.Model):
         max_digits=12, decimal_places=4, null=True, blank=True
     )
 
+    technical_position = models.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        null=True,
+        blank=True,
+        help_text="20日レンジ内での価格位置（0〜1）",
+    )
+
     trend_short = models.CharField(max_length=16, null=True, blank=True)
     trend_mid = models.CharField(max_length=16, null=True, blank=True)
     trend_long = models.CharField(max_length=16, null=True, blank=True)
