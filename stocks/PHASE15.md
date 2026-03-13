@@ -152,7 +152,7 @@ GET /api/v1/proposals/<proposal_id>/
   - 同じ proposal に対して2回 `/apply/` すると、2回目は **409**。
 
 - `test_apply_rejects_empty_suggested_payload`
-  - `suggested_weights_json` / `suggested_thresholds_json` が空 dict の proposal に対する `/apply/` は **409**。
+  - `suggested_weights_json` / `suggested_thresholds_json` が空 dict の proposal に対する `/apply/` は **400**（入力不正）。
 
 ---
 
