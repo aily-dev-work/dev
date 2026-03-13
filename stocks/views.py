@@ -47,6 +47,7 @@ from .services.profile_review_targets import (
     get_review_targets,
 )
 from .services.profile_comparison import compare_profiles
+from .services.profile_ops_summary import build_ops_summary
 
 
 class WatchStockViewSet(viewsets.ModelViewSet):
@@ -672,6 +673,42 @@ class ScoreProfileViewSet(viewsets.ViewSet):
                 {"detail": str(exc)},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="ops-summary")
+    def ops_summary(self, request):
+        """
+        運用向け ops-summary。
+        エンドポイント: GET /api/v1/score-profiles/ops-summary/
+        クエリ: signal_date_from, signal_date_to, threshold_success_rate, stale_days, min_evaluated_count
+        """
+        q = request.query_params
+        signal_date_from = q.get("signal_date_from") or None
+        signal_date_to = q.get("signal_date_to") or None
+        try:
+            threshold_success_rate = float(
+                q.get("threshold_success_rate") or DEFAULT_THRESHOLD_SUCCESS_RATE
+            )
+        except (TypeError, ValueError):
+            threshold_success_rate = DEFAULT_THRESHOLD_SUCCESS_RATE
+        try:
+            stale_days = int(q.get("stale_days") or DEFAULT_STALE_DAYS)
+        except (TypeError, ValueError):
+            stale_days = DEFAULT_STALE_DAYS
+        try:
+            min_evaluated_count = int(
+                q.get("min_evaluated_count") or DEFAULT_MIN_EVALUATED_COUNT
+            )
+        except (TypeError, ValueError):
+            min_evaluated_count = DEFAULT_MIN_EVALUATED_COUNT
+
+        data = build_ops_summary(
+            signal_date_from=signal_date_from,
+            signal_date_to=signal_date_to,
+            threshold_success_rate=threshold_success_rate,
+            stale_days=stale_days,
+            min_evaluated_count=min_evaluated_count,
+        )
         return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"], url_path="current/analysis-package")

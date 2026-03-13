@@ -2128,6 +2128,184 @@ class ScoreProfileCompareAPITests(TestCase):
         self.assertEqual(response.status_code, 400)
 
 
+class ScoreProfileOpsSummaryAPITests(TestCase):
+    """
+    フェーズ20: ops-summary API のテスト。
+    """
+
+    def setUp(self) -> None:
+        ScoreProfile.objects.all().delete()
+        ScoreProfileActivationHistory.objects.all().delete()
+        ScoreProfileProposal.objects.all().delete()
+        self.stock = WatchStock.objects.create(ticker="OPS", name="OpsStock", market="JP")
+
+        # current active profile
+        self.active_profile = ScoreProfile.objects.create(
+            name="OpsActive",
+            version="v1",
+            is_active=True,
+            description="",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        # stale 判定用に古い activation history
+        h = ScoreProfileActivationHistory.objects.create(
+            previous_profile=None,
+            activated_profile=self.active_profile,
+            previous_profile_name_snapshot="",
+            previous_profile_version_snapshot="",
+            activated_profile_name_snapshot=self.active_profile.name,
+            activated_profile_version_snapshot=self.active_profile.version,
+            source_proposal_name_snapshot="",
+            activation_reason="manual_activate",
+            note="",
+        )
+        old_date = timezone.now() - timezone.timedelta(days=40)
+        ScoreProfileActivationHistory.objects.filter(pk=h.pk).update(activated_at=old_date)
+
+        # underperforming profile（5件すべて失敗）
+        self.under_profile = ScoreProfile.objects.create(
+            name="OpsUnder",
+            version="v1",
+            is_active=False,
+            description="",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        for i in range(5):
+            sig = TradingSignal.objects.create(
+                stock=self.stock,
+                signal_date=date(2026, 1, 1 + i),
+                signal_type="buy",
+                buy_score=10,
+                sell_score=5,
+                score_bias="buy",
+                score_strength="weak",
+                signal_price="100.0000",
+                latest_close="100.0000",
+                ma25="100.0000",
+                ma75="100.0000",
+                high_20="110.0000",
+                low_20="90.0000",
+                score_profile=self.under_profile,
+                score_profile_name=self.under_profile.name,
+                score_profile_version=self.under_profile.version,
+            )
+            SignalOutcome.objects.create(
+                signal=sig,
+                base_price="100.0000",
+                return_20d=Decimal("-0.10"),
+                success_20d=False,
+            )
+
+        # accepted but not activated proposal-derived profile
+        self.candidate_profile = ScoreProfile.objects.create(
+            name="OpsCandidate",
+            version="v1",
+            is_active=False,
+            description="",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        self.proposal = ScoreProfileProposal.objects.create(
+            score_profile=self.active_profile,
+            proposal_name="ops-accepted",
+            status=ScoreProfileProposal.STATUS_ACCEPTED,
+            score_profile_name_snapshot=self.active_profile.name,
+            score_profile_version_snapshot=self.active_profile.version,
+            source_filters_json={},
+            analysis_summary="",
+            issues_json=[],
+            improvement_hypotheses_json=[],
+            suggested_weights_json={},
+            suggested_thresholds_json={},
+            cautions_json=[],
+            raw_ai_response_json={},
+            applied_score_profile=self.candidate_profile,
+        )
+
+    def test_ops_summary_returns_current_and_counts_and_messages(self) -> None:
+        response = self.client.get(
+            "/api/v1/score-profiles/ops-summary/",
+            data={
+                "threshold_success_rate": "0.5",
+                "min_evaluated_count": "5",
+                "stale_days": "30",
+                "signal_date_from": "2026-01-01",
+                "signal_date_to": "2026-12-31",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn("generated_at", body)
+        self.assertIn("current_active_profile", body)
+        self.assertEqual(body["current_active_profile"]["id"], self.active_profile.id)
+        counts = body["counts"]
+        self.assertEqual(counts["stale_active_count"], 1)
+        self.assertEqual(counts["underperforming_count"], 1)
+        self.assertEqual(counts["accepted_not_activated_count"], 1)
+        self.assertIn("message_lines", body)
+        self.assertTrue(body["message_lines"])
+
+    def test_ops_summary_underperforming_respects_min_evaluated_count(self) -> None:
+        # same under_profile (5件) だが min_evaluated_count により判定結果が変わる
+        resp1 = self.client.get(
+            "/api/v1/score-profiles/ops-summary/",
+            data={
+                "threshold_success_rate": "0.5",
+                "min_evaluated_count": "5",
+                "signal_date_from": "2026-01-01",
+                "signal_date_to": "2026-12-31",
+            },
+        )
+        self.assertEqual(resp1.status_code, 200)
+        self.assertEqual(resp1.json()["counts"]["underperforming_count"], 1)
+
+        resp2 = self.client.get(
+            "/api/v1/score-profiles/ops-summary/",
+            data={
+                "threshold_success_rate": "0.5",
+                "min_evaluated_count": "10",
+                "signal_date_from": "2026-01-01",
+                "signal_date_to": "2026-12-31",
+            },
+        )
+        self.assertEqual(resp2.status_code, 200)
+        self.assertEqual(resp2.json()["counts"]["underperforming_count"], 0)
+
+    def test_ops_summary_aligns_with_review_targets_counts(self) -> None:
+        params = {
+            "threshold_success_rate": "0.5",
+            "min_evaluated_count": "5",
+            "stale_days": "30",
+            "signal_date_from": "2026-01-01",
+            "signal_date_to": "2026-12-31",
+        }
+        rt = self.client.get(
+            "/api/v1/score-profiles/review-targets/",
+            data=params,
+        )
+        ops = self.client.get(
+            "/api/v1/score-profiles/ops-summary/",
+            data=params,
+        )
+        self.assertEqual(rt.status_code, 200)
+        self.assertEqual(ops.status_code, 200)
+        rt_body = rt.json()
+        ops_body = ops.json()
+        self.assertEqual(
+            len(rt_body["stale_active_profiles"]),
+            ops_body["counts"]["stale_active_count"],
+        )
+        self.assertEqual(
+            len(rt_body["underperforming_profiles"]),
+            ops_body["counts"]["underperforming_count"],
+        )
+        self.assertEqual(
+            len(rt_body["accepted_not_activated_profiles"]),
+            ops_body["counts"]["accepted_not_activated_count"],
+        )
+
 class AnalysisPackageTests(TestCase):
     """
     フェーズ11: analysis-package 用 service のテスト。
