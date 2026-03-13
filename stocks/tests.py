@@ -4,6 +4,7 @@ import json
 
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
+from django.utils import timezone
 
 from .models import (
     ScoreProfile,
@@ -1696,6 +1697,252 @@ class ScoreProfileRollbackAPITests(TestCase):
         self.assertGreaterEqual(len(rollback_entries), 1)
         self.assertEqual(rollback_entries[0]["activated_profile_id"], self.profile_a.id)
         self.assertEqual(rollback_entries[0]["previous_profile_id"], self.profile_b.id)
+
+
+class ScoreProfileReviewTargetsAPITests(TestCase):
+    """
+    フェーズ19: review-targets API のテスト。
+    """
+
+    def setUp(self) -> None:
+        ScoreProfile.objects.all().delete()
+        ScoreProfileActivationHistory.objects.all().delete()
+        ScoreProfileProposal.objects.all().delete()
+        self.stock = WatchStock.objects.create(ticker="RVT", name="ReviewTarget", market="JP")
+
+        self.active_profile = ScoreProfile.objects.create(
+            name="ActiveProfile",
+            version="v1",
+            is_active=True,
+            description="",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        self.candidate_profile = ScoreProfile.objects.create(
+            name="CandidateProfile",
+            version="v1",
+            is_active=False,
+            description="",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        # accepted だがまだ active にしていない proposal 由来 profile
+        self.proposal = ScoreProfileProposal.objects.create(
+            score_profile=self.active_profile,
+            proposal_name="accepted-proposal",
+            status=ScoreProfileProposal.STATUS_ACCEPTED,
+            score_profile_name_snapshot=self.active_profile.name,
+            score_profile_version_snapshot=self.active_profile.version,
+            source_filters_json={},
+            analysis_summary="",
+            issues_json=[],
+            improvement_hypotheses_json=[],
+            suggested_weights_json={},
+            suggested_thresholds_json={},
+            cautions_json=[],
+            raw_ai_response_json={},
+            applied_score_profile=self.candidate_profile,
+        )
+
+    def test_review_targets_returns_current_active_profile(self) -> None:
+        response = self.client.get("/api/v1/score-profiles/review-targets/")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIsNotNone(body["current_active_profile"])
+        self.assertEqual(body["current_active_profile"]["id"], self.active_profile.id)
+        self.assertEqual(body["current_active_profile"]["name"], "ActiveProfile")
+
+    def test_review_targets_accepted_not_activated_profiles(self) -> None:
+        response = self.client.get("/api/v1/score-profiles/review-targets/")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        accepted = body["accepted_not_activated_profiles"]
+        self.assertGreaterEqual(len(accepted), 1)
+        ids = [p["id"] for p in accepted]
+        self.assertIn(self.candidate_profile.id, ids)
+        entry = next(p for p in accepted if p["id"] == self.candidate_profile.id)
+        self.assertEqual(entry["source_proposal_id"], self.proposal.id)
+
+    def test_review_targets_underperforming_profiles(self) -> None:
+        # success_rate が低い profile: 2件中0件成功 → h20 success_rate 0
+        low_profile = ScoreProfile.objects.create(
+            name="LowRate",
+            version="v1",
+            is_active=False,
+            description="",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        for i in range(2):
+            sig = TradingSignal.objects.create(
+                stock=self.stock,
+                signal_date=date(2026, 2, 1 + i),
+                signal_type="buy",
+                buy_score=10,
+                sell_score=5,
+                score_bias="buy",
+                score_strength="weak",
+                signal_price="100.0000",
+                latest_close="100.0000",
+                ma25="100.0000",
+                ma75="100.0000",
+                high_20="110.0000",
+                low_20="90.0000",
+                score_profile=low_profile,
+                score_profile_name=low_profile.name,
+                score_profile_version=low_profile.version,
+            )
+            SignalOutcome.objects.create(
+                signal=sig,
+                base_price="100.0000",
+                return_20d=Decimal("-0.10"),
+                success_20d=False,
+            )
+        response = self.client.get(
+            "/api/v1/score-profiles/review-targets/",
+            data={"threshold_success_rate": "0.5", "signal_date_from": "2026-02-01", "signal_date_to": "2026-02-28"},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        under = body["underperforming_profiles"]
+        ids = [p["id"] for p in under]
+        self.assertIn(low_profile.id, ids)
+
+    def test_review_targets_stale_active_profiles(self) -> None:
+        # 直近の activated_at が stale_days より前の履歴を作る（create 後 update で日付を上書き）
+        h = ScoreProfileActivationHistory.objects.create(
+            previous_profile=None,
+            activated_profile=self.active_profile,
+            previous_profile_name_snapshot="",
+            previous_profile_version_snapshot="",
+            activated_profile_name_snapshot=self.active_profile.name,
+            activated_profile_version_snapshot=self.active_profile.version,
+            source_proposal_name_snapshot="",
+            activation_reason="manual_activate",
+            note="",
+        )
+        old_date = timezone.now() - timezone.timedelta(days=40)
+        ScoreProfileActivationHistory.objects.filter(pk=h.pk).update(activated_at=old_date)
+        response = self.client.get(
+            "/api/v1/score-profiles/review-targets/",
+            data={"stale_days": "30"},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        stale = body["stale_active_profiles"]
+        self.assertGreaterEqual(len(stale), 1)
+        self.assertEqual(stale[0]["id"], self.active_profile.id)
+
+
+class ScoreProfileCompareAPITests(TestCase):
+    """
+    フェーズ19: compare API のテスト。
+    """
+
+    def setUp(self) -> None:
+        ScoreProfile.objects.all().delete()
+        self.stock = WatchStock.objects.create(ticker="CMP", name="CompareStock", market="JP")
+        self.profile_a = ScoreProfile.objects.create(
+            name="CompareA",
+            version="v1",
+            is_active=True,
+            description="",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        self.profile_b = ScoreProfile.objects.create(
+            name="CompareB",
+            version="v1",
+            is_active=False,
+            description="",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        for prof, dt in [(self.profile_a, date(2026, 3, 1)), (self.profile_b, date(2026, 3, 2))]:
+            sig = TradingSignal.objects.create(
+                stock=self.stock,
+                signal_date=dt,
+                signal_type="buy",
+                buy_score=10,
+                sell_score=5,
+                score_bias="buy",
+                score_strength="weak",
+                signal_price="100.0000",
+                latest_close="100.0000",
+                ma25="100.0000",
+                ma75="100.0000",
+                high_20="110.0000",
+                low_20="90.0000",
+                score_profile=prof,
+                score_profile_name=prof.name,
+                score_profile_version=prof.version,
+            )
+            SignalOutcome.objects.create(
+                signal=sig,
+                base_price="100.0000",
+                return_5d=Decimal("0.05"),
+                success_5d=True,
+            )
+
+    def test_compare_returns_base_and_candidate_summary(self) -> None:
+        response = self.client.get(
+            "/api/v1/score-profiles/compare/",
+            data={
+                "base_profile_id": str(self.profile_a.id),
+                "candidate_profile_id": str(self.profile_b.id),
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["base_profile"]["id"], self.profile_a.id)
+        self.assertEqual(body["candidate_profile"]["id"], self.profile_b.id)
+        self.assertIn("comparison", body)
+        self.assertGreaterEqual(len(body["comparison"]), 1)
+        for row in body["comparison"]:
+            self.assertIn("signal_type", row)
+            self.assertIn("base", row)
+            self.assertIn("candidate", row)
+            self.assertIn("h5", row["base"])
+            self.assertIn("h20", row["base"])
+
+    def test_compare_same_profile_returns_200(self) -> None:
+        response = self.client.get(
+            "/api/v1/score-profiles/compare/",
+            data={
+                "base_profile_id": str(self.profile_a.id),
+                "candidate_profile_id": str(self.profile_a.id),
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["base_profile"]["id"], body["candidate_profile"]["id"])
+
+    def test_compare_missing_base_profile_returns_404(self) -> None:
+        response = self.client.get(
+            "/api/v1/score-profiles/compare/",
+            data={
+                "base_profile_id": "999999",
+                "candidate_profile_id": str(self.profile_b.id),
+            },
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_compare_missing_candidate_profile_returns_404(self) -> None:
+        response = self.client.get(
+            "/api/v1/score-profiles/compare/",
+            data={
+                "base_profile_id": str(self.profile_a.id),
+                "candidate_profile_id": "999999",
+            },
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_compare_missing_params_returns_400(self) -> None:
+        response = self.client.get(
+            "/api/v1/score-profiles/compare/",
+            data={"base_profile_id": str(self.profile_a.id)},
+        )
+        self.assertEqual(response.status_code, 400)
 
 
 class AnalysisPackageTests(TestCase):

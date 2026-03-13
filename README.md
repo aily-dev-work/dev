@@ -156,7 +156,7 @@ d:\dev\
     urls.py
     wsgi.py
     asgi.py
-  stocks/             # 株価監視アプリ（フェーズ1〜18）
+  stocks/             # 株価監視アプリ（フェーズ1〜19）
     models.py         # WatchStock, StockPriceDaily, TradingSignal, SignalOutcome, ScoreProfile, ScoreProfileProposal, ScoreProfileActivationHistory
     admin.py          # Admin for all models
     views.py          # ViewSets（stocks, stock-prices, signals）
@@ -176,6 +176,8 @@ d:\dev\
       profile_apply.py         # accepted proposal から新しい ScoreProfile を生成
       profile_activation.py    # ScoreProfile の active 切替
       profile_rollback.py      # ScoreProfile の手動ロールバック（直前へ戻す）
+      profile_review_targets.py  # レビュー対象の抽出（review-targets API 用）
+      profile_comparison.py      # active と候補 profile の比較（compare API 用）
     PHASE1.md         # フェーズ1まとめ
     PHASE2.md         # フェーズ2まとめ
     PHASE3.md         # フェーズ3まとめ
@@ -194,6 +196,7 @@ d:\dev\
     PHASE16.md        # フェーズ16まとめ（ScoreProfile 手動 activation）
     PHASE17.md        # フェーズ17まとめ（ScoreProfile activation 履歴管理）
     PHASE18.md        # フェーズ18まとめ（ScoreProfile 手動ロールバック）
+    PHASE19.md        # フェーズ19まとめ（運用補助 API: review-targets / compare）
     migrations/
       0001_initial.py
       0002_stockpricedaily.py

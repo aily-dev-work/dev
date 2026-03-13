@@ -40,6 +40,12 @@ from .services.profile_proposal_review import (
 from .services.profile_apply import apply_proposal_to_new_profile
 from .services.profile_activation import activate_score_profile
 from .services.profile_rollback import RollbackNotAllowedError, rollback_to_previous_profile
+from .services.profile_review_targets import (
+    DEFAULT_STALE_DAYS,
+    DEFAULT_THRESHOLD_SUCCESS_RATE,
+    get_review_targets,
+)
+from .services.profile_comparison import compare_profiles
 
 
 class WatchStockViewSet(viewsets.ModelViewSet):
@@ -592,6 +598,74 @@ class ScoreProfileViewSet(viewsets.ViewSet):
             "created_at": profile.created_at.isoformat() if profile.created_at else None,
             "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
         }
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="review-targets")
+    def review_targets(self, request):
+        """
+        レビュー対象の抽出。
+        エンドポイント: GET /api/v1/score-profiles/review-targets/
+        クエリ: signal_date_from, signal_date_to, threshold_success_rate, stale_days
+        """
+        q = request.query_params
+        signal_date_from = q.get("signal_date_from") or None
+        signal_date_to = q.get("signal_date_to") or None
+        try:
+            threshold_success_rate = float(q.get("threshold_success_rate") or DEFAULT_THRESHOLD_SUCCESS_RATE)
+        except (TypeError, ValueError):
+            threshold_success_rate = DEFAULT_THRESHOLD_SUCCESS_RATE
+        try:
+            stale_days = int(q.get("stale_days") or DEFAULT_STALE_DAYS)
+        except (TypeError, ValueError):
+            stale_days = DEFAULT_STALE_DAYS
+
+        data = get_review_targets(
+            signal_date_from=signal_date_from,
+            signal_date_to=signal_date_to,
+            threshold_success_rate=threshold_success_rate,
+            stale_days=stale_days,
+        )
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="compare")
+    def compare(self, request):
+        """
+        base と candidate の2 profile を比較用サマリで返す。
+        エンドポイント: GET /api/v1/score-profiles/compare/
+        クエリ: base_profile_id, candidate_profile_id, signal_date_from, signal_date_to
+        同じ profile 同士でも 200 で比較結果を返す。
+        """
+        base_id = request.query_params.get("base_profile_id")
+        candidate_id = request.query_params.get("candidate_profile_id")
+        if not base_id or not candidate_id:
+            return Response(
+                {"detail": "base_profile_id and candidate_profile_id are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            base_pk = int(base_id)
+            candidate_pk = int(candidate_id)
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "base_profile_id and candidate_profile_id must be integers."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        signal_date_from = request.query_params.get("signal_date_from") or None
+        signal_date_to = request.query_params.get("signal_date_to") or None
+
+        try:
+            data = compare_profiles(
+                base_pk,
+                candidate_pk,
+                signal_date_from=signal_date_from,
+                signal_date_to=signal_date_to,
+            )
+        except ValueError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"], url_path="current/analysis-package")
