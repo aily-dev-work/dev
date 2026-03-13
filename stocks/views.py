@@ -3,9 +3,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.db import models
 
 from .models import (
     ScoreProfile,
+    ScoreProfileActivationHistory,
     ScoreProfileProposal,
     SignalOutcome,
     StockPriceDaily,
@@ -375,7 +377,8 @@ class ScoreProfileViewSet(viewsets.ViewSet):
         except ScoreProfile.DoesNotExist:
             return Response({"detail": "ScoreProfile not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        profile = activate_score_profile(profile)
+        note = request.data.get("note") or ""
+        profile = activate_score_profile(profile, note=note, activation_reason="manual_activate")
 
         data = {
             "id": profile.id,
@@ -389,6 +392,174 @@ class ScoreProfileViewSet(viewsets.ViewSet):
             "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
         }
         return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="activation-history")
+    def activation_history_list(self, request):
+        """
+        ScoreProfile の active 切替履歴一覧を返す。
+
+        エンドポイント: GET /api/v1/score-profiles/activation-history/
+
+        フィルタ:
+        - activated_profile_id
+        - source_proposal_id
+        - activated_from=YYYY-MM-DD
+        - activated_to=YYYY-MM-DD
+        - activation_reason
+        """
+        qs = ScoreProfileActivationHistory.objects.select_related(
+            "previous_profile",
+            "activated_profile",
+            "source_proposal",
+        ).all()
+
+        activated_profile_id = request.query_params.get("activated_profile_id")
+        source_proposal_id = request.query_params.get("source_proposal_id")
+        activated_from = request.query_params.get("activated_from")
+        activated_to = request.query_params.get("activated_to")
+        activation_reason = request.query_params.get("activation_reason")
+
+        if activated_profile_id:
+            qs = qs.filter(activated_profile_id=activated_profile_id)
+        if source_proposal_id:
+            qs = qs.filter(source_proposal_id=source_proposal_id)
+        if activation_reason:
+            qs = qs.filter(activation_reason=activation_reason)
+
+        if activated_from:
+            try:
+                qs = qs.filter(activated_at__date__gte=activated_from)
+            except ValueError:
+                return Response(
+                    {"detail": "Invalid activated_from format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        if activated_to:
+            try:
+                qs = qs.filter(activated_at__date__lte=activated_to)
+            except ValueError:
+                return Response(
+                    {"detail": "Invalid activated_to format. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        qs = qs.order_by("-activated_at", "-id")
+
+        results = []
+        for h in qs:
+            previous_profile = h.previous_profile
+            activated_profile = h.activated_profile
+            source_proposal = h.source_proposal
+
+            results.append(
+                {
+                    "id": h.id,
+                    "previous_profile_id": previous_profile.id if previous_profile else None,
+                    "previous_profile_name": (
+                        previous_profile.name
+                        if previous_profile is not None
+                        else h.previous_profile_name_snapshot or None
+                    ),
+                    "previous_profile_version": (
+                        previous_profile.version
+                        if previous_profile is not None
+                        else h.previous_profile_version_snapshot or None
+                    ),
+                    "activated_profile_id": activated_profile.id,
+                    "activated_profile_name": (
+                        activated_profile.name or h.activated_profile_name_snapshot or None
+                    ),
+                    "activated_profile_version": (
+                        activated_profile.version
+                        or h.activated_profile_version_snapshot
+                        or None
+                    ),
+                    "source_proposal_id": source_proposal.id if source_proposal else None,
+                    "source_proposal_name": (
+                        source_proposal.proposal_name
+                        if source_proposal is not None
+                        else h.source_proposal_name_snapshot or None
+                    ),
+                    "activation_reason": h.activation_reason,
+                    "note": h.note,
+                    "activated_at": h.activated_at.isoformat() if h.activated_at else None,
+                }
+            )
+
+        return Response(results, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["get"], url_path="activation-history")
+    def activation_history_for_profile(self, request, pk=None):
+        """
+        特定 ScoreProfile に関連する active 切替履歴を返す。
+
+        エンドポイント: GET /api/v1/score-profiles/<id>/activation-history/
+
+        対象 profile が:
+        - activated_profile として登場した履歴
+        - previous_profile として登場した履歴
+        の両方を含む。
+        """
+        try:
+            profile = ScoreProfile.objects.get(pk=pk)
+        except ScoreProfile.DoesNotExist:
+            return Response(
+                {"detail": "ScoreProfile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        qs = ScoreProfileActivationHistory.objects.select_related(
+            "previous_profile",
+            "activated_profile",
+            "source_proposal",
+        ).filter(
+            models.Q(previous_profile_id=profile.id)
+            | models.Q(activated_profile_id=profile.id)
+        )
+        qs = qs.order_by("-activated_at", "-id")
+
+        results = []
+        for h in qs:
+            previous_profile = h.previous_profile
+            activated_profile = h.activated_profile
+            source_proposal = h.source_proposal
+
+            results.append(
+                {
+                    "id": h.id,
+                    "previous_profile_id": previous_profile.id if previous_profile else None,
+                    "previous_profile_name": (
+                        previous_profile.name
+                        if previous_profile is not None
+                        else h.previous_profile_name_snapshot or None
+                    ),
+                    "previous_profile_version": (
+                        previous_profile.version
+                        if previous_profile is not None
+                        else h.previous_profile_version_snapshot or None
+                    ),
+                    "activated_profile_id": activated_profile.id,
+                    "activated_profile_name": (
+                        activated_profile.name or h.activated_profile_name_snapshot or None
+                    ),
+                    "activated_profile_version": (
+                        activated_profile.version
+                        or h.activated_profile_version_snapshot
+                        or None
+                    ),
+                    "source_proposal_id": source_proposal.id if source_proposal else None,
+                    "source_proposal_name": (
+                        source_proposal.proposal_name
+                        if source_proposal is not None
+                        else h.source_proposal_name_snapshot or None
+                    ),
+                    "activation_reason": h.activation_reason,
+                    "note": h.note,
+                    "activated_at": h.activated_at.isoformat() if h.activated_at else None,
+                }
+            )
+
+        return Response(results, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"], url_path="current/analysis-package")
     def current_analysis_package(self, request):

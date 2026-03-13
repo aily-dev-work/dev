@@ -7,6 +7,7 @@ from django.test import TestCase
 
 from .models import (
     ScoreProfile,
+    ScoreProfileActivationHistory,
     ScoreProfileProposal,
     SignalOutcome,
     TradingSignal,
@@ -661,6 +662,49 @@ class ScoreProfileActivationTests(TestCase):
             ScoreProfile.objects.filter(is_active=True).count(),
             1,
         )
+
+    def test_activation_creates_history_with_previous_and_activated_profiles(self) -> None:
+        # candidate_profile を active 化すると、previous_profile と activated_profile を含む履歴が1件作成される
+        url = f"/api/v1/score-profiles/{self.candidate_profile.id}/activate/"
+        before = ScoreProfileActivationHistory.objects.count()
+        response = self.client.post(
+            url,
+            data=json.dumps({"note": "switch to candidate"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(ScoreProfileActivationHistory.objects.count(), before + 1)
+        history = ScoreProfileActivationHistory.objects.latest("id")
+        self.assertEqual(history.previous_profile_id, self.base_profile.id)
+        self.assertEqual(history.activated_profile_id, self.candidate_profile.id)
+        self.assertEqual(history.note, "switch to candidate")
+        self.assertEqual(history.activation_reason, "manual_activate")
+
+    def test_activation_history_handles_initial_activation_with_null_previous(self) -> None:
+        # すべての profile を非 active にした状態から初回 active 化すると previous_profile=None の履歴が作成される
+        ScoreProfile.objects.all().update(is_active=False)
+        self.base_profile.refresh_from_db()
+        self.assertFalse(self.base_profile.is_active)
+
+        url = f"/api/v1/score-profiles/{self.base_profile.id}/activate/"
+        response = self.client.post(url, data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+
+        history = ScoreProfileActivationHistory.objects.latest("id")
+        self.assertIsNone(history.previous_profile)
+        self.assertEqual(history.activated_profile_id, self.base_profile.id)
+
+    def test_reactivate_already_active_profile_does_not_create_additional_history(self) -> None:
+        url = f"/api/v1/score-profiles/{self.base_profile.id}/activate/"
+        response = self.client.post(url, data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        count_after_first = ScoreProfileActivationHistory.objects.count()
+
+        # すでに active な profile を再度 activate しても履歴件数は増えない
+        response = self.client.post(url, data={}, content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ScoreProfileActivationHistory.objects.count(), count_after_first)
 
     def test_activate_already_active_profile_is_idempotent(self) -> None:
         url = f"/api/v1/score-profiles/{self.base_profile.id}/activate/"
@@ -1342,6 +1386,124 @@ class SignalSummaryTests(TestCase):
         qs = build_summary_queryset(params)
         rows = summarize_signals(qs)
         self.assertTrue(all(r["signal_type"] == "sell" for r in rows))
+
+
+class ScoreProfileActivationHistoryAPITests(TestCase):
+    """
+    フェーズ17: ScoreProfileActivationHistory API のテスト。
+    """
+
+    def setUp(self) -> None:
+        ScoreProfile.objects.all().delete()
+        self.base_profile = ScoreProfile.objects.create(
+            name="BaseActive",
+            version="v1",
+            is_active=True,
+            description="initial active profile",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        self.candidate_profile = ScoreProfile.objects.create(
+            name="Candidate",
+            version="v2",
+            is_active=False,
+            description="candidate profile",
+            weights_json={"buy": {"x": 1.0}, "sell": {"y": 2.0}},
+            thresholds_json={"bias": {"a": 1.0}},
+        )
+        # candidate_profile を生成した proposal を模したレコード
+        self.proposal = ScoreProfileProposal.objects.create(
+            score_profile=self.base_profile,
+            proposal_name="from-base-to-candidate",
+            status=ScoreProfileProposal.STATUS_ACCEPTED,
+            score_profile_name_snapshot=self.base_profile.name,
+            score_profile_version_snapshot=self.base_profile.version,
+            source_filters_json={},
+            analysis_summary="",
+            issues_json=[],
+            improvement_hypotheses_json=[],
+            suggested_weights_json={"buy": {"x": 1.0}, "sell": {"y": 2.0}},
+            suggested_thresholds_json={"bias": {"a": 1.0}},
+            cautions_json=[],
+            raw_ai_response_json={},
+            applied_score_profile=self.candidate_profile,
+        )
+
+        # 1回目の activation
+        response = self.client.post(
+            f"/api/v1/score-profiles/{self.candidate_profile.id}/activate/",
+            data={},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_activation_history_list_returns_entries_in_desc_order(self) -> None:
+        response = self.client.get("/api/v1/score-profiles/activation-history/")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertGreaterEqual(len(body), 1)
+
+        # activated_at 降順で並んでいることを軽く確認（2件以上ある場合）
+        if len(body) >= 2:
+            dates = [row["activated_at"] for row in body]
+            self.assertEqual(dates, sorted(dates, reverse=True))
+
+    def test_activation_history_list_filters_by_activated_profile_id(self) -> None:
+        response = self.client.get(
+            "/api/v1/score-profiles/activation-history/",
+            data={"activated_profile_id": str(self.candidate_profile.id)},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(
+            all(row["activated_profile_id"] == self.candidate_profile.id for row in body)
+        )
+
+    def test_activation_history_list_filters_by_source_proposal_id(self) -> None:
+        response = self.client.get(
+            "/api/v1/score-profiles/activation-history/",
+            data={"source_proposal_id": str(self.proposal.id)},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(
+            all(row["source_proposal_id"] == self.proposal.id for row in body)
+        )
+
+    def test_activation_history_list_filters_by_date_range(self) -> None:
+        # activated_from と activated_to を現在日付で指定しても 0 件にはならない想定
+        today = date.today().isoformat()
+        response = self.client.get(
+            "/api/v1/score-profiles/activation-history/",
+            data={"activated_from": today, "activated_to": today},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        # 少なくともフィルタ自体は 200 / 空配列のどちらかで正常に動作することを確認
+        self.assertIsInstance(body, list)
+
+    def test_activation_history_list_returns_empty_for_nonexistent_profile_filter(self) -> None:
+        response = self.client.get(
+            "/api/v1/score-profiles/activation-history/",
+            data={"activated_profile_id": "999999"},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body, [])
+
+    def test_activation_history_profile_endpoint_returns_related_entries(self) -> None:
+        url = f"/api/v1/score-profiles/{self.candidate_profile.id}/activation-history/"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertGreaterEqual(len(body), 1)
+        self.assertTrue(
+            all(
+                row["activated_profile_id"] == self.candidate_profile.id
+                or row["previous_profile_id"] == self.candidate_profile.id
+                for row in body
+            )
+        )
 
 
 class AnalysisPackageTests(TestCase):

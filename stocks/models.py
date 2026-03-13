@@ -354,3 +354,83 @@ class ScoreProfileProposal(models.Model):
 
     def __str__(self) -> str:
         return f"Proposal({self.score_profile_name_snapshot} {self.score_profile_version_snapshot} - {self.proposal_name})"
+
+
+class ScoreProfileActivationHistory(models.Model):
+    """
+    ScoreProfile の active 切替履歴。
+    「いつ」「どの profile を」「何由来で」有効化したかを追跡する。
+    """
+
+    previous_profile = models.ForeignKey(
+        "ScoreProfile",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="deactivated_histories",
+        help_text="切り替え前に active だった ScoreProfile（初回は NULL 可）",
+    )
+    activated_profile = models.ForeignKey(
+        "ScoreProfile",
+        on_delete=models.CASCADE,
+        related_name="activated_histories",
+        help_text="この履歴で active にした ScoreProfile",
+    )
+    source_proposal = models.ForeignKey(
+        "ScoreProfileProposal",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="activation_histories",
+        help_text="有効化した ScoreProfile の元になった proposal（特定できる場合のみ）",
+    )
+
+    # スナップショット（FK が後で消えても追跡できるようにする）
+    previous_profile_name_snapshot = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+    )
+    previous_profile_version_snapshot = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+    )
+    activated_profile_name_snapshot = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+    )
+    activated_profile_version_snapshot = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+    )
+    source_proposal_name_snapshot = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+    )
+
+    activation_reason = models.CharField(
+        max_length=50,
+        default="manual_activate",
+        help_text="active 化の理由（例: manual_activate, apply_and_activate など）",
+    )
+    note = models.TextField(
+        blank=True,
+        default="",
+        help_text="任意のメモ（運用理由など）",
+    )
+    activated_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="active 化を実行した日時",
+    )
+
+    class Meta:
+        ordering = ["-activated_at", "-id"]
+        verbose_name = "スコアプロファイル有効化履歴"
+        verbose_name_plural = "スコアプロファイル有効化履歴"
+
+    def __str__(self) -> str:
+        return f"ActivationHistory({self.activated_profile_id} at {self.activated_at})"
