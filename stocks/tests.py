@@ -623,9 +623,10 @@ class ScoreProfileProposalApplyTests(TestCase):
         )
         url = f"/api/v1/proposals/{proposal.id}/apply/"
         response = self.client.post(url, data={}, content_type="application/json")
-        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.status_code, 400)
         proposal.refresh_from_db()
         self.assertIsNone(proposal.applied_score_profile_id)
+
 
 
 class ScoreCalculationCompatibilityTests(TestCase):

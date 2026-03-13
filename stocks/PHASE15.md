@@ -91,9 +91,9 @@ POST /api/v1/proposals/<proposal_id>/apply/
 
 - バリデーション / エラーハンドリング:
   - proposal が存在しない → **404 Not Found**
-  - `status != accepted` → **409 Conflict**
-  - すでに `applied_score_profile` が設定済み → **409 Conflict**
-  - `suggested_weights_json` / `suggested_thresholds_json` が空 or 不正 → **409 Conflict**
+  - `status != accepted` → **409 Conflict**（状態衝突）
+  - すでに `applied_score_profile` が設定済み → **409 Conflict**（再適用の衝突）
+  - `suggested_weights_json` / `suggested_thresholds_json` が空 or 不正 → **400 Bad Request**（入力不正）
 
 ### 4.2 proposal detail 拡張
 

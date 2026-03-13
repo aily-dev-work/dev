@@ -691,7 +691,11 @@ class ProposalViewSet(viewsets.ViewSet):
         try:
             profile = apply_proposal_to_new_profile(proposal)
         except ValidationError as exc:
+            # 状態衝突系（accepted でない / すでに applied 済み）を 409 にマッピング
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        except ValueError as exc:
+            # 入力不正（suggested_* が空・不正など）は 400
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         data = {
             "id": profile.id,

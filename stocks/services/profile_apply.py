@@ -21,11 +21,12 @@ def _validate_suggested_payload(proposal: ScoreProfileProposal) -> None:
     weights = proposal.suggested_weights_json
     thresholds = proposal.suggested_thresholds_json
 
+    # 入力不正は ValueError で表現し、ビュー側で 400 にマッピングする
     if not isinstance(weights, dict) or not weights:
-        raise ValidationError("suggested_weights_json must be a non-empty object.")
+        raise ValueError("suggested_weights_json must be a non-empty object.")
 
     if not isinstance(thresholds, dict) or not thresholds:
-        raise ValidationError("suggested_thresholds_json must be a non-empty object.")
+        raise ValueError("suggested_thresholds_json must be a non-empty object.")
 
 
 def apply_proposal_to_new_profile(proposal: ScoreProfileProposal) -> ScoreProfile:
