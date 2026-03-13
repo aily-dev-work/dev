@@ -177,6 +177,7 @@ d:\dev\
     PHASE7.md         # フェーズ7まとめ（シグナル + 結果のフラットデータセット）
     PHASE8.md         # フェーズ8まとめ（スコア設定の外部化）
     PHASE9.md         # フェーズ9まとめ（TradingSignal と ScoreProfile のひも付け）
+    PHASE10.md        # フェーズ10まとめ（ScoreProfile 別シグナル集計 API）
     migrations/
       0001_initial.py
       0002_stockpricedaily.py

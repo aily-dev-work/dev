@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from .models import ScoreProfile, SignalOutcome, StockPriceDaily, TradingSignal, WatchStock
 from .serializers import StockPriceDailySerializer, WatchStockSerializer
 from .services.signal_dataset import build_signal_queryset, signals_to_dataset
+from .services.signal_summary import build_summary_queryset, summarize_signals
 from .services.scoring_profile import get_active_score_profile
 from .services.signal_evaluation import evaluate_signal
 from .services.signal_generation import generate_trading_signal
@@ -295,6 +296,22 @@ class SignalViewSet(viewsets.ViewSet):
         """
         qs = build_signal_queryset(request.query_params)
         rows = signals_to_dataset(qs)
+        return Response(rows, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="summary")
+    def summary(self, request):
+        """
+        TradingSignal + SignalOutcome を ScoreProfile 単位・signal_type 単位で集計したサマリを返す。
+        フィルタ:
+        - ticker
+        - signal_date_from
+        - signal_date_to
+        - score_profile_name
+        - score_profile_version
+        - signal_type
+        """
+        qs = build_summary_queryset(request.query_params)
+        rows = summarize_signals(qs)
         return Response(rows, status=status.HTTP_200_OK)
 
 

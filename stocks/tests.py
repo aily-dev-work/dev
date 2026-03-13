@@ -9,6 +9,7 @@ from .services.signal_dataset import build_signal_queryset, signals_to_dataset
 from .services.scoring_profile import get_active_score_profile, get_active_scoring_config
 from .services.signal_generation import generate_trading_signal
 from .services.signal_scoring import score_from_technical, ScoreResult
+from .services.signal_summary import build_summary_queryset, summarize_signals
 from .services.technical_analysis import AverageVolume, HighLow, MovingAverages, TechnicalSignals, TechnicalSummary
 
 
@@ -593,3 +594,236 @@ class TradingSignalScoreProfileTests(TestCase):
         # name/version のスナップショットは残る
         self.assertEqual(signal.score_profile_name, "Phase9 profile")
         self.assertEqual(signal.score_profile_version, "v1")
+
+
+class SignalSummaryTests(TestCase):
+    """
+    フェーズ10: ScoreProfile / signal_type 単位の集計 summary をテストする。
+    """
+
+    def setUp(self) -> None:
+        ScoreProfile.objects.all().delete()
+        # 2つのプロファイル (A, B)
+        self.profile_a = ScoreProfile.objects.create(
+            name="ProfileA",
+            version="v1",
+            is_active=True,
+            description="",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        self.profile_b = ScoreProfile.objects.create(
+            name="ProfileB",
+            version="v1",
+            is_active=False,
+            description="",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+
+        self.stock = WatchStock.objects.create(ticker="SUMM", name="SummaryStock", market="JP")
+
+        # ProfileA, buy, 成功/失敗入り混じり
+        self.sig_a1 = TradingSignal.objects.create(
+            stock=self.stock,
+            signal_date=date(2026, 3, 1),
+            signal_type="buy",
+            buy_score=10,
+            sell_score=5,
+            score_bias="buy",
+            score_strength="weak",
+            signal_price="100.0000",
+            latest_close="100.0000",
+            ma25="100.0000",
+            ma75="100.0000",
+            high_20="110.0000",
+            low_20="90.0000",
+            score_profile=self.profile_a,
+            score_profile_name=self.profile_a.name,
+            score_profile_version=self.profile_a.version,
+        )
+        SignalOutcome.objects.create(
+            signal=self.sig_a1,
+            base_price="100.0000",
+            return_5d=Decimal("0.10"),  # +10%
+            success_5d=True,
+            return_10d=Decimal("-0.05"),  # -5%
+            success_10d=False,
+            return_20d=None,
+            success_20d=None,
+        )
+
+        self.sig_a2 = TradingSignal.objects.create(
+            stock=self.stock,
+            signal_date=date(2026, 3, 2),
+            signal_type="buy",
+            buy_score=20,
+            sell_score=5,
+            score_bias="buy",
+            score_strength="weak",
+            signal_price="200.0000",
+            latest_close="200.0000",
+            ma25="200.0000",
+            ma75="200.0000",
+            high_20="210.0000",
+            low_20="190.0000",
+            score_profile=self.profile_a,
+            score_profile_name=self.profile_a.name,
+            score_profile_version=self.profile_a.version,
+        )
+        SignalOutcome.objects.create(
+            signal=self.sig_a2,
+            base_price="200.0000",
+            return_5d=Decimal("0.00"),  # 0%
+            success_5d=False,
+            return_10d=None,
+            success_10d=None,
+            return_20d=Decimal("0.20"),  # +20%
+            success_20d=True,
+        )
+
+        # ProfileB, sell
+        self.sig_b1 = TradingSignal.objects.create(
+            stock=self.stock,
+            signal_date=date(2026, 3, 3),
+            signal_type="sell",
+            buy_score=5,
+            sell_score=15,
+            score_bias="sell",
+            score_strength="weak",
+            signal_price="300.0000",
+            latest_close="300.0000",
+            ma25="300.0000",
+            ma75="300.0000",
+            high_20="310.0000",
+            low_20="290.0000",
+            score_profile=self.profile_b,
+            score_profile_name=self.profile_b.name,
+            score_profile_version=self.profile_b.version,
+        )
+        SignalOutcome.objects.create(
+            signal=self.sig_b1,
+            base_price="300.0000",
+            return_5d=Decimal("-0.10"),  # -10%
+            success_5d=True,  # sell なので下落で成功
+            return_10d=None,
+            success_10d=None,
+            return_20d=None,
+            success_20d=None,
+        )
+
+        # outcome 未評価のシグナル (ProfileA, buy)
+        self.sig_a3 = TradingSignal.objects.create(
+            stock=self.stock,
+            signal_date=date(2026, 3, 4),
+            signal_type="buy",
+            buy_score=30,
+            sell_score=5,
+            score_bias="buy",
+            score_strength="weak",
+            signal_price="400.0000",
+            latest_close="400.0000",
+            ma25="400.0000",
+            ma75="400.0000",
+            high_20="410.0000",
+            low_20="390.0000",
+            score_profile=self.profile_a,
+            score_profile_name=self.profile_a.name,
+            score_profile_version=self.profile_a.version,
+        )
+
+    def test_summary_groups_by_profile_and_signal_type(self) -> None:
+        qs = build_summary_queryset({})
+        rows = summarize_signals(qs)
+
+        # ProfileA, buy
+        row_a_buy = next(
+            r
+            for r in rows
+            if r["score_profile_name"] == "ProfileA"
+            and r["score_profile_version"] == "v1"
+            and r["signal_type"] == "buy"
+        )
+        self.assertEqual(row_a_buy["total_signals"], 3)
+
+        # ProfileB, sell
+        row_b_sell = next(
+            r
+            for r in rows
+            if r["score_profile_name"] == "ProfileB"
+            and r["score_profile_version"] == "v1"
+            and r["signal_type"] == "sell"
+        )
+        self.assertEqual(row_b_sell["total_signals"], 1)
+
+    def test_success_rate_and_avg_return_are_computed_correctly(self) -> None:
+        qs = build_summary_queryset({})
+        rows = summarize_signals(qs)
+
+        row_a_buy = next(
+            r
+            for r in rows
+            if r["score_profile_name"] == "ProfileA"
+            and r["score_profile_version"] == "v1"
+            and r["signal_type"] == "buy"
+        )
+
+        # 5d: sig_a1(+0.10, success=True), sig_a2(0.00, success=False), sig_a3(未評価)
+        h5 = row_a_buy["h5"]
+        self.assertEqual(h5["evaluated_count"], 2)
+        self.assertEqual(h5["success_count"], 1)
+        self.assertAlmostEqual(h5["success_rate"], 0.5)
+        self.assertAlmostEqual(h5["avg_return"], float((Decimal("0.10") + Decimal("0.00")) / 2))
+
+        # 10d: sig_a1(-0.05, success=False), sig_a2(None), sig_a3(None)
+        h10 = row_a_buy["h10"]
+        self.assertEqual(h10["evaluated_count"], 1)
+        self.assertEqual(h10["success_count"], 0)
+        self.assertAlmostEqual(h10["success_rate"], 0.0)
+        self.assertAlmostEqual(h10["avg_return"], float(Decimal("-0.05")))
+
+        # 20d: sig_a1(None), sig_a2(+0.20, success=True), sig_a3(None)
+        h20 = row_a_buy["h20"]
+        self.assertEqual(h20["evaluated_count"], 1)
+        self.assertEqual(h20["success_count"], 1)
+        self.assertAlmostEqual(h20["success_rate"], 1.0)
+        self.assertAlmostEqual(h20["avg_return"], float(Decimal("0.20")))
+
+    def test_un_evaluated_signals_are_not_counted_as_evaluated(self) -> None:
+        qs = build_summary_queryset({})
+        rows = summarize_signals(qs)
+
+        row_b_sell = next(
+            r
+            for r in rows
+            if r["score_profile_name"] == "ProfileB"
+            and r["signal_type"] == "sell"
+        )
+
+        # ProfileB の sell シグナルは1件だけ、5d は1件評価済み
+        h5 = row_b_sell["h5"]
+        self.assertEqual(h5["evaluated_count"], 1)
+        self.assertEqual(h5["success_count"], 1)
+        self.assertAlmostEqual(h5["success_rate"], 1.0)
+
+        # 10d/20d は未評価なので evaluated_count=0
+        self.assertEqual(row_b_sell["h10"]["evaluated_count"], 0)
+        self.assertIsNone(row_b_sell["h10"]["success_rate"])
+        self.assertIsNone(row_b_sell["h10"]["avg_return"])
+
+        self.assertEqual(row_b_sell["h20"]["evaluated_count"], 0)
+        self.assertIsNone(row_b_sell["h20"]["success_rate"])
+        self.assertIsNone(row_b_sell["h20"]["avg_return"])
+
+    def test_filters_work(self) -> None:
+        # score_profile_name で絞り込み
+        params = {"score_profile_name": "ProfileA"}
+        qs = build_summary_queryset(params)
+        rows = summarize_signals(qs)
+        self.assertTrue(all(r["score_profile_name"] == "ProfileA" for r in rows))
+
+        # signal_type で絞り込み
+        params = {"signal_type": "sell"}
+        qs = build_summary_queryset(params)
+        rows = summarize_signals(qs)
+        self.assertTrue(all(r["signal_type"] == "sell" for r in rows))
