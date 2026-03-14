@@ -193,6 +193,11 @@ class TradingSignal(models.Model):
         help_text="対象となる監視銘柄",
     )
     signal_date = models.DateField(help_text="シグナル日付（通常 latest_date）")
+    signal_datetime = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="デイトレ等の intraday 発報時のみ設定。日足シグナルは null。",
+    )
     signal_type = models.CharField(
         max_length=16,
         choices=(
@@ -272,8 +277,8 @@ class TradingSignal(models.Model):
         ordering = ["-signal_date", "-created_at"]
         constraints = [
             models.UniqueConstraint(
-                fields=["stock", "signal_date"],
-                name="unique_stock_signal_per_day",
+                fields=["stock", "signal_date", "signal_datetime"],
+                name="unique_stock_signal_per_day_datetime",
             ),
         ]
 

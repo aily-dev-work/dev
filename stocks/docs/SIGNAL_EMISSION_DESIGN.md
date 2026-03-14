@@ -3,8 +3,10 @@
 ## 現状
 
 - **ScoreProfile に `trading_style` フィールドあり**（long_term / short_term / day_trade）。プロファイル一覧・詳細・新規・編集で参照・保存できる。リアルタイム監視や発報頻度を分岐するときは、**アクティブプロファイルの trading_style を参照**すればよい。
-- シグナルは **POST /api/v1/stocks/<id>/generate-signal/** を呼んだときのみ 1 銘柄・1 日 1 件保存される。
-- テクニカルは **日足のみ**（`technical_analysis.calculate_technical_summary` は StockPriceDaily のみ使用）。
+- **日足シグナル**: **POST /api/v1/stocks/<id>/generate-signal/** を呼んだとき 1 銘柄・1 日 1 件保存（`signal_datetime` は null）。
+- **5 分足シグナル（デイトレ）**: **5 分毎の自動ジョブ**で全銘柄の 5 分足を取得し、取得ごとにテクニカル・スコアを計算してシグナルを保存。`TradingSignal.signal_datetime` に 5 分バー開始時刻を設定し、同一日内で複数件可（ユニークは stock + signal_date + signal_datetime）。
+- テクニカル: **日足**は `technical_analysis.calculate_technical_summary`（StockPriceDaily）、**5 分足**は `calculate_technical_summary_5m`（StockPrice5Min）。
+- 5 分足の取得ロジックは `stocks/services/price_fetcher.fetch_and_save_5m_prices`。自動実行は management コマンド **`run_5m_fetch_and_evaluate`**（cron で 5 分毎に実行する想定）。
 - 発報されたシグナルは **GET /api/v1/signals/recent/** で取得し、ダッシュボードの「直近のシグナル発報」に表示される。
 
 ## 望ましい姿
@@ -31,10 +33,20 @@
      - **デイトレ**: 5 分足で N 分ごとに全監視銘柄を評価し、閾値超えなら発報（同一日内で複数回可にする場合はスキーマ変更が必要）。
    - あるいは、フロントや外部システムが **短周期でポーリング**する API（例: GET /api/v1/signals/evaluate-all/ を 5 分ごとに叩く）を用意し、サーバ側で「全銘柄スコア計算 → 閾値超えのみ保存」を行う方法もある。
 
+## 5 分毎の自動実行（cron 設定例）
+
+- コマンド: `python manage.py run_5m_fetch_and_evaluate`
+- 5 分毎に実行する例（cron）:
+  ```bash
+  */5 * * * * cd /path/to/project && python manage.py run_5m_fetch_and_evaluate
+  ```
+- 取得をスキップして既存 5 分足データだけで判定のみ行う: `--no-fetch`
+
 ## 実装タスク（TODO）
 
+- [x] 5 分足用テクニカルサマリの算出（`technical_analysis.calculate_technical_summary_5m`）。
+- [x] デイトレ用の高頻度発報: `TradingSignal.signal_datetime` 追加、同一日内複数シグナル対応（`generate_trading_signal_5m`）。
+- [x] 5 分毎の「データ取得 → 判定」ジョブ（`run_5m_fetch_and_evaluate` と `price_fetcher.fetch_and_save_5m_prices`）。
 - [ ] 日足ベースの「全銘柄評価し閾値超えで発報」ジョブ（management コマンド or API）の追加。
-- [ ] 5 分足用テクニカルサマリの算出（`technical_analysis` の 5m 版または resolution パラメータ対応）。
-- [ ] デイトレ用の高頻度発報（同一日内複数シグナル）のスキーマ・API設計と実装。
-- [ ] **デイトレの評価**: シグナル発報から 5 分足 N 本後（例: 6 本＝30 分）の価格でリターン・成否を算出。signal_datetime と 5 分足 outcome（return_5m_Nbars 等）の追加。
+- [ ] **デイトレの評価**: シグナル発報から 5 分足 N 本後（例: 6 本＝30 分）の価格でリターン・成否を算出。5 分足 outcome（return_5m_Nbars 等）の追加。
 - [ ] トレードスタイル（長期/短期/デイトレ）に応じた「どの resolution で・どの頻度で評価するか」の設定またはコード分岐。
