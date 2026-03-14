@@ -8,7 +8,7 @@ import time
 from datetime import date
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
-from django.db import models
+from django.db import connection, models
 from django.db.utils import OperationalError
 
 logger = logging.getLogger(__name__)
@@ -284,6 +284,8 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                 {"detail": "銘柄に銘柄コードが設定されていません。"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        # Yahoo 取得中は DB 接続を解放し、他リクエスト（activate 等）がロックを取れるようにする
+        connection.close()
 
         def fetch_yahoo(interval: str, range_param: str):
             url = (
@@ -348,6 +350,7 @@ class WatchStockViewSet(viewsets.ModelViewSet):
             pass
 
         # 5分足（直近約2ヶ月）
+        connection.close()
         try:
             data = fetch_yahoo("5m", "60d")
             parsed = parse_quote(data)
@@ -382,6 +385,7 @@ class WatchStockViewSet(viewsets.ModelViewSet):
             pass
 
         # 週足（Yahoo は 1wk。5y が通らない銘柄があるので 2y で再試行）
+        connection.close()
         for range_param in ("5y", "2y", "1y"):
             try:
                 data = fetch_yahoo("1wk", range_param)
@@ -421,6 +425,7 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                 logger.warning("fetch_prices weekly ticker=%s range=%s: %s", ticker, range_param, e)
 
         # 月足（Yahoo は range に 10y まで。20y は無効で 500 の原因になる）
+        connection.close()
         for range_param in ("10y", "5y", "2y"):
             try:
                 data = fetch_yahoo("1mo", range_param)

@@ -96,15 +96,10 @@ function ComparePageContent() {
 
       {activeProfileId !== null && (
         <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm">
-          <span className="font-medium text-emerald-800">
-            アクティブプロファイル: id={activeProfileId}
+          <span className="font-medium text-emerald-800">アクティブプロファイル: </span>
+          <span className="text-emerald-700">
+            {profiles.find((p) => p.id === activeProfileId)?.name ?? ""}
           </span>
-          {profiles.find((p) => p.id === activeProfileId) && (
-            <span className="ml-2 text-emerald-700">
-              ({profiles.find((p) => p.id === activeProfileId)?.name}{" "}
-              {profiles.find((p) => p.id === activeProfileId)?.version})
-            </span>
-          )}
         </div>
       )}
 
@@ -119,7 +114,7 @@ function ComparePageContent() {
             <option value="">-- 選択 --</option>
             {profiles.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name} ({p.version}) [id={p.id}]
+                {p.name}
                 {p.is_active ? " [アクティブ]" : ""}
               </option>
             ))}
@@ -135,7 +130,7 @@ function ComparePageContent() {
             <option value="">-- 選択 --</option>
             {profiles.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name} ({p.version}) [id={p.id}]
+                {p.name}
                 {p.is_active ? " [アクティブ]" : ""}
               </option>
             ))}
@@ -317,16 +312,7 @@ function ProfileSummaryCard({
           </span>
         )}
       </div>
-      <div className="font-medium">
-        {profile.name} <span className="text-slate-500">({profile.version})</span>
-      </div>
-      <div className="text-xs text-slate-500">id={profile.id}</div>
-      {profile.source_proposal_id && (
-        <div className="mt-1 text-xs">
-          提案由来: {profile.source_proposal_name} (id=
-          {profile.source_proposal_id})
-        </div>
-      )}
+      <div className="font-medium">{profile.name}</div>
     </div>
   );
 }
