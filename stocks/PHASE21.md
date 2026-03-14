@@ -1,40 +1,33 @@
-# Stocks Frontend (Phase 21)
+# 株価監視アプリ フェーズ21: フロントエンド MVP
 
-Next.js + TypeScript 製の簡易管理画面です。  
-既存 Django REST API (`stocks` アプリ) を利用して、ScoreProfile / Proposal / Activation history の運用をブラウザから行えます。
+## 1. フェーズ21の目的
 
-**フェーズ21の詳細仕様**: [stocks/PHASE21.md](../stocks/PHASE21.md)
+フェーズ1〜20で構築した Django REST API（stocks アプリ）を、
+ブラウザから運用できる **簡易管理画面** を追加する。
 
----
+このフェーズでは:
 
-## 1. 起動手順
+- Next.js 14 + TypeScript + Tailwind CSS による管理画面
+- ScoreProfile / Proposal / Activation history の閲覧・操作
+- ops-summary / review-targets / compare の利用
 
-前提:
+を実現する。
 
-- Node.js 18+ / npm or pnpm
-- バックエンド Django アプリが `http://127.0.0.1:8000` で起動していること
+以下は **今回やらない**:
 
-```bash
-cd d:\dev\frontend
-npm install
-npm run dev
-```
-
-ブラウザで `http://localhost:3000` を開きます。
+- 認証・権限制御
+- 自動更新・通知 UI
+- グラフ表示
+- バックエンド API の変更（既存 API のみ利用）
 
 ---
 
-## 2. 環境変数
+## 2. 構成
 
-フロントエンドから叩く API のベース URL は `NEXT_PUBLIC_API_BASE_URL` で指定できます。
-
-例: `frontend/.env.local`
-
-```bash
-NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
-```
-
-未指定時は `http://127.0.0.1:8000` を利用します。
+- ディレクトリ: `frontend/`
+- 技術: Next.js 14, TypeScript, Tailwind CSS
+- API クライアント: `frontend/lib/api.ts`（`NEXT_PUBLIC_API_BASE_URL` を参照）
+- 型定義: `frontend/types/api.ts`
 
 ---
 
@@ -92,7 +85,7 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
   - `GET /api/v1/score-profiles/ops-summary/`
   - `POST /api/v1/score-profiles/<id>/activate/`
 
-※ バックエンドに ScoreProfile 一覧 API が無いため、ops-summary / review-targets ベースで「運用上見るべき profile」のみを表示しています。
+※ バックエンドに ScoreProfile 一覧 API が無いため、ops-summary / review-targets ベースで「運用上見るべき profile」のみを表示している。
 
 ### 3.5 Compare 画面 `/profiles/compare`
 
@@ -124,10 +117,41 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 
 ---
 
-## 4. 操作確認手順（例）
+## 4. 起動手順
 
-1. Django バックエンドを起動し、いくつかの ScoreProfile / Proposal / ActivationHistory を用意。
-2. フロントエンド `npm run dev` を起動。
+前提:
+
+- Node.js 18+ / npm or pnpm
+- バックエンド Django アプリが `http://127.0.0.1:8000` で起動していること
+
+```bash
+cd d:\dev\frontend
+npm install
+npm run dev
+```
+
+ブラウザで `http://localhost:3000` を開く。
+
+---
+
+## 5. 環境変数
+
+フロントエンドから叩く API のベース URL は `NEXT_PUBLIC_API_BASE_URL` で指定する。
+
+例: `frontend/.env.local`
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+```
+
+未指定時は `http://127.0.0.1:8000` を利用する。
+
+---
+
+## 6. 操作確認手順（例）
+
+1. Django バックエンドを起動し、いくつかの ScoreProfile / Proposal / ActivationHistory を用意する。
+2. フロントエンド `npm run dev` を起動する。
 3. ブラウザで `http://localhost:3000` を開く。
 4. Dashboard:
    - Active profile / Ops summary / History が表示されること。
@@ -144,10 +168,9 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 
 ---
 
-## 5. 注意点
+## 7. 注意点
 
-- 認証・権限制御は行っていません（開発用管理画面想定）。
-- バックエンド API のレスポンス形式に強く依存しているため、API 仕様を変更する場合は併せてフロントの型 (`types/api.ts`) を更新してください。
-- プロファイルの完全な一覧 API は無いため、`/profiles` では ops-summary/ review-targets に出てくる profile だけを表示しています。
-- 自動更新・通知 UI・グラフ表示などはフェーズ21では実装していません。
-
+- 認証・権限制御は行っていない（開発用管理画面想定）。
+- バックエンド API のレスポンス形式に強く依存しているため、API 仕様を変更する場合は併せてフロントの型 (`frontend/types/api.ts`) を更新すること。
+- プロファイルの完全な一覧 API は無いため、`/profiles` では ops-summary / review-targets に出てくる profile だけを表示している。
+- 自動更新・通知 UI・グラフ表示などはフェーズ21では実装していない。
