@@ -5,6 +5,7 @@ import Link from "next/link";
 export const metadata = {
   title: "Stocks Admin",
   description: "Stocks score profile admin dashboard",
+  icons: { icon: "/icon.svg" },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
