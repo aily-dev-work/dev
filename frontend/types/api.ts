@@ -136,3 +136,55 @@ export type CompareResponse = {
   comparison: CompareRow[];
 };
 
+/** フェーズ23: ダッシュボード統計 API */
+export type DashboardProfileOverview = {
+  total_count: number;
+  active_count: number;
+  inactive_count: number;
+  proposal_derived_count: number;
+};
+
+export type DashboardChartSuccessRateRow = {
+  profile_id: number;
+  profile_name: string;
+  profile_version: string;
+  signal_type: string;
+  success_rate_h20: number | null;
+};
+
+export type DashboardChartAvgReturnRow = {
+  profile_id: number;
+  profile_name: string;
+  profile_version: string;
+  signal_type: string;
+  avg_return_h20: number | null;
+};
+
+export type DashboardActivationTimelineRow = {
+  activated_at: string | null;
+  activated_profile_name: string | null;
+  activated_profile_version: string | null;
+  activation_reason: string;
+};
+
+export type DashboardChartData = {
+  profile_success_rate_rows: DashboardChartSuccessRateRow[];
+  profile_avg_return_rows: DashboardChartAvgReturnRow[];
+  activation_timeline_rows: DashboardActivationTimelineRow[];
+};
+
+export type DashboardStatsResponse = {
+  current_active_profile: {
+    id: number;
+    name: string;
+    version: string;
+    is_active: boolean;
+    description: string;
+  } | null;
+  ops_summary: OpsSummaryResponse;
+  recent_activation_history: ActivationHistoryItem[];
+  profile_overview: DashboardProfileOverview;
+  compare_snapshot: CompareResponse | null;
+  chart_data: DashboardChartData;
+};
+

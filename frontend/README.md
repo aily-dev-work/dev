@@ -1,10 +1,11 @@
-# Stocks Frontend (Phase 21 / 22)
+# Stocks Frontend (Phase 21–23)
 
 Next.js + TypeScript 製の簡易管理画面です。  
 既存 Django REST API (`stocks` アプリ) を利用して、ScoreProfile / Proposal / Activation history の運用をブラウザから行えます。
 
-**フェーズ21の詳細仕様**: [stocks/PHASE21.md](../stocks/PHASE21.md)  
-**フェーズ22の詳細仕様**: [stocks/PHASE22.md](../stocks/PHASE22.md)
+**フェーズ21**: [stocks/PHASE21.md](../stocks/PHASE21.md)（フロントエンド MVP）  
+**フェーズ22**: [stocks/PHASE22.md](../stocks/PHASE22.md)（ScoreProfile フル一覧・compare 改善）  
+**フェーズ23**: [stocks/PHASE23.md](../stocks/PHASE23.md)（統計ダッシュボード・グラフ）
 
 ---
 
@@ -41,18 +42,19 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 
 ## 3. 画面一覧と API 対応
 
-### 3.1 ダッシュボード `/`
+### 3.1 ダッシュボード `/`（フェーズ23 で統計・グラフ追加）
 
 - 表示:
-  - 現在 active な profile
-  - ops-summary の counts / message_lines
-  - 直近 activation history 数件
+  - 現在 active な profile / ops summary カード（stale / underperforming / accepted_not_activated）
+  - profile overview（total, active, proposal-derived）
+  - Profile success rate (h20)・Profile avg return (h20) の棒グラフ（Recharts）
+  - Activation timeline 一覧
+  - Compare snapshot（base/candidate 指定時）→ Compare 画面へのリンク
+  - Recent activation history テーブル / message_lines
 - 操作:
-  - rollback ボタン（`/api/v1/score-profiles/rollback/`）
+  - Rollback ボタン
 - 利用 API:
-  - `GET /api/v1/score-profiles/ops-summary/`
-  - `GET /api/v1/score-profiles/current/`
-  - `GET /api/v1/score-profiles/activation-history/`
+  - `GET /api/v1/score-profiles/dashboard-stats/`（フェーズ23）
   - `POST /api/v1/score-profiles/rollback/`
 
 ### 3.2 Proposals 一覧 `/proposals`
@@ -92,7 +94,7 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
   - `GET /api/v1/score-profiles/`（フル一覧）
   - `POST /api/v1/score-profiles/<id>/activate/`
 
-### 3.5 Compare 画面 `/profiles/compare`（フェーズ22 でプルダウン選択）
+### 3.5 Compare 画面 `/profiles/compare`（フェーズ22 プルダウン / フェーズ23 グラフ）
 
 - 操作:
   - Base / Candidate をプルダウンで選択
@@ -100,6 +102,7 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
   - Active profile を画面上部に表示
 - 表示:
   - base_profile / candidate_profile の基本情報
+  - H20 Success rate・H20 Avg return の Base vs Candidate 棒グラフ（フェーズ23）
   - signal_type ごとの summary テーブル
     - total_signals
     - h5 / h10 / h20 の evaluated_count / success_count / success_rate / avg_return

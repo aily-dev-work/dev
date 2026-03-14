@@ -156,7 +156,7 @@ d:\dev\
     urls.py
     wsgi.py
     asgi.py
-  stocks/             # 株価監視アプリ（フェーズ1〜22）
+  stocks/             # 株価監視アプリ（フェーズ1〜23）
     models.py         # WatchStock, StockPriceDaily, TradingSignal, SignalOutcome, ScoreProfile, ScoreProfileProposal, ScoreProfileActivationHistory
     admin.py          # Admin for all models
     views.py          # ViewSets（stocks, stock-prices, signals）
@@ -200,6 +200,7 @@ d:\dev\
     PHASE20.md        # フェーズ20まとめ（運用サマリ API: ops-summary）
     PHASE21.md        # フェーズ21まとめ（フロントエンド MVP）
     PHASE22.md        # フェーズ22まとめ（ScoreProfile フル一覧 API とフロント改善）
+    PHASE23.md        # フェーズ23まとめ（統計ダッシュボード）
     migrations/
       0001_initial.py
       0002_stockpricedaily.py

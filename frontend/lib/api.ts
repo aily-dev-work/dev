@@ -42,3 +42,21 @@ export async function getScoreProfile(id: number) {
   return request<import("@/types/api").ScoreProfileDetail>(`/api/v1/score-profiles/${id}/`);
 }
 
+/** フェーズ23: ダッシュボード統計取得 */
+export async function getDashboardStats(params?: {
+  signal_date_from?: string;
+  signal_date_to?: string;
+  base_profile_id?: number;
+  candidate_profile_id?: number;
+}) {
+  const search = new URLSearchParams();
+  if (params?.signal_date_from) search.set("signal_date_from", params.signal_date_from);
+  if (params?.signal_date_to) search.set("signal_date_to", params.signal_date_to);
+  if (params?.base_profile_id != null) search.set("base_profile_id", String(params.base_profile_id));
+  if (params?.candidate_profile_id != null) search.set("candidate_profile_id", String(params.candidate_profile_id));
+  const qs = search.toString();
+  return request<import("@/types/api").DashboardStatsResponse>(
+    `/api/v1/score-profiles/dashboard-stats/${qs ? `?${qs}` : ""}`,
+  );
+}
+

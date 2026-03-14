@@ -1,7 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 import { getScoreProfiles, request } from "@/lib/api";
 import type {
   CompareResponse,
@@ -9,7 +19,7 @@ import type {
   ScoreProfileListItem,
 } from "@/types/api";
 
-export default function ProfilesComparePage() {
+function ComparePageContent() {
   const searchParams = useSearchParams();
   const initialBase = searchParams.get("base") ?? "";
 
@@ -181,6 +191,58 @@ export default function ProfilesComparePage() {
             />
           </div>
 
+          {/* H20 comparison bar charts */}
+          {rows.length > 0 && (
+            <div className="grid gap-4 rounded-lg border bg-white p-3 shadow-sm md:grid-cols-2">
+              <div>
+                <h3 className="mb-2 text-sm font-semibold">H20 Success rate (Base vs Candidate)</h3>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={rows.map((r) => ({
+                        name: r.signal_type,
+                        base: r.base.h20.success_rate ?? 0,
+                        candidate: r.candidate.h20.success_rate ?? 0,
+                      }))}
+                      margin={{ top: 4, right: 8, left: 8, bottom: 4 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis domain={[0, 1]} tick={{ fontSize: 10 }} />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="base" name="Base" fill="#475569" />
+                      <Bar dataKey="candidate" name="Candidate" fill="#0f766e" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div>
+                <h3 className="mb-2 text-sm font-semibold">H20 Avg return (Base vs Candidate)</h3>
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={rows.map((r) => ({
+                        name: r.signal_type,
+                        base: r.base.h20.avg_return ?? 0,
+                        candidate: r.candidate.h20.avg_return ?? 0,
+                      }))}
+                      margin={{ top: 4, right: 8, left: 8, bottom: 4 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 10 }} />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="base" name="Base" fill="#475569" />
+                      <Bar dataKey="candidate" name="Candidate" fill="#0f766e" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
             <table className="min-w-full text-xs md:text-sm">
               <thead className="bg-slate-100">
@@ -218,6 +280,14 @@ export default function ProfilesComparePage() {
         </section>
       )}
     </div>
+  );
+}
+
+export default function ProfilesComparePage() {
+  return (
+    <Suspense fallback={<p className="text-sm text-slate-600">Loading...</p>}>
+      <ComparePageContent />
+    </Suspense>
   );
 }
 

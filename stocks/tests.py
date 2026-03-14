@@ -1628,6 +1628,89 @@ class ScoreProfileListAPITests(TestCase):
         self.assertIn("detail", response.json())
 
 
+class ScoreProfileDashboardStatsAPITests(TestCase):
+    """
+    フェーズ23: ダッシュボード統計 API のテスト。
+    """
+
+    def setUp(self) -> None:
+        ScoreProfile.objects.all().delete()
+        ScoreProfileActivationHistory.objects.all().delete()
+        self.profile1 = ScoreProfile.objects.create(
+            name="DashP1",
+            version="v1",
+            is_active=True,
+            description="active",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        self.profile2 = ScoreProfile.objects.create(
+            name="DashP2",
+            version="v2",
+            is_active=False,
+            description="inactive",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+
+    def test_dashboard_stats_returns_200(self) -> None:
+        response = self.client.get("/api/v1/score-profiles/dashboard-stats/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_dashboard_stats_has_ops_summary_and_counts(self) -> None:
+        response = self.client.get("/api/v1/score-profiles/dashboard-stats/")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn("ops_summary", body)
+        ops = body["ops_summary"]
+        self.assertIn("counts", ops)
+        self.assertIn("stale_active_count", ops["counts"])
+        self.assertIn("underperforming_count", ops["counts"])
+        self.assertIn("accepted_not_activated_count", ops["counts"])
+
+    def test_dashboard_stats_has_recent_activation_history(self) -> None:
+        response = self.client.get("/api/v1/score-profiles/dashboard-stats/")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn("recent_activation_history", body)
+        self.assertIsInstance(body["recent_activation_history"], list)
+
+    def test_dashboard_stats_has_profile_overview(self) -> None:
+        response = self.client.get("/api/v1/score-profiles/dashboard-stats/")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn("profile_overview", body)
+        ov = body["profile_overview"]
+        self.assertIn("total_count", ov)
+        self.assertIn("active_count", ov)
+        self.assertIn("inactive_count", ov)
+        self.assertIn("proposal_derived_count", ov)
+        self.assertEqual(ov["total_count"], 2)
+        self.assertEqual(ov["active_count"], 1)
+        self.assertEqual(ov["inactive_count"], 1)
+
+    def test_dashboard_stats_has_chart_data_structure(self) -> None:
+        response = self.client.get("/api/v1/score-profiles/dashboard-stats/")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn("chart_data", body)
+        cd = body["chart_data"]
+        self.assertIn("profile_success_rate_rows", cd)
+        self.assertIn("profile_avg_return_rows", cd)
+        self.assertIn("activation_timeline_rows", cd)
+        self.assertIsInstance(cd["profile_success_rate_rows"], list)
+        self.assertIsInstance(cd["profile_avg_return_rows"], list)
+        self.assertIsInstance(cd["activation_timeline_rows"], list)
+
+    def test_dashboard_stats_invalid_base_candidate_returns_404(self) -> None:
+        response = self.client.get(
+            "/api/v1/score-profiles/dashboard-stats/"
+            "?base_profile_id=1&candidate_profile_id=999999"
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("detail", response.json())
+
+
 class ScoreProfileRollbackAPITests(TestCase):
     """
     フェーズ18: ScoreProfile 手動ロールバック API のテスト。

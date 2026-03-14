@@ -48,6 +48,7 @@ from .services.profile_review_targets import (
 )
 from .services.profile_comparison import compare_profiles
 from .services.profile_ops_summary import build_ops_summary
+from .services.profile_dashboard_stats import build_dashboard_stats
 
 
 class WatchStockViewSet(viewsets.ModelViewSet):
@@ -769,6 +770,65 @@ class ScoreProfileViewSet(viewsets.ViewSet):
             stale_days=stale_days,
             min_evaluated_count=min_evaluated_count,
         )
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="dashboard-stats")
+    def dashboard_stats(self, request):
+        """
+        ダッシュボード用統計 API。
+        エンドポイント: GET /api/v1/score-profiles/dashboard-stats/
+        クエリ: signal_date_from, signal_date_to, base_profile_id, candidate_profile_id,
+               threshold_success_rate, stale_days, min_evaluated_count
+        """
+        q = request.query_params
+        signal_date_from = q.get("signal_date_from") or None
+        signal_date_to = q.get("signal_date_to") or None
+        base_id = q.get("base_profile_id")
+        candidate_id = q.get("candidate_profile_id")
+        try:
+            threshold_success_rate = float(
+                q.get("threshold_success_rate") or DEFAULT_THRESHOLD_SUCCESS_RATE
+            )
+        except (TypeError, ValueError):
+            threshold_success_rate = DEFAULT_THRESHOLD_SUCCESS_RATE
+        try:
+            stale_days = int(q.get("stale_days") or DEFAULT_STALE_DAYS)
+        except (TypeError, ValueError):
+            stale_days = DEFAULT_STALE_DAYS
+        try:
+            min_evaluated_count = int(
+                q.get("min_evaluated_count") or DEFAULT_MIN_EVALUATED_COUNT
+            )
+        except (TypeError, ValueError):
+            min_evaluated_count = DEFAULT_MIN_EVALUATED_COUNT
+
+        base_pk = None
+        candidate_pk = None
+        if base_id and candidate_id:
+            try:
+                base_pk = int(base_id)
+                candidate_pk = int(candidate_id)
+            except (TypeError, ValueError):
+                return Response(
+                    {"detail": "base_profile_id and candidate_profile_id must be integers."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        try:
+            data = build_dashboard_stats(
+                signal_date_from=signal_date_from,
+                signal_date_to=signal_date_to,
+                base_profile_id=base_pk,
+                candidate_profile_id=candidate_pk,
+                threshold_success_rate=threshold_success_rate,
+                stale_days=stale_days,
+                min_evaluated_count=min_evaluated_count,
+            )
+        except ValueError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"], url_path="current/analysis-package")
