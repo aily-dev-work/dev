@@ -1528,6 +1528,24 @@ class ScoreProfileActivationHistoryAPITests(TestCase):
         response = self.client.get("/api/v1/score-profiles/999999/activation-history/")
         self.assertEqual(response.status_code, 404)
 
+    def test_delete_activation_history_returns_204_and_removes_entry(self) -> None:
+        history = ScoreProfileActivationHistory.objects.order_by("-id").first()
+        self.assertIsNotNone(history)
+        hid = history.id
+        count_before = ScoreProfileActivationHistory.objects.count()
+        response = self.client.delete(
+            f"/api/v1/score-profiles/activation-history/{hid}/",
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(ScoreProfileActivationHistory.objects.count(), count_before - 1)
+        self.assertFalse(ScoreProfileActivationHistory.objects.filter(pk=hid).exists())
+
+    def test_delete_activation_history_not_found_returns_404(self) -> None:
+        response = self.client.delete(
+            "/api/v1/score-profiles/activation-history/999999/",
+        )
+        self.assertEqual(response.status_code, 404)
+
 
 class ScoreProfileListAPITests(TestCase):
     """

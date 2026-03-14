@@ -12,6 +12,19 @@ from .signal_summary import build_summary_queryset, summarize_signals
 MAX_DATASET_LIMIT = 500
 DEFAULT_DATASET_LIMIT = 100
 
+# トレードスタイル: 長期・短期・デイトレ。分析データ量とAIの最適化方針に使う。
+TRADING_STYLE_LONG_TERM = "long_term"   # 長期保有（スイング・ポジション）
+TRADING_STYLE_SHORT_TERM = "short_term"  # 短期トレード（数日〜数週間）
+TRADING_STYLE_DAY_TRADE = "day_trade"    # デイトレード（当日決済）
+TRADING_STYLE_CHOICES = (TRADING_STYLE_LONG_TERM, TRADING_STYLE_SHORT_TERM, TRADING_STYLE_DAY_TRADE)
+
+# スタイル別のデフォルト dataset 件数（長期ほど多く取り長期的な視点で分析）
+STYLE_DEFAULT_LIMIT = {
+    TRADING_STYLE_LONG_TERM: 500,
+    TRADING_STYLE_SHORT_TERM: 300,
+    TRADING_STYLE_DAY_TRADE: 150,
+}
+
 
 def _normalize_limit(raw: Any) -> int:
     try:
@@ -35,6 +48,15 @@ def _extract_filters(params: Mapping[str, Any]) -> Dict[str, Any]:
     return {k: params.get(k) for k in keys if params.get(k) not in (None, "")}
 
 
+def _get_trading_style(params: Mapping[str, Any]) -> str:
+    raw = params.get("trading_style")
+    if isinstance(raw, (list, tuple)) and raw:
+        raw = raw[0]
+    if raw in TRADING_STYLE_CHOICES:
+        return raw
+    return TRADING_STYLE_SHORT_TERM
+
+
 def build_analysis_package_for_profile(
     profile: ScoreProfile,
     params: Mapping[str, Any],
@@ -42,8 +64,11 @@ def build_analysis_package_for_profile(
     """
     指定された ScoreProfile とクエリパラメータをもとに、
     AI 分析に渡しやすい analysis package を構築する。
+    trading_style により長期視点用のデータ量を調整する。
     """
-    limit = _normalize_limit(params.get("limit"))
+    trading_style = _get_trading_style(params)
+    style_limit = STYLE_DEFAULT_LIMIT.get(trading_style, DEFAULT_DATASET_LIMIT)
+    limit = _normalize_limit(params.get("limit") or style_limit)
     filters = _extract_filters(params)
 
     # summary 用 QuerySet: さらに score_profile_name / version で絞り込む
@@ -63,6 +88,26 @@ def build_analysis_package_for_profile(
     dataset_qs = dataset_qs[:limit]
     dataset_rows = signals_to_dataset(dataset_qs)
 
+    package_notes = (
+        "This package is intended for AI analysis to improve ScoreProfile with a LONG-TERM perspective. "
+        "It does not contain any AI-generated results. "
+    )
+    if trading_style == TRADING_STYLE_LONG_TERM:
+        package_notes += (
+            "The user trades with a long-term horizon (swing/position). "
+            "Optimize for stability and multi-month performance; avoid overfitting to recent short-term moves."
+        )
+    elif trading_style == TRADING_STYLE_SHORT_TERM:
+        package_notes += (
+            "The user does short-term trading (days to weeks). "
+            "Balance responsiveness with robustness over several weeks."
+        )
+    else:
+        package_notes += (
+            "The user is a day trader (same-day exit). "
+            "Optimize for intraday signal quality; short-horizon metrics matter most."
+        )
+
     package: Dict[str, Any] = {
         "target_profile": {
             "id": profile.id,
@@ -74,17 +119,14 @@ def build_analysis_package_for_profile(
             "weights_json": profile.weights_json,
             "thresholds_json": profile.thresholds_json,
         },
+        "trading_style": trading_style,
         "filters": {
             **filters,
             "limit": limit,
         },
         "summary": summary_rows,
         "dataset_rows": dataset_rows,
-        "notes": (
-            "This package is intended as input for AI-based analysis "
-            "to compare and improve ScoreProfile performance. "
-            "It does not contain any AI-generated results."
-        ),
+        "notes": package_notes,
     }
     return package
 

@@ -331,6 +331,14 @@ export async function deleteScoreProfile(id: number) {
   return request<null>(`/api/v1/score-profiles/${id}/`, { method: "DELETE" });
 }
 
+/** 有効化履歴 1 件を削除 */
+export async function deleteActivationHistory(historyId: number) {
+  return request<null>(
+    `/api/v1/score-profiles/activation-history/${historyId}/`,
+    { method: "DELETE" },
+  );
+}
+
 /** 監視銘柄のスコア一覧（買い/売り/様子見％）。ダッシュボード用 */
 export async function getStocksScores() {
   return request<import("@/types/api").StockScoresResponse>("/api/v1/stocks/scores/");

@@ -34,6 +34,7 @@ from .serializers import (
 )
 from .services.signal_dataset import build_signal_queryset, signals_to_dataset
 from .services.analysis_package import (
+    TRADING_STYLE_CHOICES,
     build_analysis_package_for_active_profile,
     build_analysis_package_for_profile,
 )
@@ -53,6 +54,14 @@ from .services.profile_proposal_review import (
     update_review_fields,
     validate_status,
 )
+
+
+def _analysis_params_from_request(request):
+    """query_params と body の trading_style をマージした params を返す（AI レビュー・package 用）。"""
+    params = dict(request.query_params)
+    if request.data and request.data.get("trading_style") in TRADING_STYLE_CHOICES:
+        params["trading_style"] = request.data.get("trading_style")
+    return params
 from .services.profile_apply import apply_proposal_to_new_profile
 from .services.profile_activation import activate_score_profile
 from .services.profile_rollback import RollbackNotAllowedError, rollback_to_previous_profile
@@ -1325,6 +1334,7 @@ class ScoreProfileViewSet(viewsets.ViewSet):
         エンドポイント: GET /api/v1/score-profiles/activation-history/
 
         フィルタ:
+        - profile_id: 直前プロファイルまたは現在プロファイルが一致する履歴（OR）
         - activated_profile_id
         - source_proposal_id
         - activated_from=YYYY-MM-DD
@@ -1337,13 +1347,22 @@ class ScoreProfileViewSet(viewsets.ViewSet):
             "source_proposal",
         ).all()
 
+        profile_id = request.query_params.get("profile_id")
         activated_profile_id = request.query_params.get("activated_profile_id")
         source_proposal_id = request.query_params.get("source_proposal_id")
         activated_from = request.query_params.get("activated_from")
         activated_to = request.query_params.get("activated_to")
         activation_reason = request.query_params.get("activation_reason")
 
-        if activated_profile_id:
+        if profile_id:
+            try:
+                pid = int(profile_id)
+                qs = qs.filter(
+                    models.Q(previous_profile_id=pid) | models.Q(activated_profile_id=pid)
+                )
+            except ValueError:
+                pass
+        elif activated_profile_id:
             qs = qs.filter(activated_profile_id=activated_profile_id)
         if source_proposal_id:
             qs = qs.filter(source_proposal_id=source_proposal_id)
@@ -1413,6 +1432,23 @@ class ScoreProfileViewSet(viewsets.ViewSet):
             )
 
         return Response(results, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["delete"], url_path=r"activation-history/(?P<history_id>[^/.]+)")
+    def delete_activation_history(self, request, history_id=None):
+        """
+        指定した有効化履歴を削除する。
+
+        エンドポイント: DELETE /api/v1/score-profiles/activation-history/<history_id>/
+        """
+        try:
+            entry = ScoreProfileActivationHistory.objects.get(pk=history_id)
+        except ScoreProfileActivationHistory.DoesNotExist:
+            return Response(
+                {"detail": "Activation history entry not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        entry.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["get"], url_path="activation-history")
     def activation_history_for_profile(self, request, pk=None):
@@ -1700,7 +1736,7 @@ class ScoreProfileViewSet(viewsets.ViewSet):
         AI 分析向けの入力パッケージ（summary + dataset）を返す。
         """
         profile = ScoreProfile.objects.get(pk=pk)
-        package = build_analysis_package_for_profile(profile, request.query_params)
+        package = build_analysis_package_for_profile(profile, _analysis_params_from_request(request))
         return Response(package, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["post"], url_path="current/ai-review")
@@ -1713,7 +1749,9 @@ class ScoreProfileViewSet(viewsets.ViewSet):
         """
         user_note = request.data.get("user_note")
         try:
-            result = build_ai_review_for_active_profile(request.query_params, user_note=user_note)
+            result = build_ai_review_for_active_profile(
+                _analysis_params_from_request(request), user_note=user_note
+            )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
         except ImproperlyConfigured as exc:
@@ -1733,9 +1771,10 @@ class ScoreProfileViewSet(viewsets.ViewSet):
         except ImproperlyConfigured as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
+        params = _analysis_params_from_request(request)
         try:
             ai_result = build_ai_review_for_profile(
-                profile, request.query_params, user_note=user_note
+                profile, params, user_note=user_note
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
@@ -1745,7 +1784,7 @@ class ScoreProfileViewSet(viewsets.ViewSet):
         # analysis_package 側と同じキーセットから filters を抽出する
         filters = {
             k: v
-            for k, v in request.query_params.items()
+            for k, v in params.items()
             if k in {"ticker", "signal_date_from", "signal_date_to", "signal_type"}
             and v not in ("", None)
         }
@@ -1784,9 +1823,10 @@ class ScoreProfileViewSet(viewsets.ViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        params = _analysis_params_from_request(request)
         try:
             ai_result = build_ai_review_for_profile(
-                profile, request.query_params, user_note=user_note
+                profile, params, user_note=user_note
             )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
@@ -1795,7 +1835,7 @@ class ScoreProfileViewSet(viewsets.ViewSet):
 
         filters = {
             k: v
-            for k, v in request.query_params.items()
+            for k, v in params.items()
             if k in {"ticker", "signal_date_from", "signal_date_to", "signal_type"}
             and v not in ("", None)
         }
@@ -2044,7 +2084,9 @@ class ProposalViewSet(viewsets.ViewSet):
             return Response({"detail": "ScoreProfile not found."}, status=status.HTTP_404_NOT_FOUND)
 
         try:
-            result = build_ai_review_for_profile(profile, request.query_params, user_note=user_note)
+            result = build_ai_review_for_profile(
+                profile, _analysis_params_from_request(request), user_note=user_note
+            )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
         except ImproperlyConfigured as exc:

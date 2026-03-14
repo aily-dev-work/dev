@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { getScoreProfile, updateScoreProfile } from "@/lib/api";
+import { getScoreProfile, updateScoreProfile, request } from "@/lib/api";
 import { DEFAULT_WEIGHTS, DEFAULT_THRESHOLDS } from "@/lib/profileDefaults";
 import {
   normalizeWeights,
@@ -26,6 +26,10 @@ export default function EditProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [tradingStyle, setTradingStyle] = useState<string>("short_term");
+  const [aiUserNote, setAiUserNote] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
   useEffect(() => {
     if (Number.isNaN(id)) {
@@ -77,6 +81,27 @@ export default function EditProfilePage() {
       setError((e as Error).message);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleGenerateProposal() {
+    if (Number.isNaN(id)) return;
+    setGenerateError(null);
+    setGenerating(true);
+    try {
+      const body: { trading_style: string; user_note?: string } = {
+        trading_style: tradingStyle,
+      };
+      if (aiUserNote.trim()) body.user_note = aiUserNote.trim();
+      const res = await request<{ proposal_id: number }>(
+        `/api/v1/score-profiles/${id}/ai-review-and-save/`,
+        { method: "POST", body: JSON.stringify(body) }
+      );
+      router.push(`/proposals/${res.proposal_id}`);
+    } catch (e) {
+      setGenerateError((e as Error).message);
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -164,6 +189,48 @@ export default function EditProfilePage() {
           </Link>
         </div>
       </form>
+
+      <section className="max-w-5xl space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-800">AI に提案を生成</h2>
+        <p className="text-sm text-slate-600">
+          このプロファイルを対象に、長期視点で改善提案を生成して保存します。トレードスタイルを選んで最適化できます。
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-slate-700">トレードスタイル</span>
+            <select
+              value={tradingStyle}
+              onChange={(e) => setTradingStyle(e.target.value)}
+              className="rounded border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="long_term">長期（スイング・ポジション）</option>
+              <option value="short_term">短期（数日〜数週間）</option>
+              <option value="day_trade">デイトレ</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-slate-700">メモ（任意）</span>
+            <input
+              type="text"
+              value={aiUserNote}
+              onChange={(e) => setAiUserNote(e.target.value)}
+              placeholder="AI への補足"
+              className="min-w-[180px] rounded border border-slate-300 px-3 py-2 text-sm"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={handleGenerateProposal}
+            disabled={generating}
+            className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-60"
+          >
+            {generating ? "生成中..." : "このプロファイルで提案を生成"}
+          </button>
+        </div>
+        {generateError && (
+          <p className="text-sm text-red-600">{generateError}</p>
+        )}
+      </section>
     </div>
   );
 }
