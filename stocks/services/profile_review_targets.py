@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 from django.utils import timezone
 
 from ..models import ScoreProfile, ScoreProfileActivationHistory, ScoreProfileProposal
+from .evaluation_horizon import get_horizon_key_and_days
 from .scoring_profile import get_active_score_profile
 from .signal_summary import build_summary_queryset, summarize_signals
 
@@ -41,16 +42,17 @@ def _is_underperforming(
     min_evaluated_count: int,
 ) -> bool:
     """
-    underperforming 判定: いずれかの signal_type で
-    h20.evaluated_count >= min_evaluated_count かつ h20.success_rate < threshold_success_rate
-    なら True。
+    underperforming 判定: プロファイルのトレードスタイルに応じた評価期間（h5/h10/h20）で、
+    いずれかの signal_type で evaluated_count >= min_evaluated_count かつ
+    success_rate < threshold_success_rate なら True。
     データが無い、または evaluated_count が不足している場合は underperforming と見なさない。
     """
+    horizon_key, _ = get_horizon_key_and_days(profile)
     rows = _profile_summary(profile, params)
     for row in rows:
-        h20 = row.get("h20") or {}
-        sr = h20.get("success_rate")
-        evaluated = h20.get("evaluated_count", 0)
+        horizon_data = row.get(horizon_key) or {}
+        sr = horizon_data.get("success_rate")
+        evaluated = horizon_data.get("evaluated_count", 0)
         if (
             evaluated >= min_evaluated_count
             and sr is not None

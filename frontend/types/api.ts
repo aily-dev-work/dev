@@ -300,6 +300,8 @@ export type DashboardChartSuccessRateRow = {
   profile_version: string;
   signal_type: string;
   success_rate_h20: number | null;
+  /** トレードスタイルに応じた評価期間（営業日）。デイトレ=5・短期=10・長期=20 */
+  evaluation_horizon_days?: number;
 };
 
 export type DashboardChartAvgReturnRow = {
@@ -308,6 +310,8 @@ export type DashboardChartAvgReturnRow = {
   profile_version: string;
   signal_type: string;
   avg_return_h20: number | null;
+  /** トレードスタイルに応じた評価期間（営業日） */
+  evaluation_horizon_days?: number;
 };
 
 export type DashboardActivationTimelineRow = {

@@ -28,6 +28,7 @@ from .services.scoring_profile import get_active_score_profile, get_active_scori
 from .services.profile_proposal import save_profile_proposal
 from .services.signal_generation import generate_trading_signal
 from .services.signal_scoring import score_from_technical, ScoreResult
+from .services.evaluation_horizon import get_horizon_key_and_days
 from .services.signal_summary import build_summary_queryset, summarize_signals
 from .services.technical_analysis import (
     calculate_technical_summary,
@@ -1716,6 +1717,43 @@ class ScoreProfileListAPITests(TestCase):
         self.assertIn("detail", response.json())
 
 
+class EvaluationHorizonTests(TestCase):
+    """トレードスタイル別の評価期間（horizon）選択をテストする。"""
+
+    def test_get_horizon_key_and_days_by_trading_style(self) -> None:
+        for style, expected_key, expected_days in [
+            (ScoreProfile.TRADING_STYLE_DAY_TRADE, "h5", 5),
+            (ScoreProfile.TRADING_STYLE_SHORT_TERM, "h10", 10),
+            (ScoreProfile.TRADING_STYLE_LONG_TERM, "h20", 20),
+        ]:
+            profile = ScoreProfile.objects.create(
+                name="T",
+                version="v1",
+                is_active=False,
+                description="",
+                weights_json={},
+                thresholds_json={},
+                trading_style=style,
+            )
+            key, days = get_horizon_key_and_days(profile)
+            self.assertEqual(key, expected_key)
+            self.assertEqual(days, expected_days)
+
+    def test_get_horizon_key_and_days_defaults_to_short_term(self) -> None:
+        profile = ScoreProfile.objects.create(
+            name="T",
+            version="v1",
+            is_active=False,
+            description="",
+            weights_json={},
+            thresholds_json={},
+            trading_style="",  # 不正値は short_term 扱い
+        )
+        key, days = get_horizon_key_and_days(profile)
+        self.assertEqual(key, "h10")
+        self.assertEqual(days, 10)
+
+
 class ScoreProfileDashboardStatsAPITests(TestCase):
     """
     フェーズ23: ダッシュボード統計 API のテスト。
@@ -1789,6 +1827,18 @@ class ScoreProfileDashboardStatsAPITests(TestCase):
         self.assertIsInstance(cd["profile_success_rate_rows"], list)
         self.assertIsInstance(cd["profile_avg_return_rows"], list)
         self.assertIsInstance(cd["activation_timeline_rows"], list)
+
+    def test_dashboard_stats_chart_rows_include_evaluation_horizon_days(self) -> None:
+        """chart_data の各行に evaluation_horizon_days が含まれる（トレードスタイル別 5/10/20）。"""
+        response = self.client.get("/api/v1/score-profiles/dashboard-stats/")
+        self.assertEqual(response.status_code, 200)
+        cd = response.json()["chart_data"]
+        for row in cd["profile_success_rate_rows"]:
+            self.assertIn("evaluation_horizon_days", row)
+            self.assertIn(row["evaluation_horizon_days"], (5, 10, 20))
+        for row in cd["profile_avg_return_rows"]:
+            self.assertIn("evaluation_horizon_days", row)
+            self.assertIn(row["evaluation_horizon_days"], (5, 10, 20))
 
     def test_dashboard_stats_invalid_base_candidate_returns_404(self) -> None:
         response = self.client.get(
@@ -2036,7 +2086,7 @@ class ScoreProfileReviewTargetsAPITests(TestCase):
         self.assertEqual(entry["source_proposal_id"], self.proposal.id)
 
     def test_review_targets_underperforming_profiles(self) -> None:
-        # success_rate が低い profile: 2件中0件成功 → h20 success_rate 0
+        # success_rate が低い profile: 2件中0件成功 → h20 success_rate 0。h20 で判定するため long_term
         # min_evaluated_count=2 なら underperforming、デフォルト 5 なら含まれない
         low_profile = ScoreProfile.objects.create(
             name="LowRate",
@@ -2045,6 +2095,7 @@ class ScoreProfileReviewTargetsAPITests(TestCase):
             description="",
             weights_json={"buy": {}, "sell": {}},
             thresholds_json={},
+            trading_style=ScoreProfile.TRADING_STYLE_LONG_TERM,
         )
         for i in range(2):
             sig = TradingSignal.objects.create(
@@ -2087,7 +2138,7 @@ class ScoreProfileReviewTargetsAPITests(TestCase):
         self.assertIn(low_profile.id, ids)
 
     def test_review_targets_underperforming_excluded_when_below_min_evaluated_count(self) -> None:
-        # 上記と同じ 2 件のみの low-rate profile。デフォルト min_evaluated_count=5 では underperforming に含まれない
+        # 上記と同じ 2 件のみの low-rate profile。h20 で判定するため long_term。デフォルト min_evaluated_count=5 では underperforming に含まれない
         low_profile = ScoreProfile.objects.create(
             name="LowRateFew",
             version="v1",
@@ -2095,6 +2146,7 @@ class ScoreProfileReviewTargetsAPITests(TestCase):
             description="",
             weights_json={"buy": {}, "sell": {}},
             thresholds_json={},
+            trading_style=ScoreProfile.TRADING_STYLE_LONG_TERM,
         )
         for i in range(2):
             sig = TradingSignal.objects.create(
@@ -2136,7 +2188,7 @@ class ScoreProfileReviewTargetsAPITests(TestCase):
         self.assertNotIn(low_profile.id, ids)
 
     def test_review_targets_underperforming_included_when_meets_min_evaluated_count(self) -> None:
-        # 5 件以上評価があり success_rate が閾値未満 → underperforming に含まれる
+        # 5 件以上評価があり success_rate が閾値未満 → underperforming に含まれる。h20 で判定するため long_term
         low_profile = ScoreProfile.objects.create(
             name="LowRateEnough",
             version="v1",
@@ -2144,6 +2196,7 @@ class ScoreProfileReviewTargetsAPITests(TestCase):
             description="",
             weights_json={"buy": {}, "sell": {}},
             thresholds_json={},
+            trading_style=ScoreProfile.TRADING_STYLE_LONG_TERM,
         )
         for i in range(5):
             sig = TradingSignal.objects.create(
@@ -2186,7 +2239,7 @@ class ScoreProfileReviewTargetsAPITests(TestCase):
         self.assertIn(low_profile.id, ids)
 
     def test_review_targets_min_evaluated_count_param_changes_result(self) -> None:
-        # 同じ 2 件の low-rate profile で、min_evaluated_count=2 なら含まれる、5 なら含まれない
+        # 同じ 2 件の low-rate profile で、min_evaluated_count=2 なら含まれる、5 なら含まれない。h20 で判定するため long_term
         low_profile = ScoreProfile.objects.create(
             name="LowRateParam",
             version="v1",
@@ -2194,6 +2247,7 @@ class ScoreProfileReviewTargetsAPITests(TestCase):
             description="",
             weights_json={"buy": {}, "sell": {}},
             thresholds_json={},
+            trading_style=ScoreProfile.TRADING_STYLE_LONG_TERM,
         )
         for i in range(2):
             sig = TradingSignal.objects.create(
@@ -2435,7 +2489,7 @@ class ScoreProfileOpsSummaryAPITests(TestCase):
         old_date = timezone.now() - timezone.timedelta(days=40)
         ScoreProfileActivationHistory.objects.filter(pk=h.pk).update(activated_at=old_date)
 
-        # underperforming profile（5件すべて失敗）
+        # underperforming profile（5件すべて失敗）。h20 で判定するため long_term を指定
         self.under_profile = ScoreProfile.objects.create(
             name="OpsUnder",
             version="v1",
@@ -2443,6 +2497,7 @@ class ScoreProfileOpsSummaryAPITests(TestCase):
             description="",
             weights_json={"buy": {}, "sell": {}},
             thresholds_json={},
+            trading_style=ScoreProfile.TRADING_STYLE_LONG_TERM,
         )
         for i in range(5):
             sig = TradingSignal.objects.create(

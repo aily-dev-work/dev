@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from ..models import ScoreProfile, ScoreProfileActivationHistory
+from .evaluation_horizon import get_horizon_key_and_days
 from .profile_ops_summary import build_ops_summary
 from .profile_comparison import compare_profiles
 from .profile_review_targets import (
@@ -100,20 +101,22 @@ def _chart_data(
     profile_avg_return_rows: List[Dict[str, Any]] = []
 
     for profile in ScoreProfile.objects.all():
+        horizon_key, horizon_days = get_horizon_key_and_days(profile)
         params["score_profile_name"] = profile.name
         params["score_profile_version"] = profile.version
         qs = build_summary_queryset(params)
         rows = summarize_signals(qs)
         for row in rows:
-            h20 = row.get("h20") or {}
-            sr = h20.get("success_rate")
-            ar = h20.get("avg_return")
+            horizon_data = row.get(horizon_key) or {}
+            sr = horizon_data.get("success_rate")
+            ar = horizon_data.get("avg_return")
             profile_success_rate_rows.append({
                 "profile_id": profile.id,
                 "profile_name": profile.name,
                 "profile_version": profile.version,
                 "signal_type": row.get("signal_type", ""),
                 "success_rate_h20": sr,
+                "evaluation_horizon_days": horizon_days,
             })
             profile_avg_return_rows.append({
                 "profile_id": profile.id,
@@ -121,6 +124,7 @@ def _chart_data(
                 "profile_version": profile.version,
                 "signal_type": row.get("signal_type", ""),
                 "avg_return_h20": ar,
+                "evaluation_horizon_days": horizon_days,
             })
 
     timeline = _recent_activation_history(limit=50)

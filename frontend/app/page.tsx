@@ -86,11 +86,13 @@ export default function DashboardPage() {
     chartData?.profile_success_rate_rows.map((r) => ({
       name: formatLabel(r),
       rate: r.success_rate_h20 != null ? Math.round(r.success_rate_h20 * 100) / 100 : null,
+      horizonDays: r.evaluation_horizon_days ?? 20,
     })) ?? [];
   const avgReturnChartData =
     chartData?.profile_avg_return_rows.map((r) => ({
       name: formatLabel(r),
       return: r.avg_return_h20,
+      horizonDays: r.evaluation_horizon_days ?? 20,
     })) ?? [];
 
   return (
@@ -171,7 +173,14 @@ export default function DashboardPage() {
         <section className="rounded-lg border bg-white p-4 shadow-sm">
           <h2 className="mb-3 text-lg font-semibold">監視銘柄のスコア（買い・売り・様子見）</h2>
           <p className="mb-3 text-xs text-slate-500">
-            現在のアクティブプロファイルで算出したスコアを％で表示しています。
+            {data?.current_active_profile ? (
+              <>
+                上記の<strong>使用中プロファイル</strong>（{displayProfileName(data.current_active_profile.name)}）で算出した
+                買い％・売り％・様子見％および<strong>現在の判定</strong>を表示しています。
+              </>
+            ) : (
+              "使用中プロファイルで算出したスコアを％で表示しています。"
+            )}
           </p>
           <div className="overflow-x-auto">
             <table className="min-w-full border text-sm">
@@ -179,12 +188,12 @@ export default function DashboardPage() {
                 <tr>
                   <th className="border px-2 py-1 text-left">銘柄コード</th>
                   <th className="border px-2 py-1 text-left">銘柄名</th>
-                  <th className="border px-2 py-1 text-center">長期トレンド</th>
-                  <th className="border px-2 py-1 text-center">短期トレンド</th>
                   <th className="border px-2 py-1 text-center">買い％</th>
                   <th className="border px-2 py-1 text-center">売り％</th>
                   <th className="border px-2 py-1 text-center">様子見％</th>
                   <th className="border px-2 py-1 text-center">現在の判定</th>
+                  <th className="border px-2 py-1 text-center">長期トレンド</th>
+                  <th className="border px-2 py-1 text-center">短期トレンド</th>
                 </tr>
               </thead>
               <tbody>
@@ -192,18 +201,6 @@ export default function DashboardPage() {
                   <tr key={s.stock_id} className="odd:bg-slate-50">
                     <td className="border px-2 py-1 font-mono">{s.ticker}</td>
                     <td className="border px-2 py-1">{s.name || "-"}</td>
-                    <td className="border px-2 py-1 text-center text-xs">
-                      {s.long_term_trend === "up" && <span className="text-emerald-700">上昇</span>}
-                      {s.long_term_trend === "neutral" && <span className="text-slate-600">中立</span>}
-                      {s.long_term_trend === "down" && <span className="text-red-700">下降</span>}
-                      {(!s.long_term_trend || !["up", "neutral", "down"].includes(s.long_term_trend)) && <span className="text-slate-400">-</span>}
-                    </td>
-                    <td className="border px-2 py-1 text-center text-xs">
-                      {s.short_term_trend === "up" && <span className="text-emerald-700">上昇</span>}
-                      {s.short_term_trend === "neutral" && <span className="text-slate-600">中立</span>}
-                      {s.short_term_trend === "down" && <span className="text-red-700">下降</span>}
-                      {(!s.short_term_trend || !["up", "neutral", "down"].includes(s.short_term_trend)) && <span className="text-slate-400">-</span>}
-                    </td>
                     <td className="border px-2 py-1 text-center">
                       {s.insufficient_data ? (
                         <span className="text-slate-400">-</span>
@@ -236,6 +233,18 @@ export default function DashboardPage() {
                         </span>
                       )}
                     </td>
+                    <td className="border px-2 py-1 text-center text-xs">
+                      {s.long_term_trend === "up" && <span className="text-emerald-700">上昇</span>}
+                      {s.long_term_trend === "neutral" && <span className="text-slate-600">中立</span>}
+                      {s.long_term_trend === "down" && <span className="text-red-700">下降</span>}
+                      {(!s.long_term_trend || !["up", "neutral", "down"].includes(s.long_term_trend)) && <span className="text-slate-400">-</span>}
+                    </td>
+                    <td className="border px-2 py-1 text-center text-xs">
+                      {s.short_term_trend === "up" && <span className="text-emerald-700">上昇</span>}
+                      {s.short_term_trend === "neutral" && <span className="text-slate-600">中立</span>}
+                      {s.short_term_trend === "down" && <span className="text-red-700">下降</span>}
+                      {(!s.short_term_trend || !["up", "neutral", "down"].includes(s.short_term_trend)) && <span className="text-slate-400">-</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -261,81 +270,11 @@ export default function DashboardPage() {
         </section>
       )}
 
-      {/* Charts (client-only to avoid Recharts SSR issues) */}
+      {/* Charts (client-only to avoid Recharts SSR issues). 評価期間はプロファイルのトレードスタイル別（デイトレ5日・短期10日・長期20日）。 */}
       <DashboardCharts
         successRateData={successRateChartData}
         avgReturnData={avgReturnChartData}
       />
-
-      {/* Activation timeline (list) */}
-      {chartData && chartData.activation_timeline_rows.length > 0 && (
-        <section className="rounded-lg border bg-white p-4 shadow-sm">
-          <h2 className="mb-2 text-lg font-semibold">有効化タイムライン</h2>
-          <ul className="space-y-1 text-sm">
-            {chartData.activation_timeline_rows.slice(0, 15).map((row, idx) => (
-              <li key={idx} className="flex flex-wrap gap-2 border-b border-slate-100 py-1">
-                <span className="text-slate-500">{row.activated_at ?? "-"}</span>
-                <span className="font-medium">
-                  {row.activated_profile_name ?? "?"} ({row.activated_profile_version ?? "?"})
-                </span>
-                <span className="text-slate-500">{row.activation_reason}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {/* Recent activation history table */}
-      <section className="rounded-lg border bg-white p-4 shadow-sm">
-        <h2 className="mb-2 text-lg font-semibold">直近の有効化履歴</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full border text-sm">
-            <thead className="bg-slate-100">
-              <tr>
-                <th className="border px-2 py-1 text-left">有効化日時</th>
-                <th className="border px-2 py-1 text-left">理由</th>
-                <th className="border px-2 py-1 text-left">直前</th>
-                <th className="border px-2 py-1 text-left">有効化後</th>
-                <th className="border px-2 py-1 text-left">メモ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data?.recent_activation_history.map((h) => (
-                <tr key={h.id} className="odd:bg-slate-50">
-                  <td className="border px-2 py-1">{h.activated_at ?? "-"}</td>
-                  <td className="border px-2 py-1">{h.activation_reason}</td>
-                  <td className="border px-2 py-1">
-                    {h.previous_profile_id
-                      ? `${h.previous_profile_name} (${h.previous_profile_version}) [id=${h.previous_profile_id}]`
-                      : "-"}
-                  </td>
-                  <td className="border px-2 py-1">
-                    {`${h.activated_profile_name} (${h.activated_profile_version}) [id=${h.activated_profile_id}]`}
-                  </td>
-                  <td className="border px-2 py-1">{h.note}</td>
-                </tr>
-              ))}
-              {(!data?.recent_activation_history?.length) && (
-                <tr>
-                  <td colSpan={5} className="border px-2 py-2 text-center text-slate-500">
-                    履歴がありません。
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* message_lines */}
-      <section className="rounded-lg border bg-white p-4 shadow-sm">
-        <h2 className="mb-2 text-lg font-semibold">メッセージ</h2>
-        <ul className="list-disc space-y-1 pl-5 text-sm text-slate-800">
-          {ops?.message_lines.map((line, idx) => (
-            <li key={idx}>{line}</li>
-          )) ?? <li className="text-slate-500">メッセージはありません。</li>}
-        </ul>
-      </section>
     </div>
   );
 }
