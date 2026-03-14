@@ -125,9 +125,10 @@ class WatchStockViewSet(viewsets.ModelViewSet):
         limit = min(int(request.query_params.get("limit") or 500), 2000)
 
         if resolution == "1d":
-            qs = (
+            # 直近 limit 件を時系列昇順で返す（チャートで最新が右になるように）
+            qs = list(
                 StockPriceDaily.objects.filter(stock=stock)
-                .order_by("date")
+                .order_by("-date")
                 .values_list("date", "open_price", "high_price", "low_price", "close_price", "volume")[:limit]
             )
             rows = [
@@ -139,12 +140,13 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     "close": float(c),
                     "volume": v if v is not None else None,
                 }
-                for d, o, h, l, c, v in qs
+                for d, o, h, l, c, v in reversed(qs)
             ]
         elif resolution == "5m":
-            qs = (
+            # 直近 limit 件を取得し、時系列昇順で返す（チャートで最新が右になるように）
+            qs = list(
                 StockPrice5Min.objects.filter(stock=stock)
-                .order_by("datetime")
+                .order_by("-datetime")
                 .values_list("datetime", "open_price", "high_price", "low_price", "close_price", "volume")[:limit]
             )
             rows = [
@@ -156,12 +158,13 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     "close": float(c),
                     "volume": v if v is not None else None,
                 }
-                for dt, o, h, l, c, v in qs
+                for dt, o, h, l, c, v in reversed(qs)
             ]
         elif resolution == "1m":
-            qs = (
+            # 直近 limit 件を時系列昇順で返す
+            qs = list(
                 StockPriceMonthly.objects.filter(stock=stock)
-                .order_by("date")
+                .order_by("-date")
                 .values_list("date", "open_price", "high_price", "low_price", "close_price", "volume")[:limit]
             )
             rows = [
@@ -173,12 +176,13 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     "close": float(c),
                     "volume": v if v is not None else None,
                 }
-                for d, o, h, l, c, v in qs
+                for d, o, h, l, c, v in reversed(qs)
             ]
         elif resolution == "1w":
-            qs = (
+            # 直近 limit 件を時系列昇順で返す
+            qs = list(
                 StockPriceWeekly.objects.filter(stock=stock)
-                .order_by("date")
+                .order_by("-date")
                 .values_list("date", "open_price", "high_price", "low_price", "close_price", "volume")[:limit]
             )
             rows = [
@@ -190,7 +194,7 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     "close": float(c),
                     "volume": v if v is not None else None,
                 }
-                for d, o, h, l, c, v in qs
+                for d, o, h, l, c, v in reversed(qs)
             ]
         else:
             return Response(
@@ -356,12 +360,16 @@ class WatchStockViewSet(viewsets.ModelViewSet):
             except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError) as e:
                 logger.warning("fetch_prices weekly ticker=%s range=%s: %s", ticker, range_param, e)
 
-        # 月足（直近5年）
-        try:
-            data = fetch_yahoo("1mo", "5y")
-            parsed = parse_quote(data)
-            if parsed:
+        # 月足（Yahoo は range に 10y まで。20y は無効で 500 の原因になる）
+        for range_param in ("10y", "5y", "2y"):
+            try:
+                data = fetch_yahoo("1mo", range_param)
+                parsed = parse_quote(data)
+                if not parsed:
+                    continue
                 timestamps, opens, highs, lows, closes, volumes = parsed
+                if not timestamps:
+                    continue
                 for i in range(len(timestamps)):
                     ts = timestamps[i]
                     if ts is None:
@@ -387,8 +395,9 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     )
                     if was_created:
                         created_monthly += 1
-        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
-            pass
+                break
+            except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError, KeyError, TypeError) as e:
+                logger.warning("fetch_prices monthly ticker=%s range=%s: %s", ticker, range_param, e)
 
         return Response({
             "stock_id": stock.id,

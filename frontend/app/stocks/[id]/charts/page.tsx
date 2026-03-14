@@ -23,18 +23,11 @@ const RESOLUTION_LABELS: Record<Resolution, string> = {
   "1m": "月足",
 };
 
-/** 表示用に足数を制限。forLargeChart=true のときは2倍の期間 */
+/** 表示用に足数を制限。4分割60本、全画面180本で統一 */
 function limitBarsForDisplay(bars: StockPriceBar[], resolution: Resolution, forLargeChart?: boolean): StockPriceBar[] {
   if (bars.length === 0) return bars;
-  const mul = forLargeChart ? 2 : 1;
-  if (resolution === "1d") return bars.slice(-60 * mul);
-  if (resolution === "5m") {
-    const barsPerPeriod = 6 * (60 / 5); // 6時間分
-    return bars.slice(-barsPerPeriod * mul);
-  }
-  if (resolution === "1w") return bars.slice(-80 * mul);
-  if (resolution === "1m") return bars.slice(-60 * mul);
-  return bars;
+  const limit = forLargeChart ? 180 : 60;
+  return bars.slice(-limit);
 }
 
 function barsToChartData(bars: StockPriceBar[], resolution: Resolution) {
