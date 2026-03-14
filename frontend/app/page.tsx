@@ -183,63 +183,93 @@ export default function DashboardPage() {
             )}
           </p>
           <div className="overflow-x-auto">
-            <table className="min-w-full border text-sm">
+            <table className="min-w-full table-fixed border text-sm">
               <thead className="bg-slate-100">
                 <tr>
-                  <th className="border px-2 py-1 text-left">銘柄コード</th>
-                  <th className="border px-2 py-1 text-left">銘柄名</th>
-                  <th className="border px-2 py-1 text-center">買い％</th>
-                  <th className="border px-2 py-1 text-center">売り％</th>
-                  <th className="border px-2 py-1 text-center">様子見％</th>
-                  <th className="border px-2 py-1 text-center">現在の判定</th>
-                  <th className="border px-2 py-1 text-center">長期トレンド</th>
-                  <th className="border px-2 py-1 text-center">短期トレンド</th>
+                  <th className="border px-2 py-1 text-left w-24">銘柄コード</th>
+                  <th className="border px-2 py-1 text-left min-w-0">銘柄名</th>
+                  <th className="border px-2 py-1 text-center w-[10%]">買い％</th>
+                  <th className="border px-2 py-1 text-center w-[10%]">売り％</th>
+                  <th className="border px-2 py-1 text-center w-[10%]">様子見％</th>
+                  <th className="border px-2 py-1 text-center w-[10%]">現在の判定</th>
+                  <th className="border px-2 py-1 text-center w-[10%]">長期トレンド</th>
+                  <th className="border px-2 py-1 text-center w-[10%]">短期トレンド</th>
                 </tr>
               </thead>
               <tbody>
                 {stockScores.map((s) => (
                   <tr key={s.stock_id} className="odd:bg-slate-50">
-                    <td className="border px-2 py-1 font-mono">{s.ticker}</td>
-                    <td className="border px-2 py-1">{s.name || "-"}</td>
-                    <td className="border px-2 py-1 text-center">
+                    <td className="border px-2 py-1 font-mono w-24">{s.ticker}</td>
+                    <td className="border px-2 py-1 min-w-0">{s.name || "-"}</td>
+                    <td className="border px-2 py-1 text-center w-[10%]">
                       {s.insufficient_data ? (
                         <span className="text-slate-400">-</span>
                       ) : (
                         <span className="font-medium text-emerald-700">{s.buy_pct}%</span>
                       )}
                     </td>
-                    <td className="border px-2 py-1 text-center">
+                    <td className="border px-2 py-1 text-center w-[10%]">
                       {s.insufficient_data ? (
                         <span className="text-slate-400">-</span>
                       ) : (
                         <span className="font-medium text-red-700">{s.sell_pct}%</span>
                       )}
                     </td>
-                    <td className="border px-2 py-1 text-center">
+                    <td className="border px-2 py-1 text-center w-[10%]">
                       {s.insufficient_data ? (
                         <span className="text-slate-400">-</span>
                       ) : (
                         <span className="text-slate-600">{s.wait_pct}%</span>
                       )}
                     </td>
-                    <td className="border px-2 py-1 text-center text-xs">
+                    <td className="border px-2 py-1 text-center text-xs w-[10%]">
                       {s.insufficient_data ? (
                         <span className="text-amber-600">データ不足</span>
-                      ) : (
+                      ) : s.bias === "buy" ? (
                         <span>
-                          {s.bias === "buy" && "買い"}
-                          {s.bias === "sell" && "売り"}
-                          {s.bias === "neutral" && "様子見"} / {s.strength}
+                          <span className="font-bold text-emerald-700">買い</span>
+                          <span className="text-slate-500"> / </span>
+                          <span
+                            className={
+                              s.strength === "weak"
+                                ? "text-emerald-500"
+                                : s.strength === "strong"
+                                  ? "text-emerald-800"
+                                  : "text-emerald-600"
+                            }
+                          >
+                            {s.strength}
+                          </span>
+                        </span>
+                      ) : s.bias === "sell" ? (
+                        <span>
+                          <span className="font-bold text-red-700">売り</span>
+                          <span className="text-slate-500"> / </span>
+                          <span
+                            className={
+                              s.strength === "weak"
+                                ? "text-red-500"
+                                : s.strength === "strong"
+                                  ? "text-red-800"
+                                  : "text-red-600"
+                            }
+                          >
+                            {s.strength}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-slate-600">
+                          様子見{s.strength ? ` / ${s.strength}` : ""}
                         </span>
                       )}
                     </td>
-                    <td className="border px-2 py-1 text-center text-xs">
+                    <td className="border px-2 py-1 text-center text-xs w-[10%]">
                       {s.long_term_trend === "up" && <span className="text-emerald-700">上昇</span>}
                       {s.long_term_trend === "neutral" && <span className="text-slate-600">中立</span>}
                       {s.long_term_trend === "down" && <span className="text-red-700">下降</span>}
                       {(!s.long_term_trend || !["up", "neutral", "down"].includes(s.long_term_trend)) && <span className="text-slate-400">-</span>}
                     </td>
-                    <td className="border px-2 py-1 text-center text-xs">
+                    <td className="border px-2 py-1 text-center text-xs w-[10%]">
                       {s.short_term_trend === "up" && <span className="text-emerald-700">上昇</span>}
                       {s.short_term_trend === "neutral" && <span className="text-slate-600">中立</span>}
                       {s.short_term_trend === "down" && <span className="text-red-700">下降</span>}
