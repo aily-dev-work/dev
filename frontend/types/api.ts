@@ -10,6 +10,73 @@ export type WatchStock = {
   updated_at?: string | null;
 };
 
+/** 価格足（5分/日/月）1本 */
+export type StockPriceBar = {
+  date?: string;
+  datetime?: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number | null;
+};
+
+/** GET /api/v1/stocks/:id/prices/ の返却 */
+export type StockPricesResponse = {
+  resolution: string;
+  stock_id: number;
+  ticker: string;
+  bars: StockPriceBar[];
+};
+
+/** 日足株価 1件（CRUD API） */
+export type StockPriceDailyRow = {
+  id: number;
+  stock: number;
+  stock_ticker: string;
+  stock_name: string;
+  date: string;
+  open_price: string;
+  high_price: string;
+  low_price: string;
+  close_price: string;
+  volume: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+/** 5分足株価 1件（CRUD API） */
+export type StockPrice5MinRow = {
+  id: number;
+  stock: number;
+  stock_ticker: string;
+  stock_name: string;
+  datetime: string;
+  open_price: string;
+  high_price: string;
+  low_price: string;
+  close_price: string;
+  volume: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+/** 月足株価 1件（CRUD API） */
+export type StockPriceMonthlyRow = {
+  id: number;
+  stock: number;
+  stock_ticker: string;
+  stock_name: string;
+  date: string;
+  open_price: string;
+  high_price: string;
+  low_price: string;
+  close_price: string;
+  volume: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export type ScoreProfile = {
   id: number;
   name: string;

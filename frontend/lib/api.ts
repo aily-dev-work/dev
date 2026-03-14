@@ -78,6 +78,159 @@ export async function deleteStock(id: number) {
   return request<null>(`/api/v1/stocks/${id}/`, { method: "DELETE" });
 }
 
+/** 銘柄の価格データ取得（5分足/日足/月足） */
+export async function getStockPrices(
+  stockId: number,
+  params?: { resolution?: "5m" | "1d" | "1m"; limit?: number },
+) {
+  const resolution = params?.resolution ?? "1d";
+  const limit = params?.limit ?? 500;
+  return request<import("@/types/api").StockPricesResponse>(
+    `/api/v1/stocks/${stockId}/prices/?resolution=${resolution}&limit=${limit}`,
+  );
+}
+
+/** 日足一覧（?stock= で銘柄指定） */
+export async function getStockPricesDaily(stockId: number) {
+  return request<import("@/types/api").StockPriceDailyRow[]>(
+    `/api/v1/stock-prices/?stock=${stockId}`,
+  );
+}
+
+/** 日足 作成 */
+export async function createStockPriceDaily(body: {
+  stock: number;
+  date: string;
+  open_price: number;
+  high_price: number;
+  low_price: number;
+  close_price: number;
+  volume?: number | null;
+}) {
+  return request<import("@/types/api").StockPriceDailyRow>("/api/v1/stock-prices/", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** 日足 更新 */
+export async function updateStockPriceDaily(
+  id: number,
+  body: Partial<{
+    date: string;
+    open_price: number;
+    high_price: number;
+    low_price: number;
+    close_price: number;
+    volume: number | null;
+  }>,
+) {
+  return request<import("@/types/api").StockPriceDailyRow>(`/api/v1/stock-prices/${id}/`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+/** 日足 削除 */
+export async function deleteStockPriceDaily(id: number) {
+  return request<null>(`/api/v1/stock-prices/${id}/`, { method: "DELETE" });
+}
+
+/** 5分足一覧 */
+export async function getStockPrices5m(stockId: number) {
+  return request<import("@/types/api").StockPrice5MinRow[]>(
+    `/api/v1/stock-prices-5m/?stock=${stockId}`,
+  );
+}
+
+/** 5分足 作成 */
+export async function createStockPrice5m(body: {
+  stock: number;
+  datetime: string;
+  open_price: number;
+  high_price: number;
+  low_price: number;
+  close_price: number;
+  volume?: number | null;
+}) {
+  return request<import("@/types/api").StockPrice5MinRow>("/api/v1/stock-prices-5m/", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** 5分足 更新 */
+export async function updateStockPrice5m(
+  id: number,
+  body: Partial<{
+    datetime: string;
+    open_price: number;
+    high_price: number;
+    low_price: number;
+    close_price: number;
+    volume: number | null;
+  }>,
+) {
+  return request<import("@/types/api").StockPrice5MinRow>(`/api/v1/stock-prices-5m/${id}/`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+/** 5分足 削除 */
+export async function deleteStockPrice5m(id: number) {
+  return request<null>(`/api/v1/stock-prices-5m/${id}/`, { method: "DELETE" });
+}
+
+/** 月足一覧 */
+export async function getStockPricesMonthly(stockId: number) {
+  return request<import("@/types/api").StockPriceMonthlyRow[]>(
+    `/api/v1/stock-prices-monthly/?stock=${stockId}`,
+  );
+}
+
+/** 月足 作成 */
+export async function createStockPriceMonthly(body: {
+  stock: number;
+  date: string;
+  open_price: number;
+  high_price: number;
+  low_price: number;
+  close_price: number;
+  volume?: number | null;
+}) {
+  return request<import("@/types/api").StockPriceMonthlyRow>("/api/v1/stock-prices-monthly/", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** 月足 更新 */
+export async function updateStockPriceMonthly(
+  id: number,
+  body: Partial<{
+    date: string;
+    open_price: number;
+    high_price: number;
+    low_price: number;
+    close_price: number;
+    volume: number | null;
+  }>,
+) {
+  return request<import("@/types/api").StockPriceMonthlyRow>(
+    `/api/v1/stock-prices-monthly/${id}/`,
+    {
+      method: "PUT",
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+/** 月足 削除 */
+export async function deleteStockPriceMonthly(id: number) {
+  return request<null>(`/api/v1/stock-prices-monthly/${id}/`, { method: "DELETE" });
+}
+
 /** フェーズ22: ScoreProfile 一覧取得 */
 export async function getScoreProfiles() {
   return request<import("@/types/api").ScoreProfileListItem[]>("/api/v1/score-profiles/");

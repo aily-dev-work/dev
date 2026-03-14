@@ -101,6 +101,18 @@ export default function StockEditPage() {
         <Link href="/stocks" className="text-sm text-slate-600 hover:text-slate-900">
           ← 一覧へ
         </Link>
+        <Link
+          href={`/stocks/${id}/charts`}
+          className="text-sm text-slate-600 hover:text-slate-900"
+        >
+          チャート
+        </Link>
+        <Link
+          href={`/stocks/${id}/prices`}
+          className="text-sm text-slate-600 hover:text-slate-900"
+        >
+          価格データ
+        </Link>
         <h1 className="text-2xl font-semibold">銘柄の編集: {stock.ticker}</h1>
       </div>
       {error && (

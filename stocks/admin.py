@@ -1,6 +1,13 @@
 from django.contrib import admin
 
-from .models import SignalOutcome, StockPriceDaily, TradingSignal, WatchStock
+from .models import (
+    SignalOutcome,
+    StockPrice5Min,
+    StockPriceDaily,
+    StockPriceMonthly,
+    TradingSignal,
+    WatchStock,
+)
 
 
 @admin.register(WatchStock)
@@ -13,6 +20,40 @@ class WatchStockAdmin(admin.ModelAdmin):
 
 @admin.register(StockPriceDaily)
 class StockPriceDailyAdmin(admin.ModelAdmin):
+    list_display = (
+        "stock",
+        "date",
+        "open_price",
+        "high_price",
+        "low_price",
+        "close_price",
+        "volume",
+        "updated_at",
+    )
+    list_filter = ("stock",)
+    search_fields = ("stock__ticker", "stock__name")
+    ordering = ("-date", "-updated_at")
+
+
+@admin.register(StockPrice5Min)
+class StockPrice5MinAdmin(admin.ModelAdmin):
+    list_display = (
+        "stock",
+        "datetime",
+        "open_price",
+        "high_price",
+        "low_price",
+        "close_price",
+        "volume",
+        "updated_at",
+    )
+    list_filter = ("stock",)
+    search_fields = ("stock__ticker", "stock__name")
+    ordering = ("-datetime", "-updated_at")
+
+
+@admin.register(StockPriceMonthly)
+class StockPriceMonthlyAdmin(admin.ModelAdmin):
     list_display = (
         "stock",
         "date",

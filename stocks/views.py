@@ -11,11 +11,18 @@ from .models import (
     ScoreProfileActivationHistory,
     ScoreProfileProposal,
     SignalOutcome,
+    StockPrice5Min,
     StockPriceDaily,
+    StockPriceMonthly,
     TradingSignal,
     WatchStock,
 )
-from .serializers import StockPriceDailySerializer, WatchStockSerializer
+from .serializers import (
+    StockPrice5MinSerializer,
+    StockPriceDailySerializer,
+    StockPriceMonthlySerializer,
+    WatchStockSerializer,
+)
 from .services.signal_dataset import build_signal_queryset, signals_to_dataset
 from .services.analysis_package import (
     build_analysis_package_for_active_profile,
@@ -96,6 +103,78 @@ class WatchStockViewSet(viewsets.ModelViewSet):
         }
 
         return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["get"], url_path="prices")
+    def prices(self, request, pk=None):
+        """
+        銘柄の価格データを resolution で取得。
+        ?resolution=5m|1d|1m &limit=500（省略時 500）
+        返却: [{ "date" | "datetime", "open", "high", "low", "close", "volume" }, ...] 昇順
+        """
+        from decimal import Decimal
+
+        stock = self.get_object()
+        resolution = (request.query_params.get("resolution") or "1d").strip().lower()
+        limit = min(int(request.query_params.get("limit") or 500), 2000)
+
+        if resolution == "1d":
+            qs = (
+                StockPriceDaily.objects.filter(stock=stock)
+                .order_by("date")
+                .values_list("date", "open_price", "high_price", "low_price", "close_price", "volume")[:limit]
+            )
+            rows = [
+                {
+                    "date": d.isoformat(),
+                    "open": float(o),
+                    "high": float(h),
+                    "low": float(l),
+                    "close": float(c),
+                    "volume": v if v is not None else None,
+                }
+                for d, o, h, l, c, v in qs
+            ]
+        elif resolution == "5m":
+            qs = (
+                StockPrice5Min.objects.filter(stock=stock)
+                .order_by("datetime")
+                .values_list("datetime", "open_price", "high_price", "low_price", "close_price", "volume")[:limit]
+            )
+            rows = [
+                {
+                    "datetime": dt.isoformat(),
+                    "open": float(o),
+                    "high": float(h),
+                    "low": float(l),
+                    "close": float(c),
+                    "volume": v if v is not None else None,
+                }
+                for dt, o, h, l, c, v in qs
+            ]
+        elif resolution == "1m":
+            qs = (
+                StockPriceMonthly.objects.filter(stock=stock)
+                .order_by("date")
+                .values_list("date", "open_price", "high_price", "low_price", "close_price", "volume")[:limit]
+            )
+            rows = [
+                {
+                    "date": d.isoformat(),
+                    "open": float(o),
+                    "high": float(h),
+                    "low": float(l),
+                    "close": float(c),
+                    "volume": v if v is not None else None,
+                }
+                for d, o, h, l, c, v in qs
+            ]
+        else:
+            return Response(
+                {"detail": "resolution must be 5m, 1d, or 1m"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response({"resolution": resolution, "stock_id": stock.id, "ticker": stock.ticker, "bars": rows})
 
     @action(detail=True, methods=["get"], url_path="score")
     def score(self, request, pk=None):
@@ -230,6 +309,30 @@ class StockPriceDailyViewSet(viewsets.ModelViewSet):
         if ticker:
             qs = qs.filter(stock__ticker=ticker)
 
+        return qs
+
+
+class StockPrice5MinViewSet(viewsets.ModelViewSet):
+    """5分足株価の CRUD。?stock=<id> で絞り込み可能。"""
+    serializer_class = StockPrice5MinSerializer
+
+    def get_queryset(self):
+        qs = StockPrice5Min.objects.select_related("stock").all()
+        stock_id = self.request.query_params.get("stock")
+        if stock_id:
+            qs = qs.filter(stock_id=stock_id)
+        return qs
+
+
+class StockPriceMonthlyViewSet(viewsets.ModelViewSet):
+    """月足株価の CRUD。?stock=<id> で絞り込み可能。"""
+    serializer_class = StockPriceMonthlySerializer
+
+    def get_queryset(self):
+        qs = StockPriceMonthly.objects.select_related("stock").all()
+        stock_id = self.request.query_params.get("stock")
+        if stock_id:
+            qs = qs.filter(stock_id=stock_id)
         return qs
 
 

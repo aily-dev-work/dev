@@ -9,6 +9,9 @@ export default function HelpPage() {
           株価シグナル用の「スコアプロファイル」を管理する画面です。
           どのプロファイルを「今の計算に使うか」の切り替え、提案の確認・反映、有効化の履歴確認ができます。
         </p>
+        <p className="text-sm font-medium text-slate-800">
+          管理操作はすべて <strong>http://localhost:3000</strong> から行えます。Django 管理画面（/admin）は使わずに、この画面だけで銘柄・価格データ・プロファイル・提案などを一覧・追加・編集・削除できます。
+        </p>
       </section>
 
       <section className="space-y-2">
@@ -55,6 +58,7 @@ export default function HelpPage() {
             <li>一覧でティッカー・銘柄名・市場・監視中フラグ・メモを確認できます。</li>
             <li>「新規追加」フォームでティッカーと銘柄名（必須）を入力して追加。</li>
             <li>行の<strong>「編集」</strong>で銘柄の内容を変更、<strong>「削除」</strong>で監視リストから外せます。</li>
+            <li><strong>「チャート」</strong>で5分足・日足・月足のグラフを表示。<strong>「価格」</strong>で日足・5分足・月足の価格データを一覧・追加・編集・削除できます。</li>
           </ul>
         </div>
 

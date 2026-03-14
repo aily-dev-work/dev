@@ -181,6 +181,18 @@ export default function StocksPage() {
                 <td className="border px-2 py-1">
                   <span className="flex flex-wrap gap-1">
                     <Link
+                      href={`/stocks/${s.id}/charts`}
+                      className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                    >
+                      チャート
+                    </Link>
+                    <Link
+                      href={`/stocks/${s.id}/prices`}
+                      className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                    >
+                      価格
+                    </Link>
+                    <Link
                       href={`/stocks/${s.id}`}
                       className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
                     >

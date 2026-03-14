@@ -78,6 +78,74 @@ class StockPriceDaily(models.Model):
         return f"{self.stock.ticker} {self.date} {self.close_price}"
 
 
+class StockPrice5Min(models.Model):
+    """
+    監視銘柄ごとの5分足株価（OHLCV）。
+    """
+    stock = models.ForeignKey(
+        WatchStock,
+        on_delete=models.CASCADE,
+        related_name="prices_5m",
+        help_text="対象となる監視銘柄",
+    )
+    datetime = models.DateTimeField(help_text="5分足の始まりの日時（UTC またはローカル）")
+    open_price = models.DecimalField(max_digits=12, decimal_places=4)
+    high_price = models.DecimalField(max_digits=12, decimal_places=4)
+    low_price = models.DecimalField(max_digits=12, decimal_places=4)
+    close_price = models.DecimalField(max_digits=12, decimal_places=4)
+    volume = models.BigIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "5分足株価"
+        verbose_name_plural = "5分足株価"
+        ordering = ["-datetime", "-updated_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["stock", "datetime"],
+                name="unique_stock_5m_datetime",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.stock.ticker} 5m {self.datetime} {self.close_price}"
+
+
+class StockPriceMonthly(models.Model):
+    """
+    監視銘柄ごとの月足株価（OHLCV）。date はその月の代表日（例: 月末）を格納。
+    """
+    stock = models.ForeignKey(
+        WatchStock,
+        on_delete=models.CASCADE,
+        related_name="prices_monthly",
+        help_text="対象となる監視銘柄",
+    )
+    date = models.DateField(help_text="月の代表日（例: 月末）")
+    open_price = models.DecimalField(max_digits=12, decimal_places=4)
+    high_price = models.DecimalField(max_digits=12, decimal_places=4)
+    low_price = models.DecimalField(max_digits=12, decimal_places=4)
+    close_price = models.DecimalField(max_digits=12, decimal_places=4)
+    volume = models.BigIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "月足株価"
+        verbose_name_plural = "月足株価"
+        ordering = ["-date", "-updated_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["stock", "date"],
+                name="unique_stock_monthly_date",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.stock.ticker} 月足 {self.date} {self.close_price}"
+
+
 class TradingSignal(models.Model):
     """
     提案タイミングのスコアとテクニカル状態を保存するモデル。
