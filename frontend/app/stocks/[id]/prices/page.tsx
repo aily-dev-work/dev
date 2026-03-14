@@ -79,7 +79,6 @@ export default function StockPricesPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-4">
         <Link href="/stocks" className="text-sm text-slate-600 hover:text-slate-900">← 銘柄一覧</Link>
-        <Link href={`/stocks/${id}`} className="text-sm text-slate-600 hover:text-slate-900">編集</Link>
         <Link href={`/stocks/${id}/charts`} className="text-sm text-slate-600 hover:text-slate-900">チャート</Link>
         <h1 className="text-2xl font-semibold">価格データ管理: {stock?.ticker} {stock?.name && `- ${stock.name}`}</h1>
       </div>

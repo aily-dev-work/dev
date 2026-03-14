@@ -258,9 +258,6 @@ export default function StockChartsPage() {
         <Link href="/stocks" className="text-sm text-slate-600 hover:text-slate-900">
           ← 銘柄一覧
         </Link>
-        <Link href={`/stocks/${id}`} className="text-sm text-slate-600 hover:text-slate-900">
-          編集
-        </Link>
         <Link href={`/stocks/${id}/prices`} className="text-sm text-slate-600 hover:text-slate-900">
           価格データ
         </Link>
