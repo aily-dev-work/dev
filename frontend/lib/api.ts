@@ -32,6 +32,52 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export { request, API_BASE_URL };
 
+/** 監視銘柄一覧取得 */
+export async function getStocks() {
+  return request<import("@/types/api").WatchStock[]>("/api/v1/stocks/");
+}
+
+/** 監視銘柄詳細取得 */
+export async function getStock(id: number) {
+  return request<import("@/types/api").WatchStock>(`/api/v1/stocks/${id}/`);
+}
+
+/** 監視銘柄作成 */
+export async function createStock(body: {
+  ticker: string;
+  name: string;
+  market?: string;
+  is_active?: boolean;
+  memo?: string;
+}) {
+  return request<import("@/types/api").WatchStock>("/api/v1/stocks/", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** 監視銘柄更新 */
+export async function updateStock(
+  id: number,
+  body: Partial<{
+    ticker: string;
+    name: string;
+    market: string;
+    is_active: boolean;
+    memo: string;
+  }>,
+) {
+  return request<import("@/types/api").WatchStock>(`/api/v1/stocks/${id}/`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+/** 監視銘柄削除 */
+export async function deleteStock(id: number) {
+  return request<null>(`/api/v1/stocks/${id}/`, { method: "DELETE" });
+}
+
 /** フェーズ22: ScoreProfile 一覧取得 */
 export async function getScoreProfiles() {
   return request<import("@/types/api").ScoreProfileListItem[]>("/api/v1/score-profiles/");

@@ -1,3 +1,15 @@
+/** 監視銘柄（WatchStock） */
+export type WatchStock = {
+  id: number;
+  ticker: string;
+  name: string;
+  market: string;
+  is_active: boolean;
+  memo: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export type ScoreProfile = {
   id: number;
   name: string;

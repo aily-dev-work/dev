@@ -49,6 +49,16 @@ export default function HelpPage() {
         </div>
 
         <div className="rounded border bg-slate-50 p-4 space-y-2">
+          <h3 className="font-semibold">銘柄</h3>
+          <ul className="list-disc list-inside text-sm text-slate-700 space-y-1">
+            <li><strong>監視したい企業（銘柄）</strong>をここで管理します。</li>
+            <li>一覧でティッカー・銘柄名・市場・監視中フラグ・メモを確認できます。</li>
+            <li>「新規追加」フォームでティッカーと銘柄名（必須）を入力して追加。</li>
+            <li>行の<strong>「編集」</strong>で銘柄の内容を変更、<strong>「削除」</strong>で監視リストから外せます。</li>
+          </ul>
+        </div>
+
+        <div className="rounded border bg-slate-50 p-4 space-y-2">
           <h3 className="font-semibold">プロファイル</h3>
           <ul className="list-disc list-inside text-sm text-slate-700 space-y-1">
             <li>登録されているスコアプロファイルの<strong>一覧</strong>です。</li>

@@ -19,6 +19,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             </Link>
             <nav className="flex gap-4 text-sm">
               <Link href="/">ダッシュボード</Link>
+              <Link href="/stocks">銘柄</Link>
               <Link href="/profiles">プロファイル</Link>
               <Link href="/profiles/compare">比較</Link>
               <Link href="/proposals">提案</Link>
