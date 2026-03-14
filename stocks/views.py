@@ -1901,9 +1901,9 @@ class ProposalViewSet(viewsets.ViewSet):
         既存ルーティング `/api/v1/proposals/` を壊さないために保持しているが、
         プロファイル単位の一覧には `/api/v1/score-profiles/<id>/proposals/` を推奨する。
         """
-        proposals = ScoreProfileProposal.objects.select_related("score_profile").order_by(
-            "-created_at"
-        )
+        proposals = ScoreProfileProposal.objects.select_related(
+            "score_profile", "applied_score_profile"
+        ).order_by("-created_at")
         results = []
         for p in proposals:
             results.append(
@@ -1915,6 +1915,13 @@ class ProposalViewSet(viewsets.ViewSet):
                     "score_profile_name_snapshot": p.score_profile_name_snapshot,
                     "score_profile_version_snapshot": p.score_profile_version_snapshot,
                     "created_at": p.created_at.isoformat() if p.created_at else None,
+                    "applied_score_profile_id": p.applied_score_profile_id,
+                    "applied_score_profile_name": (
+                        p.applied_score_profile.name if p.applied_score_profile else None
+                    ),
+                    "applied_score_profile_version": (
+                        p.applied_score_profile.version if p.applied_score_profile else None
+                    ),
                 }
             )
         return Response(results, status=status.HTTP_200_OK)

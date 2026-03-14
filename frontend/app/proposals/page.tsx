@@ -30,10 +30,16 @@ type AiReviewSaveResponse = {
 
 type ProposalsListItem = Pick<
   ScoreProfileProposal,
-  "id" | "proposal_name" | "status" | "score_profile_name_snapshot" | "score_profile_version_snapshot" | "created_at"
-> & {
-  applied_score_profile_id: number | null;
-};
+  | "id"
+  | "proposal_name"
+  | "status"
+  | "score_profile_name_snapshot"
+  | "score_profile_version_snapshot"
+  | "created_at"
+  | "applied_score_profile_id"
+  | "applied_score_profile_name"
+  | "applied_score_profile_version"
+>;
 
 export default function ProposalsPage() {
   const router = useRouter();
@@ -91,9 +97,9 @@ export default function ProposalsPage() {
       <h1 className="text-2xl font-semibold">提案</h1>
 
       <section className="rounded-lg border border-slate-200 bg-slate-50 p-4 shadow-sm">
-        <h2 className="mb-3 text-lg font-semibold text-slate-800">AI に提案を生成</h2>
+        <h2 className="mb-3 text-lg font-semibold text-slate-800">AI プロファイル改善提案</h2>
         <p className="mb-3 text-sm text-slate-600">
-          現在使用中のプロファイルを対象に、長期視点で改善提案を生成して保存します。トレードスタイルに応じて最適化されます。
+          現在使用中のプロファイルを対象に、AI による改善提案を生成して保存します。トレードスタイルに応じて最適化されます。
         </p>
         <div className="flex flex-wrap items-end gap-4">
           <label className="flex flex-col gap-1">
@@ -146,10 +152,10 @@ export default function ProposalsPage() {
             <tr>
               <th className="border px-2 py-1 text-center">名前</th>
               <th className="border px-2 py-1 text-center">状態</th>
-              <th className="border px-2 py-1 text-center">プロファイル</th>
               <th className="border px-2 py-1 text-center">作成日時</th>
-              <th className="border px-2 py-1 text-center">反映</th>
-              <th className="border px-2 py-1 text-center">詳細</th>
+              <th className="border px-2 py-1 text-center">改善対象プロファイル</th>
+              <th className="border px-2 py-1 text-center">反映プロファイル</th>
+              <th className="border px-2 py-1 text-center">提案内容詳細</th>
             </tr>
           </thead>
           <tbody>
@@ -168,13 +174,19 @@ export default function ProposalsPage() {
                   {p.status}
                 </td>
                 <td className="border px-2 py-1">
-                  {p.score_profile_name_snapshot} ({p.score_profile_version_snapshot})
-                </td>
-                <td className="border px-2 py-1">
                   {p.created_at ? new Date(p.created_at).toLocaleString() : "-"}
                 </td>
                 <td className="border px-2 py-1">
-                  {p.applied_score_profile_id ? `反映済 (id=${p.applied_score_profile_id})` : "-"}
+                  {p.score_profile_name_snapshot}
+                </td>
+                <td className="border px-2 py-1">
+                  {p.applied_score_profile_id && p.applied_score_profile_name
+                    ? `${p.applied_score_profile_name}${
+                        p.applied_score_profile_version
+                          ? ` (${p.applied_score_profile_version})`
+                          : ""
+                      }`
+                    : "-"}
                 </td>
                 <td className="border px-2 py-1">
                   <Link href={`/proposals/${p.id}`} className="text-blue-600 hover:underline">
