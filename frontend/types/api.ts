@@ -140,7 +140,7 @@ export type ScoreProfileListItem = {
 /** フェーズ22: ScoreProfile 詳細 API の返却型 */
 export type ScoreProfileDetail = ScoreProfileListItem;
 
-/** GET /api/v1/stocks/scores/ の1銘柄分（買い/売り/様子見％） */
+/** GET /api/v1/stocks/scores/ の1銘柄分（買い/売り/様子見％＋長期・短期トレンド） */
 export type StockScoreItem = {
   stock_id: number;
   ticker: string;
@@ -152,6 +152,10 @@ export type StockScoreItem = {
   buy_pct: number | null;
   sell_pct: number | null;
   wait_pct: number | null;
+  /** 長期トレンド: up=上昇, neutral=中立, down=下降（75日ベース） */
+  long_term_trend: string | null;
+  /** 短期トレンド: up=上昇, neutral=中立, down=下降（25日ベース） */
+  short_term_trend: string | null;
   insufficient_data: boolean;
   insufficient_reason?: string | null;
   error?: string;

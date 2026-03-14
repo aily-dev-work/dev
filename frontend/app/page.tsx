@@ -179,10 +179,12 @@ export default function DashboardPage() {
                 <tr>
                   <th className="border px-2 py-1 text-left">銘柄コード</th>
                   <th className="border px-2 py-1 text-left">銘柄名</th>
+                  <th className="border px-2 py-1 text-center">長期トレンド</th>
+                  <th className="border px-2 py-1 text-center">短期トレンド</th>
                   <th className="border px-2 py-1 text-center">買い％</th>
                   <th className="border px-2 py-1 text-center">売り％</th>
                   <th className="border px-2 py-1 text-center">様子見％</th>
-                  <th className="border px-2 py-1 text-center">判定</th>
+                  <th className="border px-2 py-1 text-center">現在の判定</th>
                 </tr>
               </thead>
               <tbody>
@@ -190,6 +192,18 @@ export default function DashboardPage() {
                   <tr key={s.stock_id} className="odd:bg-slate-50">
                     <td className="border px-2 py-1 font-mono">{s.ticker}</td>
                     <td className="border px-2 py-1">{s.name || "-"}</td>
+                    <td className="border px-2 py-1 text-center text-xs">
+                      {s.long_term_trend === "up" && <span className="text-emerald-700">上昇</span>}
+                      {s.long_term_trend === "neutral" && <span className="text-slate-600">中立</span>}
+                      {s.long_term_trend === "down" && <span className="text-red-700">下降</span>}
+                      {(!s.long_term_trend || !["up", "neutral", "down"].includes(s.long_term_trend)) && <span className="text-slate-400">-</span>}
+                    </td>
+                    <td className="border px-2 py-1 text-center text-xs">
+                      {s.short_term_trend === "up" && <span className="text-emerald-700">上昇</span>}
+                      {s.short_term_trend === "neutral" && <span className="text-slate-600">中立</span>}
+                      {s.short_term_trend === "down" && <span className="text-red-700">下降</span>}
+                      {(!s.short_term_trend || !["up", "neutral", "down"].includes(s.short_term_trend)) && <span className="text-slate-400">-</span>}
+                    </td>
                     <td className="border px-2 py-1 text-center">
                       {s.insufficient_data ? (
                         <span className="text-slate-400">-</span>

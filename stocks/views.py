@@ -154,6 +154,8 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     "buy_pct": None,
                     "sell_pct": None,
                     "wait_pct": None,
+                    "long_term_trend": None,
+                    "short_term_trend": None,
                     "insufficient_data": True,
                     "error": str(e),
                 })
@@ -175,6 +177,8 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                 "buy_pct": buy_pct,
                 "sell_pct": sell_pct,
                 "wait_pct": wait_pct,
+                "long_term_trend": summary.long_term_trend,
+                "short_term_trend": summary.short_term_trend,
                 "insufficient_data": score_result.insufficient_data,
                 "insufficient_reason": score_result.insufficient_reason,
             })
@@ -519,6 +523,8 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     "trend_long": summary.signals.trend_long,
                     "volume_trend": summary.signals.volume_trend,
                 },
+                "long_term_trend": summary.long_term_trend,
+                "short_term_trend": summary.short_term_trend,
             },
             "insufficient_data": score_result.insufficient_data,
             "insufficient_reason": score_result.insufficient_reason,

@@ -11,6 +11,7 @@ from .models import (
     ScoreProfileActivationHistory,
     ScoreProfileProposal,
     SignalOutcome,
+    StockPriceDaily,
     TradingSignal,
     WatchStock,
 )
@@ -28,7 +29,14 @@ from .services.profile_proposal import save_profile_proposal
 from .services.signal_generation import generate_trading_signal
 from .services.signal_scoring import score_from_technical, ScoreResult
 from .services.signal_summary import build_summary_queryset, summarize_signals
-from .services.technical_analysis import AverageVolume, HighLow, MovingAverages, TechnicalSignals, TechnicalSummary
+from .services.technical_analysis import (
+    calculate_technical_summary,
+    AverageVolume,
+    HighLow,
+    MovingAverages,
+    TechnicalSignals,
+    TechnicalSummary,
+)
 
 
 class SignalDatasetServiceTests(TestCase):
@@ -1003,6 +1011,8 @@ class ScoreCalculationCompatibilityTests(TestCase):
                 trend_long="up",
                 volume_trend="normal",
             ),
+            long_term_trend="up",
+            short_term_trend="up",
         )
 
         expected = self._old_logic_score(summary)
@@ -1014,6 +1024,58 @@ class ScoreCalculationCompatibilityTests(TestCase):
         self.assertEqual(expected.strength, actual.strength)
         self.assertEqual(expected.breakdown_buy, actual.breakdown_buy)
         self.assertEqual(expected.breakdown_sell, actual.breakdown_sell)
+
+
+class TechnicalAnalysisMultiTimeframeTests(TestCase):
+    """長期・短期トレンド（long_term_trend / short_term_trend）の算出をテストする。"""
+
+    def test_calculate_technical_summary_sets_long_short_trends(self) -> None:
+        """75日分の日足があり終値がMAより上なら長期・短期とも上昇になる。"""
+        stock = WatchStock.objects.create(ticker="MTF", name="MultiTF", market="JP")
+        # 75日分: 終値は全て 100、直近のみ 120 にすると close > ma75, ma25, ma5 → 全て up
+        from datetime import timedelta
+        base = date(2025, 1, 1)
+        for i in range(75):
+            d = base + timedelta(days=i)
+            StockPriceDaily.objects.create(
+                stock=stock,
+                date=d,
+                open_price=Decimal("100"),
+                high_price=Decimal("101"),
+                low_price=Decimal("99"),
+                close_price=Decimal("120") if i == 74 else Decimal("100"),
+                volume=10000,
+            )
+        summary = calculate_technical_summary(stock)
+        self.assertEqual(summary.long_term_trend, "up")
+        self.assertEqual(summary.short_term_trend, "up")
+
+    def test_calculate_technical_summary_flat_becomes_neutral(self) -> None:
+        """終値がMAと同値なら flat → neutral に変換される。"""
+        from datetime import timedelta
+        stock = WatchStock.objects.create(ticker="MTF2", name="MultiTF2", market="JP")
+        base = date(2025, 1, 1)
+        for i in range(75):
+            d = base + timedelta(days=i)
+            StockPriceDaily.objects.create(
+                stock=stock,
+                date=d,
+                open_price=Decimal("100"),
+                high_price=Decimal("100"),
+                low_price=Decimal("100"),
+                close_price=Decimal("100"),
+                volume=10000,
+            )
+        summary = calculate_technical_summary(stock)
+        self.assertEqual(summary.long_term_trend, "neutral")
+        self.assertEqual(summary.short_term_trend, "neutral")
+
+    def test_calculate_technical_summary_empty_data_returns_none_trends(self) -> None:
+        """日足が無い場合は long_term_trend / short_term_trend は None。"""
+        stock = WatchStock.objects.create(ticker="MTF0", name="NoData", market="JP")
+        summary = calculate_technical_summary(stock)
+        self.assertIsNone(summary.long_term_trend)
+        self.assertIsNone(summary.short_term_trend)
 
 
 class TradingSignalScoreProfileTests(TestCase):
@@ -1071,6 +1133,8 @@ class TradingSignalScoreProfileTests(TestCase):
                 trend_long="flat",
                 volume_trend="normal",
             ),
+            long_term_trend="neutral",
+            short_term_trend="neutral",
         )
 
         score = score_from_technical(summary)
@@ -1105,6 +1169,8 @@ class TradingSignalScoreProfileTests(TestCase):
                 trend_long="up",
                 volume_trend="high",
             ),
+            long_term_trend="up",
+            short_term_trend="up",
         )
 
         score = score_from_technical(summary)
@@ -1143,6 +1209,8 @@ class TradingSignalScoreProfileTests(TestCase):
                 trend_long="up",
                 volume_trend="normal",
             ),
+            long_term_trend="up",
+            short_term_trend="up",
         )
 
         score = score_from_technical(summary)

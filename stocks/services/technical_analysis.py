@@ -35,6 +35,15 @@ class TechnicalSignals:
     volume_trend: Optional[str]
 
 
+def _trend_label(raw: Optional[str]) -> Optional[str]:
+    """trend_* の up/down/flat を 長期・短期トレンド用の up/neutral/down に変換。"""
+    if raw is None:
+        return None
+    if raw == "flat":
+        return "neutral"
+    return raw
+
+
 @dataclass
 class TechnicalSummary:
     stock: WatchStock
@@ -44,6 +53,9 @@ class TechnicalSummary:
     high_low: HighLow
     average_volume: AverageVolume
     signals: TechnicalSignals
+    # 多時間軸トレンド（設計: 長期=75日・短期=25日）。AI分析の材料としても利用可能。
+    long_term_trend: Optional[str]   # "up" | "neutral" | "down"
+    short_term_trend: Optional[str]  # "up" | "neutral" | "down"
 
 
 def _decimal_or_none(values: Iterable[Decimal]) -> Optional[Decimal]:
@@ -88,6 +100,8 @@ def calculate_technical_summary(stock: WatchStock) -> TechnicalSummary:
             high_low=empty_hl,
             average_volume=empty_vol,
             signals=empty_sig,
+            long_term_trend=None,
+            short_term_trend=None,
         )
 
     latest = prices[0]
@@ -154,6 +168,10 @@ def calculate_technical_summary(stock: WatchStock) -> TechnicalSummary:
         volume_trend=volume_trend,
     )
 
+    # 設計: 長期=75日( trend_long )、短期=25日( trend_mid )
+    long_term_trend = _trend_label(trend_long)
+    short_term_trend = _trend_label(trend_mid)
+
     return TechnicalSummary(
         stock=stock,
         latest_date=str(latest.date),
@@ -162,5 +180,7 @@ def calculate_technical_summary(stock: WatchStock) -> TechnicalSummary:
         high_low=high_low,
         average_volume=average_volume,
         signals=signals,
+        long_term_trend=long_term_trend,
+        short_term_trend=short_term_trend,
     )
 
