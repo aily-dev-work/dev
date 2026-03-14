@@ -334,7 +334,9 @@ class ScoreProfile(models.Model):
     name = models.CharField(max_length=100)
     version = models.CharField(
         max_length=32,
-        help_text="バージョン識別子（例: 'v1', '2026-03-13-01' など）",
+        blank=True,
+        default="",
+        help_text="バージョン識別子（未使用の場合は空）。説明で識別する想定。",
     )
     is_active = models.BooleanField(
         default=False,
@@ -359,7 +361,7 @@ class ScoreProfile(models.Model):
         verbose_name_plural = "スコア設定プロファイル"
 
     def __str__(self) -> str:
-        return f"{self.name} ({self.version})"
+        return f"{self.name} ({self.version})" if self.version else self.name
 
 
 class ScoreProfileProposal(models.Model):

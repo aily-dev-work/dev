@@ -938,9 +938,11 @@ class ScoreCalculationCompatibilityTests(TestCase):
 
         raw_buy = sum(breakdown_buy.values())
         raw_sell = sum(breakdown_sell.values())
+        total_buy = sum(BUY_WEIGHTS.values()) or 1.0
+        total_sell = sum(SELL_WEIGHTS.values()) or 1.0
 
-        buy_score = clamp(raw_buy)
-        sell_score = clamp(raw_sell)
+        buy_score = clamp(100.0 * raw_buy / total_buy)
+        sell_score = clamp(100.0 * raw_sell / total_sell)
 
         diff = buy_score - sell_score
         abs_diff = abs(diff)

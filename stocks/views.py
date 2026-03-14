@@ -1150,13 +1150,13 @@ class ScoreProfileViewSet(viewsets.ViewSet):
         """
         手動で ScoreProfile を新規作成する。
         POST /api/v1/score-profiles/
-        body: name, version, description（任意）, weights_json（任意）, thresholds_json（任意）
+        body: name, description（任意）, weights_json（任意）, thresholds_json（任意）。version は任意（空で可）。
         """
         name = (request.data.get("name") or "").strip()
         version = (request.data.get("version") or "").strip()
-        if not name or not version:
+        if not name:
             return Response(
-                {"detail": "name と version は必須です。"},
+                {"detail": "name は必須です。"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         description = (request.data.get("description") or "").strip()

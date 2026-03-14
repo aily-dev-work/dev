@@ -23,14 +23,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <Link href="/">ダッシュボード</Link>
               <Link href="/stocks">銘柄</Link>
               <Link href="/profiles">プロファイル</Link>
-              <Link href="/profiles/compare">比較</Link>
               <Link href="/proposals">提案</Link>
               <Link href="/history">履歴</Link>
               <Link href="/help" className="text-slate-500 hover:text-slate-700">使い方</Link>
             </nav>
           </div>
         </header>
-        <main className="flex-1 mx-auto max-w-6xl px-4 py-6">{children}</main>
+        <main className="flex-1 mx-auto w-full max-w-7xl px-4 py-6">{children}</main>
       </body>
     </html>
   );

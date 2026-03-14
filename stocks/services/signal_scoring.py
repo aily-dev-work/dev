@@ -149,12 +149,14 @@ def score_from_technical(summary: TechnicalSummary) -> ScoreResult:
         breakdown_sell["near_high_20"] = 0.0
         insufficient_reasons.append("high_20_or_low_20_or_latest_missing")
 
-    # 合計スコア計算＆クランプ
+    # 合計スコア計算（割合: 当てはまった重みの合計 / 重み全体の合計 × 100）
     raw_buy = sum(breakdown_buy.values())
     raw_sell = sum(breakdown_sell.values())
+    total_buy = sum(buy_weights.values()) or 1.0
+    total_sell = sum(sell_weights.values()) or 1.0
 
-    buy_score = _clamp(raw_buy)
-    sell_score = _clamp(raw_sell)
+    buy_score = _clamp(100.0 * raw_buy / total_buy)
+    sell_score = _clamp(100.0 * raw_sell / total_sell)
 
     # バイアスと強度を判定
     diff = buy_score - sell_score

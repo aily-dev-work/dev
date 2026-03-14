@@ -275,32 +275,6 @@ export default function DashboardPage() {
         </section>
       )}
 
-      {/* Compare snapshot */}
-      {data?.compare_snapshot && (
-        <section className="rounded-lg border bg-white p-4 shadow-sm">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">比較スナップショット</h2>
-            <Link
-              href="/profiles/compare"
-              className="text-sm text-blue-600 hover:underline"
-            >
-              比較画面を開く →
-            </Link>
-          </div>
-          <div className="grid gap-3 text-sm md:grid-cols-2">
-            <div className="rounded border bg-slate-50 p-2">
-              <div className="text-xs font-semibold text-slate-500">ベース</div>
-              {data.compare_snapshot.base_profile.name} ({data.compare_snapshot.base_profile.version})
-            </div>
-            <div className="rounded border bg-slate-50 p-2">
-              <div className="text-xs font-semibold text-slate-500">候補</div>
-              {data.compare_snapshot.candidate_profile.name} (
-              {data.compare_snapshot.candidate_profile.version})
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* Recent activation history table */}
       <section className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="mb-2 text-lg font-semibold">直近の有効化履歴</h2>

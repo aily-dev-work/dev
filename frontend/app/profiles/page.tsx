@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { deleteScoreProfile, getScoreProfiles, request } from "@/lib/api";
 import type { ScoreProfileListItem } from "@/types/api";
+import { ProfileWeightsMiniChart } from "@/app/profiles/ProfileWeightsMiniChart";
 
 export default function ProfilesPage() {
   const [rows, setRows] = useState<ScoreProfileListItem[]>([]);
@@ -82,18 +83,15 @@ export default function ProfilesPage() {
       )}
       {loading && <p className="text-sm text-slate-600">読み込み中...</p>}
 
-      <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
+      <div className="w-full overflow-x-auto rounded-lg border bg-white shadow-sm">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-100">
             <tr>
               <th className="w-24 border px-2 py-1 text-center">使用</th>
-              <th className="border px-2 py-1 text-left">ID</th>
-              <th className="border px-2 py-1 text-left">名前</th>
-              <th className="border px-2 py-1 text-left">バージョン</th>
-              <th className="border px-2 py-1 text-left">説明</th>
-              <th className="border px-2 py-1 text-left">元の提案</th>
-              <th className="border px-2 py-1 text-left">作成日</th>
-              <th className="border px-2 py-1 text-left">操作</th>
+              <th className="min-w-[140px] border px-2 py-1 text-center">名前</th>
+              <th className="min-w-[220px] border px-2 py-1 text-center">説明</th>
+              <th className="min-w-[480px] border px-2 py-1 text-center">設定（重み）</th>
+              <th className="min-w-[120px] border px-2 py-1 text-center">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -118,40 +116,24 @@ export default function ProfilesPage() {
                     </button>
                   )}
                 </td>
-                <td className="border px-2 py-1">{p.id}</td>
-                <td className="border px-2 py-1 font-medium">{p.name}</td>
-                <td className="border px-2 py-1">{p.version}</td>
-                <td className="max-w-[200px] truncate border px-2 py-1 text-slate-600">
-                  {p.description || "-"}
+                <td className="border px-2 py-1 text-center font-medium">{p.name}</td>
+                <td className="border px-2 py-1 text-center text-slate-600">
+                  <span className="line-clamp-2" title={p.description || undefined}>
+                    {p.description || "-"}
+                  </span>
                 </td>
-                <td className="border px-2 py-1">
-                  {p.source_proposal_id ? (
-                    <Link
-                      href={`/proposals/${p.source_proposal_id}`}
-                      className="text-blue-600 hover:underline"
-                    >
-                      {p.source_proposal_name ?? "?"} (id={p.source_proposal_id})
-                    </Link>
-                  ) : (
-                    "-"
-                  )}
+                <td className="border px-2 py-1 align-middle text-center">
+                  <div className="mx-auto flex justify-center">
+                    <ProfileWeightsMiniChart weightsJson={p.weights_json} />
+                  </div>
                 </td>
-                <td className="border px-2 py-1 text-xs text-slate-500">
-                  {p.created_at ? new Date(p.created_at).toLocaleDateString() : "-"}
-                </td>
-                <td className="border px-2 py-1">
-                  <span className="flex flex-wrap gap-1">
+                <td className="border px-2 py-1 text-center">
+                  <span className="inline-flex flex-wrap justify-center gap-1">
                     <Link
                       href={`/profiles/${p.id}/edit`}
                       className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
                     >
                       編集
-                    </Link>
-                    <Link
-                      href={`/profiles/compare?base=${p.id}`}
-                      className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
-                    >
-                      比較
                     </Link>
                     <button
                       type="button"
@@ -168,7 +150,7 @@ export default function ProfilesPage() {
             ))}
             {rows.length === 0 && !loading && (
               <tr>
-                <td colSpan={8} className="border px-2 py-2 text-center text-slate-500">
+                <td colSpan={5} className="border px-2 py-2 text-center text-slate-500">
                   プロファイルがありません。
                 </td>
               </tr>

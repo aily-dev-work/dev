@@ -1,24 +1,24 @@
-/** バックエンド _default_weights と同様のデフォルト重み（新規作成の初期値） */
+/** デフォルト重み（合計100％で配分。新規作成の初期値） */
 export const DEFAULT_WEIGHTS: Record<string, unknown> = {
   buy: {
-    trend_long_up: 20.0,
+    trend_long_up: 15.0,
     trend_mid_up: 15.0,
     trend_short_up: 10.0,
     volume_high: 10.0,
     above_ma25: 10.0,
     above_ma75: 10.0,
     near_high_20: 10.0,
-    near_low_20: 10.0,
+    near_low_20: 20.0,
   },
   sell: {
-    trend_long_down: 20.0,
+    trend_long_down: 15.0,
     trend_mid_down: 15.0,
     trend_short_down: 10.0,
     volume_low: 10.0,
     below_ma25: 10.0,
     below_ma75: 10.0,
     near_low_20: 10.0,
-    near_high_20: 10.0,
+    near_high_20: 20.0,
   },
 };
 

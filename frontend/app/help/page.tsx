@@ -67,16 +67,6 @@ export default function HelpPage() {
           <ul className="list-disc list-inside text-sm text-slate-700 space-y-1">
             <li>登録されているスコアプロファイルの<strong>一覧</strong>です。</li>
             <li><strong>「アクティブにする」</strong>を押すと、そのプロファイルが「今の計算に使うプロファイル」に切り替わります。</li>
-            <li><strong>「比較」</strong>を押すと、比較画面に飛び、そのプロファイルをベースに別のプロファイルと比較できます。</li>
-          </ul>
-        </div>
-
-        <div className="rounded border bg-slate-50 p-4 space-y-2">
-          <h3 className="font-semibold">比較</h3>
-          <ul className="list-disc list-inside text-sm text-slate-700 space-y-1">
-            <li><strong>ベース</strong>と<strong>候補</strong>の2つのプロファイルをプルダウンで選び、「比較する」を押します。</li>
-            <li>シグナル種別ごとの件数・成功率・平均リターン（H5/H10/H20）の違いが表とグラフで出ます。</li>
-            <li>どちらをアクティブにするか判断するときの参考にしてください。</li>
           </ul>
         </div>
 
@@ -110,9 +100,6 @@ export default function HelpPage() {
           </li>
           <li>
             <strong>切り替えをやめて戻したい</strong> → ダッシュボードの「直前のプロファイルにロールバック」を押す。
-          </li>
-          <li>
-            <strong>2つのプロファイルの成績を比べたい</strong> → 「比較」でベースと候補を選んで「比較する」。
           </li>
           <li>
             <strong>提案を採用して新しいプロファイルを作りたい</strong> → 「提案」で該当提案の詳細を開き、状態を accepted にして「レビューを保存」→「提案を反映」。その後「プロファイル」一覧で新しいプロファイルに「アクティブにする」。
