@@ -11,6 +11,18 @@ const DashboardCharts = dynamic(
   { ssr: false },
 );
 
+/** API のプロファイル名・説明を表示用に日本語化（よくある初期値のみ） */
+function displayProfileName(name: string): string {
+  if (name === "Default scoring profile") return "デフォルトスコアプロファイル";
+  return name;
+}
+function displayProfileDescription(desc: string): string {
+  if (desc.includes("Initial profile migrated from hardcoded signal_scoring.py")) {
+    return "フェーズ4の signal_scoring.py から移行した初期プロファイル。";
+  }
+  return desc;
+}
+
 function formatLabel(row: { profile_name: string; profile_version: string; signal_type: string }) {
   return `${row.profile_name} ${row.profile_version} - ${row.signal_type}`;
 }
@@ -100,7 +112,7 @@ export default function DashboardPage() {
           {data?.current_active_profile ? (
             <div className="space-y-1">
               <div className="text-base font-medium">
-                {data.current_active_profile.name}{" "}
+                {displayProfileName(data.current_active_profile.name)}{" "}
                 <span className="text-slate-500">({data.current_active_profile.version})</span>
               </div>
               <div className="text-xs text-slate-500">
@@ -108,7 +120,7 @@ export default function DashboardPage() {
               </div>
               {data.current_active_profile.description && (
                 <p className="mt-1 text-sm text-slate-700">
-                  {data.current_active_profile.description}
+                  {displayProfileDescription(data.current_active_profile.description)}
                 </p>
               )}
             </div>
