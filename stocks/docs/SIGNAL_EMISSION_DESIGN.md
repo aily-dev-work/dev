@@ -41,6 +41,7 @@
   */5 * * * * cd /path/to/project && python manage.py run_5m_fetch_and_evaluate
   ```
 - 取得をスキップして既存 5 分足データだけで判定のみ行う: `--no-fetch`
+- **クラウドで自動実行**（Vercel / Supabase / Docker）: HTTP エンドポイント `POST /api/v1/cron/run-5m-evaluate/` を 5 分毎に呼ぶ方式。詳細は [CRON_CLOUD.md](CRON_CLOUD.md) を参照。
 
 ## 実装タスク（TODO）
 
