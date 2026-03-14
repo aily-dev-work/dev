@@ -42,37 +42,37 @@ export default function HistoryPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Activation history</h1>
+      <h1 className="text-2xl font-semibold">有効化履歴</h1>
       <form
         onSubmit={handleFilterSubmit}
         className="flex flex-wrap items-end gap-3 rounded border bg-white p-3 text-sm shadow-sm"
       >
         <label className="flex flex-col">
-          <span className="mb-1 font-medium">Reason</span>
+          <span className="mb-1 font-medium">理由</span>
           <select
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             className="rounded border px-2 py-1"
           >
-            <option value="">(all)</option>
+            <option value="">(すべて)</option>
             <option value="manual_activate">manual_activate</option>
             <option value="manual_rollback">manual_rollback</option>
           </select>
         </label>
         <label className="flex flex-col">
-          <span className="mb-1 font-medium">Activated profile id</span>
+          <span className="mb-1 font-medium">有効化したプロファイル ID</span>
           <input
             value={activatedId}
             onChange={(e) => setActivatedId(e.target.value)}
             className="w-32 rounded border px-2 py-1"
-            placeholder="e.g. 1"
+            placeholder="例: 1"
           />
         </label>
         <button
           type="submit"
           className="rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
         >
-          Apply filters
+          絞り込み
         </button>
       </form>
 
@@ -81,18 +81,18 @@ export default function HistoryPage() {
           {error}
         </div>
       )}
-      {loading && <p className="text-sm text-slate-600">Loading...</p>}
+      {loading && <p className="text-sm text-slate-600">読み込み中...</p>}
 
       <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
         <table className="min-w-full text-xs md:text-sm">
           <thead className="bg-slate-100">
             <tr>
-              <th className="border px-2 py-1 text-left">Activated at</th>
-              <th className="border px-2 py-1 text-left">Reason</th>
-              <th className="border px-2 py-1 text-left">Previous</th>
-              <th className="border px-2 py-1 text-left">Activated</th>
-              <th className="border px-2 py-1 text-left">Source proposal</th>
-              <th className="border px-2 py-1 text-left">Note</th>
+              <th className="border px-2 py-1 text-left">有効化日時</th>
+              <th className="border px-2 py-1 text-left">理由</th>
+              <th className="border px-2 py-1 text-left">直前</th>
+              <th className="border px-2 py-1 text-left">有効化後</th>
+              <th className="border px-2 py-1 text-left">元の提案</th>
+              <th className="border px-2 py-1 text-left">メモ</th>
             </tr>
           </thead>
           <tbody>
@@ -121,7 +121,7 @@ export default function HistoryPage() {
             {items.length === 0 && !loading && (
               <tr>
                 <td colSpan={6} className="border px-2 py-2 text-center text-slate-500">
-                  No history.
+                  履歴がありません。
                 </td>
               </tr>
             )}

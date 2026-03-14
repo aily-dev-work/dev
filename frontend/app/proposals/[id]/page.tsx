@@ -69,10 +69,10 @@ export default function ProposalDetailPage() {
 
   async function handleApply() {
     if (!proposal || proposal.status !== "accepted") {
-      alert("Only accepted proposals can be applied.");
+      alert("採用（accepted）済みの提案のみ反映できます。");
       return;
     }
-    if (!confirm("Apply this proposal to create a new profile?")) return;
+    if (!confirm("この提案を反映して新しいプロファイルを作成しますか？")) return;
     setApplying(true);
     setError(null);
     try {
@@ -89,19 +89,19 @@ export default function ProposalDetailPage() {
   }
 
   if (Number.isNaN(id)) {
-    return <p>Invalid proposal id.</p>;
+    return <p>無効な提案 ID です。</p>;
   }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Proposal #{id}</h1>
+        <h1 className="text-2xl font-semibold">提案 #{id}</h1>
         <button
           type="button"
           onClick={() => router.back()}
           className="text-sm text-slate-600 hover:text-slate-900"
         >
-          ← Back
+          ← 戻る
         </button>
       </div>
 
@@ -110,26 +110,26 @@ export default function ProposalDetailPage() {
           {error}
         </div>
       )}
-      {loading && <p className="text-sm text-slate-600">Loading...</p>}
+      {loading && <p className="text-sm text-slate-600">読み込み中...</p>}
 
       {proposal && (
         <div className="space-y-4">
           <section className="rounded border bg-white p-4 shadow-sm">
-            <h2 className="mb-2 text-lg font-semibold">Summary</h2>
+            <h2 className="mb-2 text-lg font-semibold">サマリ</h2>
             <div className="space-y-1 text-sm">
               <div>
-                <span className="font-medium">Name:</span> {proposal.proposal_name}
+                <span className="font-medium">名前:</span> {proposal.proposal_name}
               </div>
               <div>
-                <span className="font-medium">Status:</span> {proposal.status}
+                <span className="font-medium">状態:</span> {proposal.status}
               </div>
               <div>
-                <span className="font-medium">Target profile:</span>{" "}
+                <span className="font-medium">対象プロファイル:</span>{" "}
                 {proposal.score_profile_name_snapshot} (
                 {proposal.score_profile_version_snapshot})
               </div>
               <div>
-                <span className="font-medium">Applied profile:</span>{" "}
+                <span className="font-medium">反映済みプロファイル:</span>{" "}
                 {proposal.applied_score_profile_id
                   ? `${proposal.applied_score_profile_name} (${proposal.applied_score_profile_version}) [id=${proposal.applied_score_profile_id}]`
                   : "-"}
@@ -138,10 +138,10 @@ export default function ProposalDetailPage() {
           </section>
 
           <section className="rounded border bg-white p-4 shadow-sm space-y-3">
-            <h2 className="text-lg font-semibold">Review</h2>
+            <h2 className="text-lg font-semibold">レビュー</h2>
             <div className="flex flex-wrap gap-3 text-sm">
               <label className="flex items-center gap-2">
-                <span className="w-24">Status</span>
+                <span className="w-24">状態</span>
                 <select
                   value={reviewStatus}
                   onChange={(e) => setReviewStatus(e.target.value)}
@@ -155,7 +155,7 @@ export default function ProposalDetailPage() {
               </label>
             </div>
             <div className="text-sm">
-              <div className="mb-1 font-medium">Review note</div>
+              <div className="mb-1 font-medium">レビューメモ</div>
               <textarea
                 value={reviewNote}
                 onChange={(e) => setReviewNote(e.target.value)}
@@ -170,7 +170,7 @@ export default function ProposalDetailPage() {
                 disabled={savingReview}
                 className="rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60"
               >
-                {savingReview ? "Saving..." : "Save review"}
+                {savingReview ? "保存中..." : "レビューを保存"}
               </button>
               <button
                 type="button"
@@ -178,21 +178,21 @@ export default function ProposalDetailPage() {
                 disabled={applying || proposal.status !== "accepted"}
                 className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
               >
-                {applying ? "Applying..." : "Apply proposal"}
+                {applying ? "反映中..." : "提案を反映"}
               </button>
             </div>
           </section>
 
           <section className="rounded border bg-white p-4 shadow-sm space-y-4">
-            <h2 className="text-lg font-semibold">Details</h2>
-            <DetailBlock title="Analysis summary" value={proposal.analysis_summary} />
-            <JsonBlock title="Source filters" value={proposal.source_filters_json} />
-            <JsonBlock title="Issues" value={proposal.issues_json} />
-            <JsonBlock title="Improvement hypotheses" value={proposal.improvement_hypotheses_json} />
-            <JsonBlock title="Suggested weights" value={proposal.suggested_weights_json} />
-            <JsonBlock title="Suggested thresholds" value={proposal.suggested_thresholds_json} />
-            <JsonBlock title="Cautions" value={proposal.cautions_json} />
-            <JsonBlock title="Raw AI response" value={proposal.raw_ai_response_json} />
+            <h2 className="text-lg font-semibold">詳細</h2>
+            <DetailBlock title="分析サマリ" value={proposal.analysis_summary} />
+            <JsonBlock title="元フィルタ" value={proposal.source_filters_json} />
+            <JsonBlock title="課題" value={proposal.issues_json} />
+            <JsonBlock title="改善仮説" value={proposal.improvement_hypotheses_json} />
+            <JsonBlock title="提案重み" value={proposal.suggested_weights_json} />
+            <JsonBlock title="提案閾値" value={proposal.suggested_thresholds_json} />
+            <JsonBlock title="注意点" value={proposal.cautions_json} />
+            <JsonBlock title="AI 生レスポンス" value={proposal.raw_ai_response_json} />
           </section>
         </div>
       )}

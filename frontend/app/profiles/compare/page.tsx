@@ -89,15 +89,15 @@ function ComparePageContent() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Compare profiles</h1>
+      <h1 className="text-2xl font-semibold">プロファイル比較</h1>
       <p className="text-sm text-slate-600">
-        Select two profiles to compare using the dropdowns below.
+        比較する2つのプロファイルをプルダウンで選択してください。
       </p>
 
       {activeProfileId !== null && (
         <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm">
           <span className="font-medium text-emerald-800">
-            Active profile: id={activeProfileId}
+            アクティブプロファイル: id={activeProfileId}
           </span>
           {profiles.find((p) => p.id === activeProfileId) && (
             <span className="ml-2 text-emerald-700">
@@ -110,33 +110,33 @@ function ComparePageContent() {
 
       <div className="flex flex-wrap items-end gap-3 text-sm">
         <label className="flex flex-col">
-          <span className="mb-1 font-medium">Base profile</span>
+          <span className="mb-1 font-medium">ベース</span>
           <select
             value={baseId}
             onChange={(e) => setBaseId(e.target.value)}
             className="min-w-[220px] rounded border px-2 py-1.5"
           >
-            <option value="">-- Select --</option>
+            <option value="">-- 選択 --</option>
             {profiles.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name} ({p.version}) [id={p.id}]
-                {p.is_active ? " [ACTIVE]" : ""}
+                {p.is_active ? " [アクティブ]" : ""}
               </option>
             ))}
           </select>
         </label>
         <label className="flex flex-col">
-          <span className="mb-1 font-medium">Candidate profile</span>
+          <span className="mb-1 font-medium">候補</span>
           <select
             value={candidateId}
             onChange={(e) => setCandidateId(e.target.value)}
             className="min-w-[220px] rounded border px-2 py-1.5"
           >
-            <option value="">-- Select --</option>
+            <option value="">-- 選択 --</option>
             {profiles.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name} ({p.version}) [id={p.id}]
-                {p.is_active ? " [ACTIVE]" : ""}
+                {p.is_active ? " [アクティブ]" : ""}
               </option>
             ))}
           </select>
@@ -146,7 +146,7 @@ function ComparePageContent() {
           onClick={swapIds}
           className="rounded border px-2 py-1.5 text-slate-700 hover:bg-slate-100"
         >
-          Swap
+          入れ替え
         </button>
         <button
           type="button"
@@ -160,13 +160,13 @@ function ComparePageContent() {
           }
           className="rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60"
         >
-          {loading ? "Comparing..." : "Compare"}
+          {loading ? "比較中..." : "比較する"}
         </button>
       </div>
 
       {baseId === candidateId && baseId && (
         <p className="text-sm text-amber-600">
-          Base and candidate are the same. Select different profiles to compare.
+          ベースと候補が同じです。別のプロファイルを選んで比較してください。
         </p>
       )}
 
@@ -180,12 +180,12 @@ function ComparePageContent() {
         <section className="space-y-3">
           <div className="grid gap-3 md:grid-cols-2">
             <ProfileSummaryCard
-              title="Base"
+              title="ベース"
               profile={data.base_profile}
               isActive={data.base_profile.id === activeProfileId}
             />
             <ProfileSummaryCard
-              title="Candidate"
+              title="候補"
               profile={data.candidate_profile}
               isActive={data.candidate_profile.id === activeProfileId}
             />
@@ -195,7 +195,7 @@ function ComparePageContent() {
           {rows.length > 0 && (
             <div className="grid gap-4 rounded-lg border bg-white p-3 shadow-sm md:grid-cols-2">
               <div>
-                <h3 className="mb-2 text-sm font-semibold">H20 Success rate (Base vs Candidate)</h3>
+                <h3 className="mb-2 text-sm font-semibold">H20 成功率（ベース vs 候補）</h3>
                 <div className="h-48">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
@@ -211,14 +211,14 @@ function ComparePageContent() {
                       <YAxis domain={[0, 1]} tick={{ fontSize: 10 }} />
                       <Tooltip />
                       <Legend />
-                      <Bar dataKey="base" name="Base" fill="#475569" />
-                      <Bar dataKey="candidate" name="Candidate" fill="#0f766e" />
+                      <Bar dataKey="base" name="ベース" fill="#475569" />
+                      <Bar dataKey="candidate" name="候補" fill="#0f766e" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
               <div>
-                <h3 className="mb-2 text-sm font-semibold">H20 Avg return (Base vs Candidate)</h3>
+                <h3 className="mb-2 text-sm font-semibold">H20 平均リターン（ベース vs 候補）</h3>
                 <div className="h-48">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
@@ -234,8 +234,8 @@ function ComparePageContent() {
                       <YAxis tick={{ fontSize: 10 }} />
                       <Tooltip />
                       <Legend />
-                      <Bar dataKey="base" name="Base" fill="#475569" />
-                      <Bar dataKey="candidate" name="Candidate" fill="#0f766e" />
+                      <Bar dataKey="base" name="ベース" fill="#475569" />
+                      <Bar dataKey="candidate" name="候補" fill="#0f766e" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -247,17 +247,17 @@ function ComparePageContent() {
             <table className="min-w-full text-xs md:text-sm">
               <thead className="bg-slate-100">
                 <tr>
-                  <th className="border px-2 py-1 text-left">Signal type</th>
-                  <th className="border px-2 py-1 text-left">Side</th>
-                  <th className="border px-2 py-1 text-right">Total</th>
-                  <th className="border px-2 py-1 text-right">H5 eval</th>
-                  <th className="border px-2 py-1 text-right">H5 succ</th>
-                  <th className="border px-2 py-1 text-right">H5 rate</th>
-                  <th className="border px-2 py-1 text-right">H5 avg</th>
-                  <th className="border px-2 py-1 text-right">H20 eval</th>
-                  <th className="border px-2 py-1 text-right">H20 succ</th>
-                  <th className="border px-2 py-1 text-right">H20 rate</th>
-                  <th className="border px-2 py-1 text-right">H20 avg</th>
+                  <th className="border px-2 py-1 text-left">シグナル種別</th>
+                  <th className="border px-2 py-1 text-left">側</th>
+                  <th className="border px-2 py-1 text-right">件数</th>
+                  <th className="border px-2 py-1 text-right">H5評価</th>
+                  <th className="border px-2 py-1 text-right">H5成功</th>
+                  <th className="border px-2 py-1 text-right">H5率</th>
+                  <th className="border px-2 py-1 text-right">H5平均</th>
+                  <th className="border px-2 py-1 text-right">H20評価</th>
+                  <th className="border px-2 py-1 text-right">H20成功</th>
+                  <th className="border px-2 py-1 text-right">H20率</th>
+                  <th className="border px-2 py-1 text-right">H20平均</th>
                 </tr>
               </thead>
               <tbody>
@@ -270,7 +270,7 @@ function ComparePageContent() {
                       colSpan={11}
                       className="border px-2 py-2 text-center text-slate-500"
                     >
-                      No summary data.
+                      サマリデータがありません。
                     </td>
                   </tr>
                 )}
@@ -285,7 +285,7 @@ function ComparePageContent() {
 
 export default function ProfilesComparePage() {
   return (
-    <Suspense fallback={<p className="text-sm text-slate-600">Loading...</p>}>
+    <Suspense fallback={<p className="text-sm text-slate-600">読み込み中...</p>}>
       <ComparePageContent />
     </Suspense>
   );
@@ -313,7 +313,7 @@ function ProfileSummaryCard({
         {title}
         {isActive && (
           <span className="ml-2 rounded bg-emerald-600 px-1.5 py-0.5 text-white">
-            ACTIVE
+            アクティブ
           </span>
         )}
       </div>
@@ -323,7 +323,7 @@ function ProfileSummaryCard({
       <div className="text-xs text-slate-500">id={profile.id}</div>
       {profile.source_proposal_id && (
         <div className="mt-1 text-xs">
-          from proposal: {profile.source_proposal_name} (id=
+          提案由来: {profile.source_proposal_name} (id=
           {profile.source_proposal_id})
         </div>
       )}
@@ -353,7 +353,7 @@ function FragmentedRows({ row }: { row: CompareRow }) {
         <td className="border px-2 py-1" rowSpan={2}>
           {row.signal_type}
         </td>
-        <td className="border px-2 py-1 text-right font-medium">Base</td>
+        <td className="border px-2 py-1 text-right font-medium">ベース</td>
         <td className="border px-2 py-1 text-right">{row.base.total_signals}</td>
         {cells(row.base.h5)}
         <td className="border px-2 py-1 text-right">
@@ -374,7 +374,7 @@ function FragmentedRows({ row }: { row: CompareRow }) {
         </td>
       </tr>
       <tr className="odd:bg-white">
-        <td className="border px-2 py-1 text-right font-medium">Candidate</td>
+        <td className="border px-2 py-1 text-right font-medium">候補</td>
         <td className="border px-2 py-1 text-right">
           {row.candidate.total_signals}
         </td>

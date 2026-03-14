@@ -29,7 +29,7 @@ export default function ProfilesPage() {
   }, []);
 
   async function handleActivate(id: number) {
-    if (!confirm(`Activate profile id=${id}?`)) return;
+    if (!confirm(`プロファイル id=${id} をアクティブにしますか？`)) return;
     setActivatingId(id);
     setError(null);
     try {
@@ -47,29 +47,29 @@ export default function ProfilesPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Profiles</h1>
+      <h1 className="text-2xl font-semibold">プロファイル</h1>
       <p className="text-sm text-slate-600">
-        Full list of ScoreProfiles. Activate or compare from here.
+        スコアプロファイルの一覧。ここからアクティブ化や比較ができます。
       </p>
       {error && (
         <div className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </div>
       )}
-      {loading && <p className="text-sm text-slate-600">Loading...</p>}
+      {loading && <p className="text-sm text-slate-600">読み込み中...</p>}
 
       <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-100">
             <tr>
               <th className="border px-2 py-1 text-left">ID</th>
-              <th className="border px-2 py-1 text-left">Name</th>
-              <th className="border px-2 py-1 text-left">Version</th>
-              <th className="border px-2 py-1 text-left">Active</th>
-              <th className="border px-2 py-1 text-left">Description</th>
-              <th className="border px-2 py-1 text-left">Source proposal</th>
-              <th className="border px-2 py-1 text-left">Created</th>
-              <th className="border px-2 py-1 text-left">Actions</th>
+              <th className="border px-2 py-1 text-left">名前</th>
+              <th className="border px-2 py-1 text-left">バージョン</th>
+              <th className="border px-2 py-1 text-left">アクティブ</th>
+              <th className="border px-2 py-1 text-left">説明</th>
+              <th className="border px-2 py-1 text-left">元の提案</th>
+              <th className="border px-2 py-1 text-left">作成日</th>
+              <th className="border px-2 py-1 text-left">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -108,13 +108,13 @@ export default function ProfilesPage() {
                       disabled={activatingId === p.id}
                       className="rounded bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-60"
                     >
-                      {activatingId === p.id ? "Activating..." : "Activate"}
+                      {activatingId === p.id ? "反映中..." : "アクティブにする"}
                     </button>
                     <Link
                       href={`/profiles/compare?base=${p.id}`}
                       className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
                     >
-                      Compare
+                      比較
                     </Link>
                   </span>
                 </td>
@@ -123,7 +123,7 @@ export default function ProfilesPage() {
             {rows.length === 0 && !loading && (
               <tr>
                 <td colSpan={8} className="border px-2 py-2 text-center text-slate-500">
-                  No profiles.
+                  プロファイルがありません。
                 </td>
               </tr>
             )}

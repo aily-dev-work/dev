@@ -36,24 +36,24 @@ export default function ProposalsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Proposals</h1>
+      <h1 className="text-2xl font-semibold">提案</h1>
       {error && (
         <div className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </div>
       )}
-      {loading && <p className="text-sm text-slate-600">Loading...</p>}
+      {loading && <p className="text-sm text-slate-600">読み込み中...</p>}
       <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-100">
             <tr>
               <th className="border px-2 py-1 text-left">ID</th>
-              <th className="border px-2 py-1 text-left">Name</th>
-              <th className="border px-2 py-1 text-left">Status</th>
-              <th className="border px-2 py-1 text-left">Profile</th>
-              <th className="border px-2 py-1 text-left">Created</th>
-              <th className="border px-2 py-1 text-left">Applied</th>
-              <th className="border px-2 py-1 text-left">Detail</th>
+              <th className="border px-2 py-1 text-left">名前</th>
+              <th className="border px-2 py-1 text-left">状態</th>
+              <th className="border px-2 py-1 text-left">プロファイル</th>
+              <th className="border px-2 py-1 text-left">作成日時</th>
+              <th className="border px-2 py-1 text-left">反映</th>
+              <th className="border px-2 py-1 text-left">詳細</th>
             </tr>
           </thead>
           <tbody>
@@ -79,11 +79,11 @@ export default function ProposalsPage() {
                   {p.created_at ? new Date(p.created_at).toLocaleString() : "-"}
                 </td>
                 <td className="border px-2 py-1">
-                  {p.applied_score_profile_id ? `applied (id=${p.applied_score_profile_id})` : "-"}
+                  {p.applied_score_profile_id ? `反映済 (id=${p.applied_score_profile_id})` : "-"}
                 </td>
                 <td className="border px-2 py-1">
                   <Link href={`/proposals/${p.id}`} className="text-blue-600 hover:underline">
-                    View
+                    表示
                   </Link>
                 </td>
               </tr>
@@ -91,7 +91,7 @@ export default function ProposalsPage() {
             {items.length === 0 && !loading && (
               <tr>
                 <td colSpan={7} className="border px-2 py-2 text-center text-slate-500">
-                  No proposals.
+                  提案がありません。
                 </td>
               </tr>
             )}

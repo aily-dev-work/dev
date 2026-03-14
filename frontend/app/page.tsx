@@ -39,7 +39,7 @@ export default function DashboardPage() {
   }, []);
 
   async function handleRollback() {
-    if (!confirm("Rollback to previous profile?")) return;
+    if (!confirm("直前のプロファイルにロールバックしますか？")) return;
     setRollbackLoading(true);
     setError(null);
     try {
@@ -58,8 +58,8 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-slate-600">Loading...</p>
+        <h1 className="text-2xl font-semibold">ダッシュボード</h1>
+        <p className="text-sm text-slate-600">読み込み中...</p>
       </div>
     );
   }
@@ -67,7 +67,7 @@ export default function DashboardPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <h1 className="text-2xl font-semibold">ダッシュボード</h1>
         <div className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </div>
@@ -91,12 +91,12 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
+      <h1 className="text-2xl font-semibold">ダッシュボード</h1>
 
       {/* Upper cards: current active + counts */}
       <section className="grid gap-4 md:grid-cols-[2fr,1fr]">
         <div className="rounded-lg border bg-white p-4 shadow-sm">
-          <h2 className="mb-2 text-lg font-semibold">Current active profile</h2>
+          <h2 className="mb-2 text-lg font-semibold">現在のアクティブプロファイル</h2>
           {data?.current_active_profile ? (
             <div className="space-y-1">
               <div className="text-base font-medium">
@@ -113,7 +113,7 @@ export default function DashboardPage() {
               )}
             </div>
           ) : (
-            <p className="text-sm text-slate-600">No active profile configured.</p>
+            <p className="text-sm text-slate-600">アクティブなプロファイルがありません。</p>
           )}
           <div className="mt-4">
             <button
@@ -122,24 +122,24 @@ export default function DashboardPage() {
               disabled={rollbackLoading}
               className="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
             >
-              {rollbackLoading ? "Rolling back..." : "Rollback to previous profile"}
+              {rollbackLoading ? "ロールバック中..." : "直前のプロファイルにロールバック"}
             </button>
           </div>
         </div>
 
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-slate-700">Ops summary</h2>
+          <h2 className="text-sm font-semibold text-slate-700">運用サマリ</h2>
           <div className="grid gap-2">
             <div className="rounded border bg-white px-3 py-2 text-sm shadow-sm">
-              <div className="text-slate-500">Stale active</div>
+              <div className="text-slate-500">古いアクティブ</div>
               <div className="text-xl font-semibold">{ops?.counts.stale_active_count ?? 0}</div>
             </div>
             <div className="rounded border bg-white px-3 py-2 text-sm shadow-sm">
-              <div className="text-slate-500">Underperforming</div>
+              <div className="text-slate-500">成績不振</div>
               <div className="text-xl font-semibold">{ops?.counts.underperforming_count ?? 0}</div>
             </div>
             <div className="rounded border bg-white px-3 py-2 text-sm shadow-sm">
-              <div className="text-slate-500">Accepted not activated</div>
+              <div className="text-slate-500">採用済み・未反映</div>
               <div className="text-xl font-semibold">
                 {ops?.counts.accepted_not_activated_count ?? 0}
               </div>
@@ -147,8 +147,7 @@ export default function DashboardPage() {
           </div>
           {overview && (
             <div className="rounded border bg-slate-50 px-3 py-2 text-xs text-slate-600">
-              Profiles: {overview.total_count} total, {overview.active_count} active,{" "}
-              {overview.proposal_derived_count} from proposals
+              プロファイル: 合計 {overview.total_count}、アクティブ {overview.active_count}、提案由来 {overview.proposal_derived_count}
             </div>
           )}
         </div>
@@ -163,7 +162,7 @@ export default function DashboardPage() {
       {/* Activation timeline (list) */}
       {chartData && chartData.activation_timeline_rows.length > 0 && (
         <section className="rounded-lg border bg-white p-4 shadow-sm">
-          <h2 className="mb-2 text-lg font-semibold">Activation timeline</h2>
+          <h2 className="mb-2 text-lg font-semibold">有効化タイムライン</h2>
           <ul className="space-y-1 text-sm">
             {chartData.activation_timeline_rows.slice(0, 15).map((row, idx) => (
               <li key={idx} className="flex flex-wrap gap-2 border-b border-slate-100 py-1">
@@ -182,21 +181,21 @@ export default function DashboardPage() {
       {data?.compare_snapshot && (
         <section className="rounded-lg border bg-white p-4 shadow-sm">
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Compare snapshot</h2>
+            <h2 className="text-lg font-semibold">比較スナップショット</h2>
             <Link
               href="/profiles/compare"
               className="text-sm text-blue-600 hover:underline"
             >
-              Open Compare →
+              比較画面を開く →
             </Link>
           </div>
           <div className="grid gap-3 text-sm md:grid-cols-2">
             <div className="rounded border bg-slate-50 p-2">
-              <div className="text-xs font-semibold text-slate-500">Base</div>
+              <div className="text-xs font-semibold text-slate-500">ベース</div>
               {data.compare_snapshot.base_profile.name} ({data.compare_snapshot.base_profile.version})
             </div>
             <div className="rounded border bg-slate-50 p-2">
-              <div className="text-xs font-semibold text-slate-500">Candidate</div>
+              <div className="text-xs font-semibold text-slate-500">候補</div>
               {data.compare_snapshot.candidate_profile.name} (
               {data.compare_snapshot.candidate_profile.version})
             </div>
@@ -206,16 +205,16 @@ export default function DashboardPage() {
 
       {/* Recent activation history table */}
       <section className="rounded-lg border bg-white p-4 shadow-sm">
-        <h2 className="mb-2 text-lg font-semibold">Recent activation history</h2>
+        <h2 className="mb-2 text-lg font-semibold">直近の有効化履歴</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full border text-sm">
             <thead className="bg-slate-100">
               <tr>
-                <th className="border px-2 py-1 text-left">Activated at</th>
-                <th className="border px-2 py-1 text-left">Reason</th>
-                <th className="border px-2 py-1 text-left">Previous</th>
-                <th className="border px-2 py-1 text-left">Activated</th>
-                <th className="border px-2 py-1 text-left">Note</th>
+                <th className="border px-2 py-1 text-left">有効化日時</th>
+                <th className="border px-2 py-1 text-left">理由</th>
+                <th className="border px-2 py-1 text-left">直前</th>
+                <th className="border px-2 py-1 text-left">有効化後</th>
+                <th className="border px-2 py-1 text-left">メモ</th>
               </tr>
             </thead>
             <tbody>
@@ -237,7 +236,7 @@ export default function DashboardPage() {
               {(!data?.recent_activation_history?.length) && (
                 <tr>
                   <td colSpan={5} className="border px-2 py-2 text-center text-slate-500">
-                    No history.
+                    履歴がありません。
                   </td>
                 </tr>
               )}
@@ -248,11 +247,11 @@ export default function DashboardPage() {
 
       {/* message_lines */}
       <section className="rounded-lg border bg-white p-4 shadow-sm">
-        <h2 className="mb-2 text-lg font-semibold">Messages</h2>
+        <h2 className="mb-2 text-lg font-semibold">メッセージ</h2>
         <ul className="list-disc space-y-1 pl-5 text-sm text-slate-800">
           {ops?.message_lines.map((line, idx) => (
             <li key={idx}>{line}</li>
-          )) ?? <li className="text-slate-500">No messages.</li>}
+          )) ?? <li className="text-slate-500">メッセージはありません。</li>}
         </ul>
       </section>
     </div>

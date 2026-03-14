@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 export const metadata = {
-  title: "Stocks Admin",
-  description: "Stocks score profile admin dashboard",
+  title: "株価スコア管理",
+  description: "スコアプロファイル管理ダッシュボード",
   icons: { icon: "/icon.svg" },
 };
 
@@ -15,14 +15,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <header className="border-b bg-white">
           <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
             <Link href="/" className="text-lg font-semibold">
-              Stocks Admin
+              株価スコア管理
             </Link>
             <nav className="flex gap-4 text-sm">
-              <Link href="/">Dashboard</Link>
-              <Link href="/profiles">Profiles</Link>
-              <Link href="/profiles/compare">Compare</Link>
-              <Link href="/proposals">Proposals</Link>
-              <Link href="/history">History</Link>
+              <Link href="/">ダッシュボード</Link>
+              <Link href="/profiles">プロファイル</Link>
+              <Link href="/profiles/compare">比較</Link>
+              <Link href="/proposals">提案</Link>
+              <Link href="/history">履歴</Link>
             </nav>
           </div>
         </header>
