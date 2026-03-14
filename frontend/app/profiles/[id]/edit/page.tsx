@@ -4,6 +4,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { getScoreProfile, updateScoreProfile } from "@/lib/api";
+import { DEFAULT_WEIGHTS, DEFAULT_THRESHOLDS } from "@/lib/profileDefaults";
+
+function jsonStringify(obj: unknown): string {
+  if (obj === undefined || obj === null) return "{}";
+  try {
+    return JSON.stringify(obj, null, 2);
+  } catch {
+    return "{}";
+  }
+}
 
 export default function EditProfilePage() {
   const params = useParams<{ id: string }>();
@@ -12,6 +22,8 @@ export default function EditProfilePage() {
   const [name, setName] = useState("");
   const [version, setVersion] = useState("");
   const [description, setDescription] = useState("");
+  const [weightsJson, setWeightsJson] = useState("");
+  const [thresholdsJson, setThresholdsJson] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -31,6 +43,8 @@ export default function EditProfilePage() {
           setName(p.name);
           setVersion(p.version);
           setDescription(p.description || "");
+          setWeightsJson(jsonStringify(p.weights_json ?? DEFAULT_WEIGHTS));
+          setThresholdsJson(jsonStringify(p.thresholds_json ?? DEFAULT_THRESHOLDS));
         }
       })
       .catch((e) => {
@@ -50,6 +64,22 @@ export default function EditProfilePage() {
       setError("名前とバージョンは必須です。");
       return;
     }
+    let weights: Record<string, unknown>;
+    let thresholds: Record<string, unknown>;
+    try {
+      weights = JSON.parse(weightsJson) as Record<string, unknown>;
+      if (typeof weights !== "object" || weights === null) throw new Error("重みはオブジェクトである必要があります");
+    } catch {
+      setError("重みの JSON が不正です。");
+      return;
+    }
+    try {
+      thresholds = JSON.parse(thresholdsJson) as Record<string, unknown>;
+      if (typeof thresholds !== "object" || thresholds === null) throw new Error("閾値はオブジェクトである必要があります");
+    } catch {
+      setError("閾値の JSON が不正です。");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -57,6 +87,8 @@ export default function EditProfilePage() {
         name: name.trim(),
         version: version.trim(),
         description: description.trim(),
+        weights_json: weights,
+        thresholds_json: thresholds,
       });
       router.push("/profiles");
       router.refresh();
@@ -129,7 +161,27 @@ export default function EditProfilePage() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
-            className="mt-1 block w-full rounded border border-slate-300 px-3 py-2 text-sm"
+            className="mt-1 block w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
+          />
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">重み（JSON） *</span>
+          <textarea
+            value={weightsJson}
+            onChange={(e) => setWeightsJson(e.target.value)}
+            rows={14}
+            className="mt-1 block w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
+            spellCheck={false}
+          />
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">閾値（JSON） *</span>
+          <textarea
+            value={thresholdsJson}
+            onChange={(e) => setThresholdsJson(e.target.value)}
+            rows={6}
+            className="mt-1 block w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
+            spellCheck={false}
           />
         </label>
         <div className="flex gap-2">
