@@ -327,6 +327,15 @@ export type DashboardChartData = {
   activation_timeline_rows: DashboardActivationTimelineRow[];
 };
 
+/** 使用中プロファイルの成績 5 段階 + 未判定 */
+export type PerformanceLevel =
+  | "excellent"
+  | "good"
+  | "average"
+  | "needs_review"
+  | "poor"
+  | "unrated";
+
 export type DashboardStatsResponse = {
   current_active_profile: {
     id: number;
@@ -334,6 +343,8 @@ export type DashboardStatsResponse = {
     version: string;
     is_active: boolean;
     description: string;
+    /** 成績 5 段階 + 未判定（excellent/good/average/needs_review/poor/unrated） */
+    performance_level?: PerformanceLevel;
   } | null;
   ops_summary: OpsSummaryResponse;
   recent_activation_history: ActivationHistoryItem[];

@@ -35,6 +35,48 @@ def _profile_summary(
     return summarize_signals(qs)
 
 
+# 成績 5 段階 + 未判定（API で返す値）
+PERFORMANCE_EXCELLENT = "excellent"   # 優秀
+PERFORMANCE_GOOD = "good"             # 良好
+PERFORMANCE_AVERAGE = "average"       # 普通
+PERFORMANCE_NEEDS_REVIEW = "needs_review"  # 要見直し
+PERFORMANCE_POOR = "poor"             # 要改善
+PERFORMANCE_UNRATED = "unrated"       # 未判定
+
+
+def get_performance_level(
+    profile: ScoreProfile,
+    params: Dict[str, Any],
+    min_evaluated_count: int,
+) -> str:
+    """
+    プロファイルの成績を 5 段階 + 未判定で返す。
+    トレードスタイルに応じた評価期間（h5/h10/h20）で、評価件数が足りている signal_type の
+    成功率の最小値で判定。いずれも件数不足なら unrated。
+    """
+    horizon_key, _ = get_horizon_key_and_days(profile)
+    rows = _profile_summary(profile, params)
+    rates: List[float] = []
+    for row in rows:
+        horizon_data = row.get(horizon_key) or {}
+        sr = horizon_data.get("success_rate")
+        evaluated = horizon_data.get("evaluated_count", 0)
+        if evaluated >= min_evaluated_count and sr is not None:
+            rates.append(float(sr))
+    if not rates:
+        return PERFORMANCE_UNRATED
+    min_sr = min(rates)
+    if min_sr >= 0.75:
+        return PERFORMANCE_EXCELLENT
+    if min_sr >= 0.6:
+        return PERFORMANCE_GOOD
+    if min_sr >= 0.5:
+        return PERFORMANCE_AVERAGE
+    if min_sr >= 0.3:
+        return PERFORMANCE_NEEDS_REVIEW
+    return PERFORMANCE_POOR
+
+
 def _is_underperforming(
     profile: ScoreProfile,
     params: Dict[str, Any],

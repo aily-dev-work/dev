@@ -76,12 +76,8 @@ export default function DashboardPage() {
     );
   }
 
-  const ops = data?.ops_summary;
   const chartData = data?.chart_data;
-  const activeId = data?.current_active_profile?.id;
-  const isUnderperforming =
-    activeId != null &&
-    (ops?.underperforming_profiles?.some((p) => p.id === activeId) ?? false);
+  const performanceLevel = data?.current_active_profile?.performance_level;
   const successRateChartData =
     chartData?.profile_success_rate_rows.map((r) => ({
       name: formatLabel(r),
@@ -99,7 +95,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">ダッシュボード</h1>
 
-      {/* 使用中プロファイル + 成績 */}
+      {/* 使用中プロファイル + 成績（5段階+未判定） */}
       <section className="flex flex-wrap items-center gap-4 text-sm">
         <span className="font-medium text-slate-700">
           使用中プロファイル:{" "}
@@ -110,12 +106,31 @@ export default function DashboardPage() {
         {data?.current_active_profile && (
           <span
             className={
-              isUnderperforming
-                ? "rounded bg-amber-100 px-2 py-0.5 font-medium text-amber-800"
-                : "rounded bg-slate-100 px-2 py-0.5 text-slate-700"
+              performanceLevel === "excellent"
+                ? "rounded bg-emerald-100 px-2 py-0.5 font-medium text-emerald-800"
+                : performanceLevel === "good"
+                  ? "rounded bg-teal-100 px-2 py-0.5 font-medium text-teal-800"
+                  : performanceLevel === "average"
+                    ? "rounded bg-slate-100 px-2 py-0.5 font-medium text-slate-700"
+                    : performanceLevel === "needs_review"
+                      ? "rounded bg-amber-100 px-2 py-0.5 font-medium text-amber-800"
+                      : performanceLevel === "poor"
+                        ? "rounded bg-red-100 px-2 py-0.5 font-medium text-red-800"
+                        : "rounded bg-slate-200 px-2 py-0.5 text-slate-600"
             }
           >
-            成績: {isUnderperforming ? "要見直し" : "良好"}
+            成績:{" "}
+            {performanceLevel === "excellent"
+              ? "優秀"
+              : performanceLevel === "good"
+                ? "良好"
+                : performanceLevel === "average"
+                  ? "普通"
+                  : performanceLevel === "needs_review"
+                    ? "要見直し"
+                    : performanceLevel === "poor"
+                      ? "要改善"
+                      : "未判定"}
           </span>
         )}
       </section>

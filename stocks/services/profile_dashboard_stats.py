@@ -14,6 +14,7 @@ from .profile_review_targets import (
     DEFAULT_MIN_EVALUATED_COUNT,
     DEFAULT_STALE_DAYS,
     DEFAULT_THRESHOLD_SUCCESS_RATE,
+    get_performance_level,
 )
 from .scoring_profile import get_active_score_profile
 from .signal_summary import build_summary_queryset, summarize_signals
@@ -163,15 +164,24 @@ def build_dashboard_stats(
     """
     from django.core.exceptions import ImproperlyConfigured
 
-    # current_active_profile
+    # current_active_profile（成績 5 段階 + 未判定を付与）
+    params_for_review: Dict[str, Any] = {}
+    if signal_date_from:
+        params_for_review["signal_date_from"] = signal_date_from
+    if signal_date_to:
+        params_for_review["signal_date_to"] = signal_date_to
     try:
         active = get_active_score_profile()
+        performance_level = get_performance_level(
+            active, params_for_review, min_evaluated_count
+        )
         current_active_profile = {
             "id": active.id,
             "name": active.name,
             "version": active.version,
             "is_active": active.is_active,
             "description": active.description or "",
+            "performance_level": performance_level,
         }
     except ImproperlyConfigured:
         current_active_profile = None
