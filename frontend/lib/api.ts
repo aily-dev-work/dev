@@ -203,6 +203,39 @@ export async function deleteStockPrice5m(id: number) {
   return request<null>(`/api/v1/stock-prices-5m/${id}/`, { method: "DELETE" });
 }
 
+/** 週足一覧 */
+export async function getStockPricesWeekly(stockId: number) {
+  return request<import("@/types/api").StockPriceWeeklyRow[]>(
+    `/api/v1/stock-prices-weekly/?stock=${stockId}`,
+  );
+}
+
+/** 週足 更新 */
+export async function updateStockPriceWeekly(
+  id: number,
+  body: Partial<{
+    date: string;
+    open_price: number;
+    high_price: number;
+    low_price: number;
+    close_price: number;
+    volume: number | null;
+  }>,
+) {
+  return request<import("@/types/api").StockPriceWeeklyRow>(
+    `/api/v1/stock-prices-weekly/${id}/`,
+    {
+      method: "PUT",
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+/** 週足 削除 */
+export async function deleteStockPriceWeekly(id: number) {
+  return request<null>(`/api/v1/stock-prices-weekly/${id}/`, { method: "DELETE" });
+}
+
 /** 月足一覧 */
 export async function getStockPricesMonthly(stockId: number) {
   return request<import("@/types/api").StockPriceMonthlyRow[]>(

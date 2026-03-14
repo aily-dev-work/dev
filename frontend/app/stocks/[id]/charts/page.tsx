@@ -13,7 +13,8 @@ const StockPriceChart = dynamic(
   { ssr: false },
 );
 
-type Resolution = "5m" | "1d" | "1w" | "1m";
+const RESOLUTIONS = ["1d", "1w", "5m", "1m"] as const;
+type Resolution = (typeof RESOLUTIONS)[number];
 
 const RESOLUTION_LABELS: Record<Resolution, string> = {
   "5m": "5分足",
@@ -22,16 +23,17 @@ const RESOLUTION_LABELS: Record<Resolution, string> = {
   "1m": "月足",
 };
 
-/** 表示用に足数を制限: 日足60日、5分足6時間、週足2年、月足5年 */
-function limitBarsForDisplay(bars: StockPriceBar[], resolution: Resolution): StockPriceBar[] {
+/** 表示用に足数を制限。forLargeChart=true のときは2倍の期間 */
+function limitBarsForDisplay(bars: StockPriceBar[], resolution: Resolution, forLargeChart?: boolean): StockPriceBar[] {
   if (bars.length === 0) return bars;
-  if (resolution === "1d") return bars.slice(-60);
+  const mul = forLargeChart ? 2 : 1;
+  if (resolution === "1d") return bars.slice(-60 * mul);
   if (resolution === "5m") {
-    const bars6h = 6 * (60 / 5);
-    return bars.slice(-bars6h);
+    const barsPerPeriod = 6 * (60 / 5); // 6時間分
+    return bars.slice(-barsPerPeriod * mul);
   }
-  if (resolution === "1w") return bars.slice(-104);
-  if (resolution === "1m") return bars.slice(-60);
+  if (resolution === "1w") return bars.slice(-80 * mul);
+  if (resolution === "1m") return bars.slice(-60 * mul);
   return bars;
 }
 
@@ -54,13 +56,13 @@ export default function StockChartsPage() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
   const [stock, setStock] = useState<WatchStock | null>(null);
-  const [resolution, setResolution] = useState<Resolution>("1d");
-  const [bars, setBars] = useState<StockPriceBar[]>([]);
+  const [barsByResolution, setBarsByResolution] = useState<Partial<Record<Resolution, StockPriceBar[]>>>({});
   const [stockLoading, setStockLoading] = useState(true);
   const [barsLoading, setBarsLoading] = useState(true);
   const [fetchingPrices, setFetchingPrices] = useState(false);
   const [fetchMessage, setFetchMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fullScreenResolution, setFullScreenResolution] = useState<Resolution | null>(null);
   const hasAutoFetchedRef = useRef(false);
 
   useEffect(() => {
@@ -84,34 +86,51 @@ export default function StockChartsPage() {
     };
   }, [id]);
 
+  // 4足を一括取得
   useEffect(() => {
     if (Number.isNaN(id)) return;
-    let ok = true;
     setBarsLoading(true);
     setError(null);
-    getStockPrices(id, { resolution, limit: 500 })
-      .then((res) => {
-        if (ok) setBars(res.bars);
+    Promise.all(
+      RESOLUTIONS.map((res) =>
+        getStockPrices(id, { resolution: res, limit: 500 }).then((r) => ({ res, bars: r.bars })),
+      ),
+    )
+      .then((results) => {
+        setBarsByResolution((prev) => {
+          const next = { ...prev };
+          for (const { res, bars } of results) {
+            next[res] = bars;
+          }
+          return next;
+        });
       })
-      .catch((e) => {
-        if (ok) setError((e as Error).message);
-      })
-      .finally(() => {
-        if (ok) setBarsLoading(false);
-      });
-    return () => {
-      ok = false;
-    };
-  }, [id, resolution]);
+      .catch((e) => setError((e as Error).message))
+      .finally(() => setBarsLoading(false));
+  }, [id]);
 
-  // 日足でデータが無いとき、アクセス時に自動で Yahoo から取得
+  // 表示中の足のデータが空のとき、バックグラウンド取得完了に備えて再取得（1d のみポーリング）
+  const bars1d = barsByResolution["1d"] ?? [];
+  useEffect(() => {
+    if (Number.isNaN(id) || barsLoading || bars1d.length > 0) return;
+    const t = window.setInterval(() => {
+      getStockPrices(id, { resolution: "1d", limit: 500 })
+        .then((res) => {
+          if (res.bars.length === 0) return;
+          setBarsByResolution((prev) => ({ ...prev, "1d": res.bars }));
+        })
+        .catch(() => {});
+    }, 3000);
+    return () => window.clearInterval(t);
+  }, [id, barsLoading, bars1d.length]);
+
+  // 日足が無いとき、アクセス時に自動で Yahoo から取得
   useEffect(() => {
     if (
       Number.isNaN(id) ||
       !stock ||
       barsLoading ||
-      resolution !== "1d" ||
-      bars.length > 0 ||
+      bars1d.length > 0 ||
       hasAutoFetchedRef.current
     ) {
       return;
@@ -124,12 +143,24 @@ export default function StockChartsPage() {
         setFetchMessage(
           `日足 ${res.daily.created} 件、週足 ${res.weekly.created} 件、5分足 ${res["5m"].created} 件、月足 ${res.monthly.created} 件を取得しました。`,
         );
-        return getStockPrices(id, { resolution: "1d", limit: 500 });
+        return Promise.all(
+          RESOLUTIONS.map((r) =>
+            getStockPrices(id, { resolution: r, limit: 500 }).then((data) => ({ res: r, bars: data.bars })),
+          ),
+        );
       })
-      .then((r) => setBars(r.bars))
+      .then((results) => {
+        setBarsByResolution((prev) => {
+          const next = { ...prev };
+          for (const { res, bars } of results) {
+            next[res] = bars;
+          }
+          return next;
+        });
+      })
       .catch((e) => setError((e as Error).message))
       .finally(() => setFetchingPrices(false));
-  }, [id, stock, barsLoading, resolution, bars.length]);
+  }, [id, stock, barsLoading, bars1d.length]);
 
   async function handleFetchPrices() {
     setFetchingPrices(true);
@@ -138,9 +169,20 @@ export default function StockChartsPage() {
     try {
       const res = await fetchStockPrices(id);
       setFetchMessage(
-          `日足 ${res.daily.created} 件、週足 ${res.weekly.created} 件、5分足 ${res["5m"].created} 件、月足 ${res.monthly.created} 件を取得しました。`,
-        );
-      getStockPrices(id, { resolution: "1d", limit: 500 }).then((r) => setBars(r.bars));
+        `日足 ${res.daily.created} 件、週足 ${res.weekly.created} 件、5分足 ${res["5m"].created} 件、月足 ${res.monthly.created} 件を取得しました。`,
+      );
+      const results = await Promise.all(
+        RESOLUTIONS.map((r) =>
+          getStockPrices(id, { resolution: r, limit: 500 }).then((data) => ({ res: r, bars: data.bars })),
+        ),
+      );
+      setBarsByResolution((prev) => {
+        const next = { ...prev };
+        for (const { res, bars } of results) {
+          next[res] = bars;
+        }
+        return next;
+      });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -152,7 +194,9 @@ export default function StockChartsPage() {
     return (
       <div className="space-y-4">
         <p>無効な銘柄 ID です。</p>
-        <Link href="/stocks" className="text-blue-600 hover:underline">一覧へ戻る</Link>
+        <Link href="/stocks" className="text-blue-600 hover:underline">
+          一覧へ戻る
+        </Link>
       </div>
     );
   }
@@ -167,16 +211,56 @@ export default function StockChartsPage() {
         <div className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
         </div>
-        <Link href="/stocks" className="text-blue-600 hover:underline">一覧へ戻る</Link>
+        <Link href="/stocks" className="text-blue-600 hover:underline">
+          一覧へ戻る
+        </Link>
       </div>
     );
   }
 
-  const displayedBars = limitBarsForDisplay(bars, resolution);
-  const chartData = barsToChartData(displayedBars, resolution);
+  // 全画面表示（1枚のチャート）
+  if (fullScreenResolution) {
+    const bars = barsByResolution[fullScreenResolution] ?? [];
+    const displayedBars = limitBarsForDisplay(bars, fullScreenResolution, true);
+    const chartData = barsToChartData(displayedBars, fullScreenResolution);
 
+    return (
+      <div
+        className="fixed inset-x-8 inset-y-20 z-50 flex flex-col rounded-lg border-2 border-slate-200 bg-white shadow-xl"
+        role="button"
+        tabIndex={0}
+        onClick={() => setFullScreenResolution(null)}
+        onKeyDown={(e) => e.key === "Escape" && setFullScreenResolution(null)}
+      >
+        <div className="flex shrink-0 items-center justify-between rounded-t-lg border-b bg-white px-4 py-2">
+          <h2 className="text-lg font-semibold">{RESOLUTION_LABELS[fullScreenResolution]}</h2>
+          <button
+            type="button"
+            className="rounded bg-slate-200 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-300"
+            onClick={(e) => {
+              e.stopPropagation();
+              setFullScreenResolution(null);
+            }}
+          >
+            閉じる
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 p-2" onClick={(e) => e.stopPropagation()}>
+          {chartData.length > 0 ? (
+            <div className="h-full min-h-0 w-full">
+              <StockPriceChart key={fullScreenResolution} data={chartData} />
+            </div>
+          ) : (
+            <p className="p-4 text-slate-500">データがありません。</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // 4分割表示
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-4">
         <Link href="/stocks" className="text-sm text-slate-600 hover:text-slate-900">
           ← 銘柄一覧
@@ -190,23 +274,14 @@ export default function StockChartsPage() {
         <h1 className="text-2xl font-semibold">
           {stock?.ticker} {stock?.name && `- ${stock.name}`}
         </h1>
-      </div>
-
-      <div className="flex gap-2 border-b border-slate-200 pb-2">
-        {(["1d", "1w", "5m", "1m"] as const).map((res) => (
-          <button
-            key={res}
-            type="button"
-            onClick={() => setResolution(res)}
-            className={`rounded px-4 py-2 text-sm font-medium ${
-              resolution === res
-                ? "bg-slate-900 text-white"
-                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-            }`}
-          >
-            {RESOLUTION_LABELS[res]}
-          </button>
-        ))}
+        <button
+          type="button"
+          onClick={handleFetchPrices}
+          disabled={fetchingPrices}
+          className="rounded bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-60"
+        >
+          {fetchingPrices ? "取得中..." : "株価を取得（Yahoo）"}
+        </button>
       </div>
 
       {error && (
@@ -220,34 +295,51 @@ export default function StockChartsPage() {
         </div>
       )}
 
-      <div className="rounded-lg border bg-white p-4 shadow-sm">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold">{RESOLUTION_LABELS[resolution]} 終値</h2>
-          <button
-            type="button"
-            onClick={handleFetchPrices}
-            disabled={fetchingPrices}
-            className="rounded bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-60"
-          >
-            {fetchingPrices ? "取得中..." : "株価を取得（Yahoo・日足）"}
-          </button>
+      {barsLoading ? (
+        <p className="text-sm text-slate-600">読み込み中...</p>
+      ) : (
+        <div className="relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] w-screen">
+          <div className="mx-auto max-w-7xl px-4">
+            <div className="grid grid-cols-2 grid-rows-2 gap-3">
+          {RESOLUTIONS.map((res) => {
+            const bars = barsByResolution[res] ?? [];
+            const displayedBars = limitBarsForDisplay(bars, res);
+            const chartData = barsToChartData(displayedBars, res);
+
+            return (
+              <div
+                key={res}
+                role="button"
+                tabIndex={0}
+                className="flex cursor-pointer flex-col overflow-hidden rounded-lg border bg-white shadow-sm transition hover:border-slate-400 hover:shadow"
+                onClick={() => setFullScreenResolution(res)}
+                onKeyDown={(e) => e.key === "Enter" && setFullScreenResolution(res)}
+              >
+                <div className="shrink-0 border-b bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700">
+                  {RESOLUTION_LABELS[res]}
+                </div>
+                <div className="h-64 min-h-0 shrink-0">
+                  {chartData.length > 0 ? (
+                    <StockPriceChart key={res} data={chartData} />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                      データがありません
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+            </div>
+          </div>
         </div>
-        {barsLoading ? (
-          <p className="text-sm text-slate-600">読み込み中...</p>
-        ) : chartData.length > 0 ? (
-          <div className="h-80">
-            <StockPriceChart data={chartData} />
-          </div>
-        ) : (
-          <div className="space-y-2 text-sm text-slate-500">
-            <p>データがありません。</p>
-            <p>
-              <strong>「株価を取得（Yahoo・日足）」</strong>
-              を押すと、Yahoo Finance から直近約2年分の日足を取得して保存できます。取得後はチャートに表示されます。
-            </p>
-          </div>
-        )}
-      </div>
+      )}
+
+      {!barsLoading && RESOLUTIONS.every((r) => (barsByResolution[r] ?? []).length === 0) && (
+        <p className="text-sm text-slate-500">
+          「株価を取得（Yahoo）」でデータを取得するとチャートに表示されます。
+        </p>
+      )}
     </div>
   );
 }

@@ -70,10 +70,11 @@ export default function StockPriceChart({ data }: { data: ChartPoint[] }) {
           timeVisible: true,
           secondsVisible: false,
           borderColor: "#d1d5db",
+          rightOffset: 0,
         },
         rightPriceScale: {
           borderColor: "#d1d5db",
-          scaleMargins: { top: 0.1, bottom: 0.2 },
+          scaleMargins: { top: 0.02, bottom: 0.02 },
         },
       });
 
@@ -116,8 +117,7 @@ export default function StockPriceChart({ data }: { data: ChartPoint[] }) {
   return (
     <div
       ref={containerRef}
-      className="h-full w-full min-h-[200px]"
-      style={{ height: "320px" }}
+      className="h-full w-full min-h-[160px]"
     />
   );
 }

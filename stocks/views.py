@@ -3,9 +3,13 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+import logging
+from datetime import date
+
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import models
-from datetime import date
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     ScoreProfile,
@@ -23,6 +27,7 @@ from .serializers import (
     StockPrice5MinSerializer,
     StockPriceDailySerializer,
     StockPriceMonthlySerializer,
+    StockPriceWeeklySerializer,
     WatchStockSerializer,
 )
 from .services.signal_dataset import build_signal_queryset, signals_to_dataset
@@ -312,12 +317,16 @@ class WatchStockViewSet(viewsets.ModelViewSet):
         except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
             pass
 
-        # 週足（直近5年）
-        try:
-            data = fetch_yahoo("1wk", "5y")
-            parsed = parse_quote(data)
-            if parsed:
+        # 週足（Yahoo は 1wk。5y が通らない銘柄があるので 2y で再試行）
+        for range_param in ("5y", "2y", "1y"):
+            try:
+                data = fetch_yahoo("1wk", range_param)
+                parsed = parse_quote(data)
+                if not parsed:
+                    continue
                 timestamps, opens, highs, lows, closes, volumes = parsed
+                if not timestamps:
+                    continue
                 for i in range(len(timestamps)):
                     ts = timestamps[i]
                     if ts is None:
@@ -343,8 +352,9 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     )
                     if was_created:
                         created_weekly += 1
-        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
-            pass
+                break
+            except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError) as e:
+                logger.warning("fetch_prices weekly ticker=%s range=%s: %s", ticker, range_param, e)
 
         # 月足（直近5年）
         try:
@@ -824,6 +834,18 @@ class StockPriceMonthlyViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = StockPriceMonthly.objects.select_related("stock").all()
+        stock_id = self.request.query_params.get("stock")
+        if stock_id:
+            qs = qs.filter(stock_id=stock_id)
+        return qs
+
+
+class StockPriceWeeklyViewSet(viewsets.ModelViewSet):
+    """週足株価の CRUD。?stock=<id> で絞り込み可能。"""
+    serializer_class = StockPriceWeeklySerializer
+
+    def get_queryset(self):
+        qs = StockPriceWeekly.objects.select_related("stock").all()
         stock_id = self.request.query_params.get("stock")
         if stock_id:
             qs = qs.filter(stock_id=stock_id)

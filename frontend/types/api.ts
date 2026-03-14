@@ -76,6 +76,22 @@ export type StockPrice5MinRow = {
   updated_at?: string | null;
 };
 
+/** 週足株価 1件（CRUD API） */
+export type StockPriceWeeklyRow = {
+  id: number;
+  stock: number;
+  stock_ticker: string;
+  stock_name: string;
+  date: string;
+  open_price: string;
+  high_price: string;
+  low_price: string;
+  close_price: string;
+  volume: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 /** 月足株価 1件（CRUD API） */
 export type StockPriceMonthlyRow = {
   id: number;
