@@ -5,6 +5,7 @@ from .models import (
     StockPrice5Min,
     StockPriceDaily,
     StockPriceMonthly,
+    StockPriceWeekly,
     TradingSignal,
     WatchStock,
 )
@@ -50,6 +51,23 @@ class StockPrice5MinAdmin(admin.ModelAdmin):
     list_filter = ("stock",)
     search_fields = ("stock__ticker", "stock__name")
     ordering = ("-datetime", "-updated_at")
+
+
+@admin.register(StockPriceWeekly)
+class StockPriceWeeklyAdmin(admin.ModelAdmin):
+    list_display = (
+        "stock",
+        "date",
+        "open_price",
+        "high_price",
+        "low_price",
+        "close_price",
+        "volume",
+        "updated_at",
+    )
+    list_filter = ("stock",)
+    search_fields = ("stock__ticker", "stock__name")
+    ordering = ("-date", "-updated_at")
 
 
 @admin.register(StockPriceMonthly)

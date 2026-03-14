@@ -1,6 +1,7 @@
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import models
@@ -14,6 +15,7 @@ from .models import (
     StockPrice5Min,
     StockPriceDaily,
     StockPriceMonthly,
+    StockPriceWeekly,
     TradingSignal,
     WatchStock,
 )
@@ -168,15 +170,225 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                 }
                 for d, o, h, l, c, v in qs
             ]
+        elif resolution == "1w":
+            qs = (
+                StockPriceWeekly.objects.filter(stock=stock)
+                .order_by("date")
+                .values_list("date", "open_price", "high_price", "low_price", "close_price", "volume")[:limit]
+            )
+            rows = [
+                {
+                    "date": d.isoformat(),
+                    "open": float(o),
+                    "high": float(h),
+                    "low": float(l),
+                    "close": float(c),
+                    "volume": v if v is not None else None,
+                }
+                for d, o, h, l, c, v in qs
+            ]
         else:
             return Response(
-                {"detail": "resolution must be 5m, 1d, or 1m"},
+                {"detail": "resolution must be 5m, 1d, 1w, or 1m"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         return Response({"resolution": resolution, "stock_id": stock.id, "ticker": stock.ticker, "bars": rows})
 
-    @action(detail=True, methods=["get"], url_path="score")
+    @action(detail=True, methods=["post"], url_path="fetch-prices")
+    def fetch_prices(self, request, pk=None):
+        """
+        Yahoo Finance から日足・5分足・月足を取得して保存する。
+        POST /api/v1/stocks/:id/fetch-prices/
+        """
+        import json
+        import urllib.error
+        import urllib.parse
+        import urllib.request
+        from datetime import date, datetime
+        from decimal import Decimal
+
+        stock = self.get_object()
+        ticker = (stock.ticker or "").strip()
+        if not ticker:
+            return Response(
+                {"detail": "銘柄にティッカーが設定されていません。"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        def fetch_yahoo(interval: str, range_param: str):
+            url = (
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(ticker)}"
+                f"?interval={interval}&range={range_param}"
+            )
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return json.loads(resp.read().decode())
+
+        def parse_quote(data):
+            result = (data.get("chart") or {}).get("result")
+            if not result:
+                return None
+            res = result[0]
+            timestamps = res.get("timestamp") or []
+            quote = ((res.get("indicators") or {}).get("quote") or [{}])[0]
+            return timestamps, quote.get("open") or [], quote.get("high") or [], quote.get("low") or [], quote.get("close") or [], quote.get("volume") or []
+
+        created_daily = 0
+        created_5m = 0
+        created_weekly = 0
+        created_monthly = 0
+
+        # 日足
+        try:
+            data = fetch_yahoo("1d", "2y")
+            parsed = parse_quote(data)
+            if parsed:
+                timestamps, opens, highs, lows, closes, volumes = parsed
+                for i in range(len(timestamps)):
+                    ts = timestamps[i]
+                    if ts is None:
+                        continue
+                    d = date.fromtimestamp(ts)
+                    o = opens[i] if i < len(opens) else None
+                    h = highs[i] if i < len(highs) else None
+                    l_ = lows[i] if i < len(lows) else None
+                    c = closes[i] if i < len(closes) else None
+                    v = volumes[i] if i < len(volumes) else None
+                    if c is None and o is None and h is None and l_ is None:
+                        continue
+                    close_val = Decimal(str(c)) if c is not None else (Decimal(str(o)) if o is not None else None)
+                    if close_val is None:
+                        continue
+                    open_val = Decimal(str(o)) if o is not None else close_val
+                    high_val = Decimal(str(h)) if h is not None else close_val
+                    low_val = Decimal(str(l_)) if l_ is not None else close_val
+                    vol = int(v) if v is not None and v == v else None
+                    _, was_created = StockPriceDaily.objects.update_or_create(
+                        stock=stock, date=d,
+                        defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
+                    )
+                    if was_created:
+                        created_daily += 1
+        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
+            pass
+
+        # 5分足（直近約2ヶ月）
+        try:
+            data = fetch_yahoo("5m", "60d")
+            parsed = parse_quote(data)
+            if parsed:
+                timestamps, opens, highs, lows, closes, volumes = parsed
+                for i in range(len(timestamps)):
+                    ts = timestamps[i]
+                    if ts is None:
+                        continue
+                    dt = datetime.fromtimestamp(ts)
+                    o = opens[i] if i < len(opens) else None
+                    h = highs[i] if i < len(highs) else None
+                    l_ = lows[i] if i < len(lows) else None
+                    c = closes[i] if i < len(closes) else None
+                    v = volumes[i] if i < len(volumes) else None
+                    if c is None and o is None and h is None and l_ is None:
+                        continue
+                    close_val = Decimal(str(c)) if c is not None else (Decimal(str(o)) if o is not None else None)
+                    if close_val is None:
+                        continue
+                    open_val = Decimal(str(o)) if o is not None else close_val
+                    high_val = Decimal(str(h)) if h is not None else close_val
+                    low_val = Decimal(str(l_)) if l_ is not None else close_val
+                    vol = int(v) if v is not None and v == v else None
+                    _, was_created = StockPrice5Min.objects.update_or_create(
+                        stock=stock, datetime=dt,
+                        defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
+                    )
+                    if was_created:
+                        created_5m += 1
+        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
+            pass
+
+        # 週足（直近5年）
+        try:
+            data = fetch_yahoo("1wk", "5y")
+            parsed = parse_quote(data)
+            if parsed:
+                timestamps, opens, highs, lows, closes, volumes = parsed
+                for i in range(len(timestamps)):
+                    ts = timestamps[i]
+                    if ts is None:
+                        continue
+                    d = date.fromtimestamp(ts)
+                    o = opens[i] if i < len(opens) else None
+                    h = highs[i] if i < len(highs) else None
+                    l_ = lows[i] if i < len(lows) else None
+                    c = closes[i] if i < len(closes) else None
+                    v = volumes[i] if i < len(volumes) else None
+                    if c is None and o is None and h is None and l_ is None:
+                        continue
+                    close_val = Decimal(str(c)) if c is not None else (Decimal(str(o)) if o is not None else None)
+                    if close_val is None:
+                        continue
+                    open_val = Decimal(str(o)) if o is not None else close_val
+                    high_val = Decimal(str(h)) if h is not None else close_val
+                    low_val = Decimal(str(l_)) if l_ is not None else close_val
+                    vol = int(v) if v is not None and v == v else None
+                    _, was_created = StockPriceWeekly.objects.update_or_create(
+                        stock=stock, date=d,
+                        defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
+                    )
+                    if was_created:
+                        created_weekly += 1
+        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
+            pass
+
+        # 月足（直近5年）
+        try:
+            data = fetch_yahoo("1mo", "5y")
+            parsed = parse_quote(data)
+            if parsed:
+                timestamps, opens, highs, lows, closes, volumes = parsed
+                for i in range(len(timestamps)):
+                    ts = timestamps[i]
+                    if ts is None:
+                        continue
+                    d = date.fromtimestamp(ts)
+                    o = opens[i] if i < len(opens) else None
+                    h = highs[i] if i < len(highs) else None
+                    l_ = lows[i] if i < len(lows) else None
+                    c = closes[i] if i < len(closes) else None
+                    v = volumes[i] if i < len(volumes) else None
+                    if c is None and o is None and h is None and l_ is None:
+                        continue
+                    close_val = Decimal(str(c)) if c is not None else (Decimal(str(o)) if o is not None else None)
+                    if close_val is None:
+                        continue
+                    open_val = Decimal(str(o)) if o is not None else close_val
+                    high_val = Decimal(str(h)) if h is not None else close_val
+                    low_val = Decimal(str(l_)) if l_ is not None else close_val
+                    vol = int(v) if v is not None and v == v else None
+                    _, was_created = StockPriceMonthly.objects.update_or_create(
+                        stock=stock, date=d,
+                        defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
+                    )
+                    if was_created:
+                        created_monthly += 1
+        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
+            pass
+
+        return Response({
+            "stock_id": stock.id,
+            "ticker": stock.ticker,
+            "created": created_daily + created_5m + created_weekly + created_monthly,
+            "daily": {"created": created_daily},
+            "5m": {"created": created_5m},
+            "weekly": {"created": created_weekly},
+            "monthly": {"created": created_monthly},
+        })
     def score(self, request, pk=None):
         """
         1銘柄分の買い/売りスコアを返す。
@@ -284,6 +496,288 @@ class WatchStockViewSet(viewsets.ModelViewSet):
             )
 
         return Response(results, status=status.HTTP_200_OK)
+
+
+def _fetch_yahoo_search(q: str) -> list:
+    """Yahoo Finance 検索 API を呼び、quotes のリストを返す。失敗時は空リスト。"""
+    import json
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    for base_url in (
+        "https://query1.finance.yahoo.com/v1/finance/search",
+        "https://query2.finance.yahoo.com/v1/finance/search",
+    ):
+        params = urllib.parse.urlencode({"q": q, "quotesCount": 25})
+        req = urllib.request.Request(
+            f"{base_url}?{params}",
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode())
+            quotes = data.get("quotes") or []
+            if quotes:
+                return quotes
+        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
+            continue
+    return []
+
+
+# Yahoo API が空でも表示する日本株のフォールバック（シンボル → 表示用 quote 辞書）
+_STATIC_FALLBACKS = {
+    "7013": {"symbol": "7013.T", "shortname": "IHI", "longname": "IHI株式会社"},
+    "7013.T": {"symbol": "7013.T", "shortname": "IHI", "longname": "IHI株式会社"},
+    "IHI": {"symbol": "7013.T", "shortname": "IHI", "longname": "IHI株式会社"},
+}
+
+# 東証銘柄のシンボル → 日本語企業名（Yahoo は英語のみのため補完）
+_SYMBOL_TO_NAME_JA = {
+    "7203.T": "トヨタ自動車",
+    "6758.T": "ソニーグループ",
+    "9984.T": "ソフトバンクグループ",
+    "6861.T": "キーエンス",
+    "8306.T": "三菱UFJフィナンシャル・グループ",
+    "9432.T": "日本電信電話",
+    "8035.T": "東京エレクトロン",
+    "6902.T": "デンソー",
+    "7013.T": "IHI株式会社",
+    "7267.T": "本田技研工業",
+    "8058.T": "三菱商事",
+    "9433.T": "KDDI",
+    "4063.T": "信越化学工業",
+    "4519.T": "中外製薬",
+    "7741.T": "HOYA",
+    "6367.T": "ダイキン工業",
+    "6098.T": "リクルートホールディングス",
+    "6594.T": "日本電産",
+    "6981.T": "村田製作所",
+    "7201.T": "日産自動車",
+    "6501.T": "日立製作所",
+    "6702.T": "富士通",
+    "7752.T": "リコー",
+    "8031.T": "三井物産",
+    "8053.T": "住友商事",
+    "8001.T": "伊藤忠商事",
+    "7974.T": "任天堂",
+    "9983.T": "ファーストリテイリング",
+    "4568.T": "第一三共",
+    "4578.T": "大塚ホールディングス",
+    "6506.T": "安川電機",
+    "6971.T": "京セラ",
+    "6857.T": "アドバンテスト",
+    "7832.T": "バンダイナムコホールディングス",
+    "8802.T": "三菱地所",
+    "8801.T": "三井不動産",
+    "8766.T": "東京海上ホールディングス",
+    "8411.T": "みずほフィナンシャルグループ",
+    "8316.T": "三井住友フィナンシャルグループ",
+}
+
+# 日本語検索ワード → シンボル（検索クエリが日本語のときこのシンボルでも検索する）
+_SEARCH_JA_TO_SYMBOL = {
+    "トヨタ": "7203.T",
+    "トヨタ自動車": "7203.T",
+    "ソニー": "6758.T",
+    "ソニーグループ": "6758.T",
+    "ソフトバンク": "9984.T",
+    "ソフトバンクグループ": "9984.T",
+    "キーエンス": "6861.T",
+    "IHI": "7013.T",
+    "アイエイチアイ": "7013.T",
+    "本田": "7267.T",
+    "ホンダ": "7267.T",
+    "本田技研": "7267.T",
+    "本田技研工業": "7267.T",
+    "三菱UFJ": "8306.T",
+    "みずほ": "8411.T",
+    "みずほFG": "8411.T",
+    "三井住友FG": "8316.T",
+    "SMFG": "8316.T",
+    "MUFG": "8306.T",
+    "NTT": "9432.T",
+    "日本電信電話": "9432.T",
+    "東京エレクトロン": "8035.T",
+    "TEL": "8035.T",
+    "デンソー": "6902.T",
+    "三菱商事": "8058.T",
+    "KDDI": "9433.T",
+    "信越化学": "4063.T",
+    "信越化学工業": "4063.T",
+    "中外製薬": "4519.T",
+    "HOYA": "7741.T",
+    "ホーヤ": "7741.T",
+    "ダイキン": "6367.T",
+    "ダイキン工業": "6367.T",
+    "リクルート": "6098.T",
+    "リクルートHD": "6098.T",
+    "日本電産": "6594.T",
+    "村田製作所": "6981.T",
+    "村田": "6981.T",
+    "日産": "7201.T",
+    "日産自動車": "7201.T",
+    "日立": "6501.T",
+    "日立製作所": "6501.T",
+    "富士通": "6702.T",
+    "リコー": "7752.T",
+    "三井物産": "8031.T",
+    "住友商事": "8053.T",
+    "伊藤忠": "8001.T",
+    "伊藤忠商事": "8001.T",
+    "任天堂": "7974.T",
+    "ユニクロ": "9983.T",
+    "ファーストリテイリング": "9983.T",
+    "ファストリ": "9983.T",
+    "第一三共": "4568.T",
+    "大塚": "4578.T",
+    "大塚HD": "4578.T",
+    "安川電機": "6506.T",
+    "京セラ": "6971.T",
+    "アドバンテスト": "6857.T",
+    "バンダイ": "7832.T",
+    "バンダイナムコ": "7832.T",
+    "三菱地所": "8802.T",
+    "三井不動産": "8801.T",
+    "東京海上": "8766.T",
+    "東京海上HD": "8766.T",
+}
+
+
+def _symbols_for_ja_query(q: str) -> list:
+    """日本語クエリから追加検索するシンボルのリストを返す。"""
+    qn = q.strip()
+    if not qn:
+        return []
+    symbols = []
+    # 完全一致
+    sym = _SEARCH_JA_TO_SYMBOL.get(qn) or _SEARCH_JA_TO_SYMBOL.get(qn.upper())
+    if sym:
+        symbols.append(sym)
+    # 部分一致: 日本語企業名にクエリが含まれる銘柄
+    for symbol, name_ja in _SYMBOL_TO_NAME_JA.items():
+        if qn in name_ja and symbol not in symbols:
+            symbols.append(symbol)
+    return symbols
+
+
+def _static_fallback_quotes(q: str) -> list:
+    """検索 API が空のとき、知っている銘柄だけ静的で返す。"""
+    qn = q.strip().upper()
+    if not qn:
+        return []
+    # 完全一致
+    if qn in _STATIC_FALLBACKS:
+        return [_STATIC_FALLBACKS[qn].copy()]
+    # 4桁数字 → .T を試す
+    if qn.isdigit() and len(qn) == 4 and f"{qn}.T" in _STATIC_FALLBACKS:
+        return [_STATIC_FALLBACKS[f"{qn}.T"].copy()]
+    return []
+
+
+def _quotes_to_results(quotes: list) -> list:
+    """API の quotes を results 形式に変換。"""
+    results = []
+    seen = set()
+    for item in quotes:
+        symbol = (item.get("symbol") or "").strip()
+        if not symbol or symbol.startswith("."):
+            continue
+        key = symbol.upper()
+        if key in seen:
+            continue
+        seen.add(key)
+        shortname = (item.get("shortname") or "").strip()
+        longname = (item.get("longname") or "").strip()
+        name = longname or shortname or symbol
+        exchange = (item.get("exchange") or "").strip()
+        quote_type = (item.get("quoteType") or "").strip()
+        out = {
+            "symbol": symbol,
+            "name": name,
+            "exchange": exchange or None,
+            "quote_type": quote_type or None,
+        }
+        name_ja = _SYMBOL_TO_NAME_JA.get(symbol) or _SYMBOL_TO_NAME_JA.get(symbol.upper())
+        if name_ja:
+            out["name_ja"] = name_ja
+        results.append(out)
+    return results
+
+
+def _sort_results_japan_first(results: list) -> None:
+    """日本株（東証 .T）を常に上にくるようソートする。"""
+    def key(r):
+        s = (r.get("symbol") or "").upper()
+        # 東証 .T を先頭、そのあと他市場（.TW, .TWO, .KS 等）、最後にサフィックスなし
+        if s.endswith(".T"):
+            return (0, s)
+        if "." in s:
+            return (1, s)
+        return (2, s)
+    results.sort(key=key)
+
+
+class MarketSearchView(APIView):
+    """
+    リアルな市場の銘柄を検索する API。
+    Yahoo Finance の検索 API をプロキシし、?q= で銘柄コードや銘柄名を検索する。
+    日本株は「7013」だけだとヒットしにくいため、4桁数字のときは「7013.T」でも再検索して結果をマージする。
+    """
+
+    def get(self, request):
+        q = (request.query_params.get("q") or "").strip()
+        if not q:
+            return Response({"results": []})
+
+        quotes = _fetch_yahoo_search(q)
+        seen = {(item.get("symbol") or "").upper() for item in quotes}
+
+        # 日本株: 銘柄コードのみ（4桁数字）のとき .T でも検索してマージ（例: 7013 → 7013.T）
+        extra_queries = []
+        if q.isdigit() and len(q) == 4:
+            extra_queries.append(f"{q}.T")
+        # 英語の銘柄名フォールバック（例: IHI → 7013.T）
+        name_to_ticker = {"IHI": "7013.T"}
+        if q.upper() in name_to_ticker:
+            extra_queries.append(name_to_ticker[q.upper()])
+        # 日本語検索: 企業名・略称で該当するシンボルを追加検索
+        for sym in _symbols_for_ja_query(q):
+            if sym not in extra_queries:
+                extra_queries.append(sym)
+
+        for eq in extra_queries:
+            for item in _fetch_yahoo_search(eq):
+                sym = (item.get("symbol") or "").strip()
+                if sym and not sym.startswith(".") and sym.upper() not in seen:
+                    quotes.append(item)
+                    seen.add(sym.upper())
+
+        results = _quotes_to_results(quotes)
+
+        # Yahoo がブロック等で空のとき: 静的フォールバック
+        if not results and q:
+            fallbacks = _static_fallback_quotes(q)
+            if fallbacks:
+                results = _quotes_to_results(fallbacks)
+            else:
+                # 日本語検索でヒットしたシンボルを合成結果で返す
+                for sym in _symbols_for_ja_query(q):
+                    name_ja = _SYMBOL_TO_NAME_JA.get(sym)
+                    if name_ja:
+                        results.append({
+                            "symbol": sym,
+                            "name": name_ja,
+                            "name_ja": name_ja,
+                            "exchange": None,
+                            "quote_type": None,
+                        })
+
+        _sort_results_japan_first(results)
+        return Response({"results": results})
 
 
 class StockPriceDailyViewSet(viewsets.ModelViewSet):

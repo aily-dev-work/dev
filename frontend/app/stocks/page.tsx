@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { getStocks, createStock, deleteStock } from "@/lib/api";
+import { getStocks, createStock, deleteStock, searchMarket } from "@/lib/api";
 import type { WatchStock } from "@/types/api";
+import type { MarketSearchResult } from "@/types/api";
+
+const DEBOUNCE_MS = 400;
 
 export default function StocksPage() {
   const [rows, setRows] = useState<WatchStock[]>([]);
@@ -11,6 +14,12 @@ export default function StocksPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [marketQuery, setMarketQuery] = useState("");
+  const [marketResults, setMarketResults] = useState<MarketSearchResult[]>([]);
+  const [marketSearching, setMarketSearching] = useState(false);
+  const [marketError, setMarketError] = useState<string | null>(null);
+  const [addingSymbol, setAddingSymbol] = useState<string | null>(null);
+  const [filterQuery, setFilterQuery] = useState("");
   const [form, setForm] = useState({
     ticker: "",
     name: "",
@@ -18,6 +27,15 @@ export default function StocksPage() {
     is_active: true,
     memo: "",
   });
+
+  const filterLower = filterQuery.trim().toLowerCase();
+  const filteredRows = filterLower
+    ? rows.filter(
+        (s) =>
+          s.ticker.toLowerCase().includes(filterLower) ||
+          s.name.toLowerCase().includes(filterLower),
+      )
+    : rows;
 
   async function load() {
     setLoading(true);
@@ -35,6 +53,50 @@ export default function StocksPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    const q = marketQuery.trim();
+    if (!q) {
+      setMarketResults([]);
+      setMarketError(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      setMarketSearching(true);
+      setMarketError(null);
+      searchMarket(q)
+        .then((res) => {
+          setMarketResults(res.results || []);
+        })
+        .catch((e) => {
+          setMarketError((e as Error).message);
+          setMarketResults([]);
+        })
+        .finally(() => setMarketSearching(false));
+    }, DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [marketQuery]);
+
+  const handleAddFromMarket = useCallback(
+    async (item: MarketSearchResult) => {
+      setAddingSymbol(item.symbol);
+      setError(null);
+      try {
+        await createStock({
+          ticker: item.symbol,
+          name: (item.name_ja ?? item.name) || item.symbol,
+          market: item.exchange || undefined,
+          is_active: true,
+        });
+        await load();
+      } catch (e) {
+        setError((e as Error).message);
+      } finally {
+        setAddingSymbol(null);
+      }
+    },
+    [],
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -79,8 +141,89 @@ export default function StocksPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">監視銘柄</h1>
       <p className="text-sm text-slate-600">
-        監視したい企業（銘柄）をここで追加・編集・削除できます。
+        市場の銘柄を検索して監視リストに追加できます。登録済み銘柄は下の一覧で絞り込み・編集・削除できます。
       </p>
+
+      <section className="rounded-lg border bg-white p-4 shadow-sm">
+        <h2 className="mb-2 text-sm font-semibold text-slate-700">市場の銘柄を検索</h2>
+        <p className="mb-2 text-xs text-slate-500">
+          銘柄コード（例: 7203.T）や銘柄名（例: トヨタ）で検索し、結果から選択して監視リストに追加します。
+        </p>
+        <input
+          type="search"
+          value={marketQuery}
+          onChange={(e) => setMarketQuery(e.target.value)}
+          placeholder="例: 7203 / トヨタ / IHI株式会社"
+          className="w-full max-w-md rounded border border-slate-300 px-3 py-2 text-sm"
+          aria-label="市場の銘柄を検索"
+        />
+        {marketSearching && <p className="mt-2 text-xs text-slate-500">検索中...</p>}
+        {marketError && (
+          <p className="mt-2 text-xs text-red-600">{marketError}</p>
+        )}
+        {marketResults.length > 0 && (
+          <ul className="mt-3 max-h-60 overflow-y-auto rounded border border-slate-200 bg-slate-50">
+            {marketResults.map((item) => {
+              const isRegistered = rows.some(
+                (r) => r.ticker.toUpperCase() === item.symbol.toUpperCase(),
+              );
+              return (
+                <li
+                  key={item.symbol}
+                  className="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 last:border-b-0"
+                >
+                  <span className="min-w-0 flex-1 text-sm">
+                    <span className="font-mono text-slate-800">{item.symbol}</span>
+                    <span className="ml-2 text-slate-600">
+                      {item.name_ja ?? item.name}
+                    </span>
+                    {item.exchange && (
+                      <span className="ml-2 text-xs text-slate-400">
+                        {item.exchange}
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={isRegistered || addingSymbol === item.symbol}
+                    onClick={() => handleAddFromMarket(item)}
+                    className="shrink-0 rounded bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700 disabled:bg-slate-400 disabled:opacity-70"
+                  >
+                    {isRegistered
+                      ? "登録済み"
+                      : addingSymbol === item.symbol
+                        ? "追加中..."
+                        : "監視リストに追加"}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {marketQuery.trim() && !marketSearching && marketResults.length === 0 && !marketError && (
+          <p className="mt-2 text-xs text-slate-500">該当する銘柄がありません。</p>
+        )}
+      </section>
+
+      <section className="rounded-lg border bg-white p-4 shadow-sm">
+        <label className="block text-sm font-medium text-slate-700">
+          登録済み銘柄の絞り込み
+        </label>
+        <input
+          type="search"
+          value={filterQuery}
+          onChange={(e) => setFilterQuery(e.target.value)}
+          placeholder="銘柄コード・銘柄名で絞り込む"
+          className="mt-2 w-full max-w-md rounded border border-slate-300 px-3 py-2 text-sm"
+          aria-label="登録済み銘柄の絞り込み"
+        />
+        {filterLower && (
+          <p className="mt-2 text-xs text-slate-500">
+            {filteredRows.length} 件表示
+          </p>
+        )}
+      </section>
+
       {error && (
         <div className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
@@ -148,6 +291,7 @@ export default function StocksPage() {
         </form>
       </section>
 
+      <h2 className="text-lg font-semibold">登録済み銘柄一覧</h2>
       {loading && <p className="text-sm text-slate-600">読み込み中...</p>}
       <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
         <table className="min-w-full text-sm">
@@ -163,7 +307,7 @@ export default function StocksPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((s) => (
+            {filteredRows.map((s) => (
               <tr
                 key={s.id}
                 className={s.is_active ? "bg-emerald-50" : "odd:bg-slate-50"}
@@ -180,6 +324,12 @@ export default function StocksPage() {
                 </td>
                 <td className="border px-2 py-1">
                   <span className="flex flex-wrap gap-1">
+                    <Link
+                      href={`/stocks/${s.id}`}
+                      className="rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white hover:bg-slate-700"
+                    >
+                      選択
+                    </Link>
                     <Link
                       href={`/stocks/${s.id}/charts`}
                       className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
@@ -215,6 +365,9 @@ export default function StocksPage() {
       </div>
       {!loading && rows.length === 0 && (
         <p className="text-sm text-slate-500">監視銘柄がありません。上から追加してください。</p>
+      )}
+      {!loading && rows.length > 0 && filteredRows.length === 0 && (
+        <p className="text-sm text-slate-500">絞り込みに一致する銘柄がありません。</p>
       )}
     </div>
   );

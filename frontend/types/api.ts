@@ -1,3 +1,18 @@
+/** 市場検索 1件（Yahoo Finance 等） */
+export type MarketSearchResult = {
+  symbol: string;
+  name: string;
+  /** 東証銘柄などで日本語企業名がある場合 */
+  name_ja?: string | null;
+  exchange: string | null;
+  quote_type: string | null;
+};
+
+/** GET /api/v1/market-search/?q= の返却 */
+export type MarketSearchResponse = {
+  results: MarketSearchResult[];
+};
+
 /** 監視銘柄（WatchStock） */
 export type WatchStock = {
   id: number;

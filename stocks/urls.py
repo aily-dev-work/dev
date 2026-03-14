@@ -1,6 +1,8 @@
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    MarketSearchView,
     ProposalViewSet,
     ScoreProfileViewSet,
     SignalViewSet,
@@ -21,5 +23,7 @@ router.register("signals", SignalViewSet, basename="signal")
 router.register("score-profiles", ScoreProfileViewSet, basename="scoreprofile")
 router.register("proposals", ProposalViewSet, basename="proposal")
 
-urlpatterns = router.urls
+urlpatterns = [
+    path("market-search/", MarketSearchView.as_view(), name="market-search"),
+] + router.urls
 

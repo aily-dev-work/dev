@@ -146,6 +146,40 @@ class StockPriceMonthly(models.Model):
         return f"{self.stock.ticker} 月足 {self.date} {self.close_price}"
 
 
+class StockPriceWeekly(models.Model):
+    """
+    監視銘柄ごとの週足株価（OHLCV）。date はその週の代表日（例: 週末）を格納。
+    """
+    stock = models.ForeignKey(
+        WatchStock,
+        on_delete=models.CASCADE,
+        related_name="prices_weekly",
+        help_text="対象となる監視銘柄",
+    )
+    date = models.DateField(help_text="週の代表日（例: 週末）")
+    open_price = models.DecimalField(max_digits=12, decimal_places=4)
+    high_price = models.DecimalField(max_digits=12, decimal_places=4)
+    low_price = models.DecimalField(max_digits=12, decimal_places=4)
+    close_price = models.DecimalField(max_digits=12, decimal_places=4)
+    volume = models.BigIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "週足株価"
+        verbose_name_plural = "週足株価"
+        ordering = ["-date", "-updated_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["stock", "date"],
+                name="unique_stock_weekly_date",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.stock.ticker} 週足 {self.date} {self.close_price}"
+
+
 class TradingSignal(models.Model):
     """
     提案タイミングのスコアとテクニカル状態を保存するモデル。

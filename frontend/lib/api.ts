@@ -32,6 +32,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export { request, API_BASE_URL };
 
+/** 市場の銘柄を検索（Yahoo Finance 等） */
+export async function searchMarket(query: string) {
+  const q = encodeURIComponent((query || "").trim());
+  return request<import("@/types/api").MarketSearchResponse>(
+    `/api/v1/market-search/?q=${q}`,
+  );
+}
+
 /** 監視銘柄一覧取得 */
 export async function getStocks() {
   return request<import("@/types/api").WatchStock[]>("/api/v1/stocks/");
@@ -78,10 +86,23 @@ export async function deleteStock(id: number) {
   return request<null>(`/api/v1/stocks/${id}/`, { method: "DELETE" });
 }
 
+/** 銘柄の株価を Yahoo Finance から取得して保存（日足・5分足・月足） */
+export async function fetchStockPrices(stockId: number) {
+  return request<{
+    stock_id: number;
+    ticker: string;
+    created: number;
+    daily: { created: number };
+    weekly: { created: number };
+    "5m": { created: number };
+    monthly: { created: number };
+  }>(`/api/v1/stocks/${stockId}/fetch-prices/`, { method: "POST" });
+}
+
 /** 銘柄の価格データ取得（5分足/日足/月足） */
 export async function getStockPrices(
   stockId: number,
-  params?: { resolution?: "5m" | "1d" | "1m"; limit?: number },
+  params?: { resolution?: "5m" | "1d" | "1w" | "1m"; limit?: number },
 ) {
   const resolution = params?.resolution ?? "1d";
   const limit = params?.limit ?? 500;
