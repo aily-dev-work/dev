@@ -32,3 +32,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export { request, API_BASE_URL };
 
+/** フェーズ22: ScoreProfile 一覧取得 */
+export async function getScoreProfiles() {
+  return request<import("@/types/api").ScoreProfileListItem[]>("/api/v1/score-profiles/");
+}
+
+/** フェーズ22: ScoreProfile 詳細取得 */
+export async function getScoreProfile(id: number) {
+  return request<import("@/types/api").ScoreProfileDetail>(`/api/v1/score-profiles/${id}/`);
+}
+

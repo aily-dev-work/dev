@@ -357,6 +357,66 @@ class ScoreProfileViewSet(viewsets.ViewSet):
     スコア設定プロファイルを扱う ViewSet（現時点では read-only）。
     """
 
+    def list(self, request):
+        """
+        ScoreProfile のフル一覧を返す。
+        エンドポイント: GET /api/v1/score-profiles/
+        フェーズ22: proposal 由来 profile の source_proposal 情報を含む。
+        """
+        qs = (
+            ScoreProfile.objects.prefetch_related("source_proposals")
+            .order_by("-is_active", "-updated_at")
+        )
+        results = []
+        for p in qs:
+            source = p.source_proposals.order_by("-created_at").first()
+            results.append(
+                {
+                    "id": p.id,
+                    "name": p.name,
+                    "version": p.version,
+                    "is_active": p.is_active,
+                    "description": p.description or "",
+                    "weights_json": p.weights_json,
+                    "thresholds_json": p.thresholds_json,
+                    "created_at": p.created_at.isoformat() if p.created_at else None,
+                    "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+                    "source_proposal_id": source.id if source else None,
+                    "source_proposal_name": source.proposal_name if source else None,
+                    "source_proposal_status": source.status if source else None,
+                }
+            )
+        return Response(results, status=status.HTTP_200_OK)
+
+    def retrieve(self, request, pk=None):
+        """
+        単一の ScoreProfile 詳細を返す。
+        エンドポイント: GET /api/v1/score-profiles/<id>/
+        """
+        try:
+            p = ScoreProfile.objects.prefetch_related("source_proposals").get(pk=pk)
+        except ScoreProfile.DoesNotExist:
+            return Response(
+                {"detail": "ScoreProfile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        source = p.source_proposals.order_by("-created_at").first()
+        data = {
+            "id": p.id,
+            "name": p.name,
+            "version": p.version,
+            "is_active": p.is_active,
+            "description": p.description or "",
+            "weights_json": p.weights_json,
+            "thresholds_json": p.thresholds_json,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+            "source_proposal_id": source.id if source else None,
+            "source_proposal_name": source.proposal_name if source else None,
+            "source_proposal_status": source.status if source else None,
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=["get"], url_path="current")
     def current(self, request):
         """

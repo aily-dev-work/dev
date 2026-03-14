@@ -1527,6 +1527,107 @@ class ScoreProfileActivationHistoryAPITests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class ScoreProfileListAPITests(TestCase):
+    """
+    フェーズ22: ScoreProfile 一覧・詳細 API のテスト。
+    """
+
+    def setUp(self) -> None:
+        ScoreProfile.objects.all().delete()
+        ScoreProfileProposal.objects.all().delete()
+        self.profile1 = ScoreProfile.objects.create(
+            name="Profile1",
+            version="v1",
+            is_active=True,
+            description="first profile",
+            weights_json={"buy": {}, "sell": {}},
+            thresholds_json={},
+        )
+        self.profile2 = ScoreProfile.objects.create(
+            name="Profile2",
+            version="v2",
+            is_active=False,
+            description="second profile",
+            weights_json={"buy": {"x": 1.0}, "sell": {}},
+            thresholds_json={"bias": {}},
+        )
+        self.proposal = ScoreProfileProposal.objects.create(
+            score_profile=self.profile1,
+            proposal_name="proposal-for-p2",
+            status=ScoreProfileProposal.STATUS_ACCEPTED,
+            score_profile_name_snapshot=self.profile1.name,
+            score_profile_version_snapshot=self.profile1.version,
+            source_filters_json={},
+            analysis_summary="",
+            issues_json=[],
+            improvement_hypotheses_json=[],
+            suggested_weights_json={"buy": {"x": 1.0}, "sell": {}},
+            suggested_thresholds_json={"bias": {}},
+            cautions_json=[],
+            raw_ai_response_json={},
+            applied_score_profile=self.profile2,
+        )
+
+    def test_list_returns_200_and_all_profiles(self) -> None:
+        response = self.client.get("/api/v1/score-profiles/")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIsInstance(body, list)
+        self.assertEqual(len(body), 2)
+
+        ids = [p["id"] for p in body]
+        self.assertIn(self.profile1.id, ids)
+        self.assertIn(self.profile2.id, ids)
+
+        for p in body:
+            self.assertIn("id", p)
+            self.assertIn("name", p)
+            self.assertIn("version", p)
+            self.assertIn("is_active", p)
+            self.assertIn("description", p)
+            self.assertIn("weights_json", p)
+            self.assertIn("thresholds_json", p)
+            self.assertIn("created_at", p)
+            self.assertIn("updated_at", p)
+            self.assertIn("source_proposal_id", p)
+            self.assertIn("source_proposal_name", p)
+            self.assertIn("source_proposal_status", p)
+
+    def test_list_profile_from_proposal_has_source_proposal_info(self) -> None:
+        response = self.client.get("/api/v1/score-profiles/")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        p2 = next(p for p in body if p["id"] == self.profile2.id)
+        self.assertEqual(p2["source_proposal_id"], self.proposal.id)
+        self.assertEqual(p2["source_proposal_name"], "proposal-for-p2")
+        self.assertEqual(p2["source_proposal_status"], "accepted")
+
+    def test_list_profile_without_source_proposal_has_null_source_fields(self) -> None:
+        response = self.client.get("/api/v1/score-profiles/")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        p1 = next(p for p in body if p["id"] == self.profile1.id)
+        self.assertIsNone(p1["source_proposal_id"])
+        self.assertIsNone(p1["source_proposal_name"])
+        self.assertIsNone(p1["source_proposal_status"])
+
+    def test_retrieve_returns_200_and_profile_detail(self) -> None:
+        response = self.client.get(f"/api/v1/score-profiles/{self.profile2.id}/")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["id"], self.profile2.id)
+        self.assertEqual(body["name"], "Profile2")
+        self.assertEqual(body["version"], "v2")
+        self.assertFalse(body["is_active"])
+        self.assertEqual(body["source_proposal_id"], self.proposal.id)
+        self.assertEqual(body["source_proposal_name"], "proposal-for-p2")
+
+    def test_retrieve_not_found_returns_404(self) -> None:
+        response = self.client.get("/api/v1/score-profiles/999999/")
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("detail", response.json())
+
+
 class ScoreProfileRollbackAPITests(TestCase):
     """
     フェーズ18: ScoreProfile 手動ロールバック API のテスト。

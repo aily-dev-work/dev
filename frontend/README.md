@@ -1,9 +1,10 @@
-# Stocks Frontend (Phase 21)
+# Stocks Frontend (Phase 21 / 22)
 
 Next.js + TypeScript 製の簡易管理画面です。  
 既存 Django REST API (`stocks` アプリ) を利用して、ScoreProfile / Proposal / Activation history の運用をブラウザから行えます。
 
-**フェーズ21の詳細仕様**: [stocks/PHASE21.md](../stocks/PHASE21.md)
+**フェーズ21の詳細仕様**: [stocks/PHASE21.md](../stocks/PHASE21.md)  
+**フェーズ22の詳細仕様**: [stocks/PHASE22.md](../stocks/PHASE22.md)
 
 ---
 
@@ -80,31 +81,30 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
   - `PATCH /api/v1/proposals/<id>/review/`
   - `POST /api/v1/proposals/<id>/apply/`
 
-### 3.4 Profiles 一覧（サマリ） `/profiles`
+### 3.4 Profiles 一覧 `/profiles`（フェーズ22 でフル一覧化）
 
 - 表示:
-  - id / name / version / is_active
-  - kind: current / stale / underperforming / accepted_not_activated
-  - source proposal 情報（あれば）
+  - id / name / version / is_active / description / source proposal / created_at
 - 操作:
-  - activate ボタン（Confirm 付き）
+  - Activate ボタン（Confirm 付き）
+  - Compare リンク（`/profiles/compare?base=<id>` へ遷移）
 - 利用 API:
-  - `GET /api/v1/score-profiles/ops-summary/`
+  - `GET /api/v1/score-profiles/`（フル一覧）
   - `POST /api/v1/score-profiles/<id>/activate/`
 
-※ バックエンドに ScoreProfile 一覧 API が無いため、ops-summary / review-targets ベースで「運用上見るべき profile」のみを表示しています。
-
-### 3.5 Compare 画面 `/profiles/compare`
+### 3.5 Compare 画面 `/profiles/compare`（フェーズ22 でプルダウン選択）
 
 - 操作:
-  - base_profile_id / candidate_profile_id を入力し compare API を実行
+  - Base / Candidate をプルダウンで選択
   - Swap ボタンで base / candidate を入れ替え
+  - Active profile を画面上部に表示
 - 表示:
   - base_profile / candidate_profile の基本情報
   - signal_type ごとの summary テーブル
     - total_signals
     - h5 / h10 / h20 の evaluated_count / success_count / success_rate / avg_return
 - 利用 API:
+  - `GET /api/v1/score-profiles/`（プルダウン用一覧）
   - `GET /api/v1/score-profiles/compare/?base_profile_id=...&candidate_profile_id=...`
 
 ### 3.6 History 画面 `/history`
@@ -135,10 +135,11 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 5. Proposals:
    - Proposal 一覧が表示され、accepted proposal に対して detail 画面から review / apply が行えること。
 6. Profiles:
-   - current / stale / underperforming / accepted-not-activated profiles が一覧表示されること。
+   - 全 profile が一覧表示されること。
    - Activate ボタンで profile を切り替えられること。
+   - Compare リンクで compare 画面へ遷移できること。
 7. Compare:
-   - 2つの profile id を指定して compare できること。
+   - プルダウンから base / candidate を選択して compare できること。
 8. History:
    - activation history 一覧が表示され、filter で絞り込みできること。
 
@@ -148,6 +149,6 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 
 - 認証・権限制御は行っていません（開発用管理画面想定）。
 - バックエンド API のレスポンス形式に強く依存しているため、API 仕様を変更する場合は併せてフロントの型 (`types/api.ts`) を更新してください。
-- プロファイルの完全な一覧 API は無いため、`/profiles` では ops-summary/ review-targets に出てくる profile だけを表示しています。
+- フェーズ22 で ScoreProfile フル一覧 API を追加し、`/profiles` は全 profile を表示するようになりました。
 - 自動更新・通知 UI・グラフ表示などはフェーズ21では実装していません。
 

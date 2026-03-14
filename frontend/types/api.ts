@@ -10,6 +10,25 @@ export type ScoreProfile = {
   updated_at?: string | null;
 };
 
+/** フェーズ22: ScoreProfile 一覧 API の返却型 */
+export type ScoreProfileListItem = {
+  id: number;
+  name: string;
+  version: string;
+  is_active: boolean;
+  description: string;
+  weights_json?: unknown;
+  thresholds_json?: unknown;
+  created_at?: string | null;
+  updated_at?: string | null;
+  source_proposal_id: number | null;
+  source_proposal_name: string | null;
+  source_proposal_status: string | null;
+};
+
+/** フェーズ22: ScoreProfile 詳細 API の返却型 */
+export type ScoreProfileDetail = ScoreProfileListItem;
+
 export type ScoreProfileProposal = {
   id: number;
   score_profile_id: number;

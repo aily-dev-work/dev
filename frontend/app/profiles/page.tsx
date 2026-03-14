@@ -2,21 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { request } from "@/lib/api";
-import type { OpsSummaryResponse } from "@/types/api";
-
-type ProfileRow = {
-  id: number;
-  name: string;
-  version: string;
-  is_active: boolean;
-  kind: "current" | "stale" | "underperforming" | "accepted_not_activated";
-  source_proposal_id?: number;
-  source_proposal_name?: string;
-};
+import { getScoreProfiles, request } from "@/lib/api";
+import type { ScoreProfileListItem } from "@/types/api";
 
 export default function ProfilesPage() {
-  const [rows, setRows] = useState<ProfileRow[]>([]);
+  const [rows, setRows] = useState<ScoreProfileListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activatingId, setActivatingId] = useState<number | null>(null);
@@ -25,42 +15,8 @@ export default function ProfilesPage() {
     setLoading(true);
     setError(null);
     try {
-      const ops = await request<OpsSummaryResponse>("/api/v1/score-profiles/ops-summary/");
-      const list: ProfileRow[] = [];
-      if (ops.current_active_profile) {
-        list.push({
-          ...ops.current_active_profile,
-          kind: "current",
-        });
-      }
-      ops.stale_active_profiles.forEach((p) =>
-        list.push({
-          ...p,
-          kind: "stale",
-        }),
-      );
-      ops.underperforming_profiles.forEach((p) =>
-        list.push({
-          ...p,
-          kind: "underperforming",
-        }),
-      );
-      ops.accepted_not_activated_profiles.forEach((p) =>
-        list.push({
-          ...p,
-          kind: "accepted_not_activated",
-          source_proposal_id: p.source_proposal_id,
-          source_proposal_name: p.source_proposal_name,
-        }),
-      );
-      // dedupe by id, prefer current > others
-      const byId = new Map<number, ProfileRow>();
-      for (const r of list) {
-        if (!byId.has(r.id) || r.kind === "current") {
-          byId.set(r.id, r);
-        }
-      }
-      setRows(Array.from(byId.values()));
+      const list = await getScoreProfiles();
+      setRows(list);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -91,10 +47,9 @@ export default function ProfilesPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Profiles (summary)</h1>
+      <h1 className="text-2xl font-semibold">Profiles</h1>
       <p className="text-sm text-slate-600">
-        This view is based on ops-summary and shows currently relevant profiles (current /
-        stale / underperforming / accepted-but-not-activated).
+        Full list of ScoreProfiles. Activate or compare from here.
       </p>
       {error && (
         <div className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -111,8 +66,9 @@ export default function ProfilesPage() {
               <th className="border px-2 py-1 text-left">Name</th>
               <th className="border px-2 py-1 text-left">Version</th>
               <th className="border px-2 py-1 text-left">Active</th>
-              <th className="border px-2 py-1 text-left">Kind</th>
+              <th className="border px-2 py-1 text-left">Description</th>
               <th className="border px-2 py-1 text-left">Source proposal</th>
+              <th className="border px-2 py-1 text-left">Created</th>
               <th className="border px-2 py-1 text-left">Actions</th>
             </tr>
           </thead>
@@ -126,53 +82,54 @@ export default function ProfilesPage() {
                 <td className="border px-2 py-1 font-medium">{p.name}</td>
                 <td className="border px-2 py-1">{p.version}</td>
                 <td className="border px-2 py-1">{String(p.is_active)}</td>
-                <td className="border px-2 py-1">{p.kind}</td>
+                <td className="max-w-[200px] truncate border px-2 py-1 text-slate-600">
+                  {p.description || "-"}
+                </td>
                 <td className="border px-2 py-1">
                   {p.source_proposal_id ? (
                     <Link
                       href={`/proposals/${p.source_proposal_id}`}
                       className="text-blue-600 hover:underline"
                     >
-                      {p.source_proposal_name} (id={p.source_proposal_id})
+                      {p.source_proposal_name ?? "?"} (id={p.source_proposal_id})
                     </Link>
                   ) : (
                     "-"
                   )}
                 </td>
+                <td className="border px-2 py-1 text-xs text-slate-500">
+                  {p.created_at ? new Date(p.created_at).toLocaleDateString() : "-"}
+                </td>
                 <td className="border px-2 py-1">
-                  <button
-                    type="button"
-                    onClick={() => handleActivate(p.id)}
-                    disabled={activatingId === p.id}
-                    className="rounded bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-60"
-                  >
-                    {activatingId === p.id ? "Activating..." : "Activate"}
-                  </button>
+                  <span className="flex flex-wrap gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleActivate(p.id)}
+                      disabled={activatingId === p.id}
+                      className="rounded bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-60"
+                    >
+                      {activatingId === p.id ? "Activating..." : "Activate"}
+                    </button>
+                    <Link
+                      href={`/profiles/compare?base=${p.id}`}
+                      className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                    >
+                      Compare
+                    </Link>
+                  </span>
                 </td>
               </tr>
             ))}
             {rows.length === 0 && !loading && (
               <tr>
-                <td colSpan={7} className="border px-2 py-2 text-center text-slate-500">
-                  No profiles in ops summary.
+                <td colSpan={8} className="border px-2 py-2 text-center text-slate-500">
+                  No profiles.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
-
-      <section className="rounded border bg-white p-3 text-xs text-slate-600">
-        <p className="font-semibold">Compare helper</p>
-        <p>
-          Use profile ids from this table on{" "}
-          <Link href="/profiles/compare" className="text-blue-600 hover:underline">
-            Compare
-          </Link>{" "}
-          page.
-        </p>
-      </section>
     </div>
   );
 }
-
