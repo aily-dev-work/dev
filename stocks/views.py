@@ -7,6 +7,7 @@ import logging
 import time
 from datetime import date
 
+from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import connection, models
 from django.db.utils import OperationalError
@@ -48,6 +49,7 @@ from .services.signal_evaluation import evaluate_signal
 from .services.signal_generation import generate_trading_signal
 from .services.signal_scoring import score_from_technical
 from .services.technical_analysis import calculate_technical_summary
+from .services.run_5m_job import run_5m_fetch_and_evaluate
 from .services.profile_proposal import save_profile_proposal
 from .services.profile_proposal_review import (
     can_delete,
@@ -818,6 +820,31 @@ def _sort_results_japan_first(results: list) -> None:
             return (1, s)
         return (2, s)
     results.sort(key=key)
+
+
+class Run5mEvaluateView(APIView):
+    """
+    5 分毎ジョブ用 HTTP エンドポイント。クラウドの cron から POST で呼ぶ。
+    X-Cron-Secret ヘッダーが settings.RUN_5M_CRON_SECRET と一致する場合のみ実行。
+    RUN_5M_CRON_SECRET が未設定の場合は 403。
+    """
+
+    def post(self, request):
+        secret = getattr(settings, "RUN_5M_CRON_SECRET", "") or ""
+        if not secret:
+            return Response(
+                {"detail": "Cron endpoint is disabled (RUN_5M_CRON_SECRET not set)."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        provided = request.headers.get("X-Cron-Secret") or request.query_params.get("secret") or ""
+        if provided != secret:
+            return Response(
+                {"detail": "Invalid or missing X-Cron-Secret."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        no_fetch = request.query_params.get("no_fetch", "").lower() in ("1", "true", "yes")
+        result = run_5m_fetch_and_evaluate(skip_fetch=no_fetch)
+        return Response(result, status=status.HTTP_200_OK)
 
 
 class MarketSearchView(APIView):

@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     MarketSearchView,
     ProposalViewSet,
+    Run5mEvaluateView,
     ScoreProfileViewSet,
     SignalViewSet,
     StockPrice5MinViewSet,
@@ -27,5 +28,6 @@ router.register("proposals", ProposalViewSet, basename="proposal")
 
 urlpatterns = [
     path("market-search/", MarketSearchView.as_view(), name="market-search"),
+    path("cron/run-5m-evaluate/", Run5mEvaluateView.as_view(), name="cron-run-5m-evaluate"),
 ] + router.urls
 

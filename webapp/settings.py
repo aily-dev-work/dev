@@ -146,6 +146,10 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 LOGIN_REDIRECT_URL = '/admin/'
 LOGOUT_REDIRECT_URL = '/admin/'
 
+# 5 分毎 cron 用 HTTP エンドポイントの検証用シークレット（未設定ならエンドポイントは 403）
+# クラウドの cron から POST する際に X-Cron-Secret ヘッダーで送る。
+RUN_5M_CRON_SECRET = os.environ.get('RUN_5M_CRON_SECRET', '')
+
 # Django REST Framework（初期設定のみ。API 設計は後から）
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
