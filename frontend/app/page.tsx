@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { getDashboardStats, getStocksScores, request } from "@/lib/api";
-import type { DashboardStatsResponse, StockScoreItem } from "@/types/api";
+import { getDashboardStats, getStocksScores, getRecentSignals } from "@/lib/api";
+import type { DashboardStatsResponse, RecentSignalItem, StockScoreItem } from "@/types/api";
 
 const DashboardCharts = dynamic(
   () => import("@/app/components/DashboardCharts").then((m) => m.DashboardCharts),
@@ -30,20 +30,21 @@ function formatLabel(row: { profile_name: string; profile_version: string; signa
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardStatsResponse | null>(null);
   const [stockScores, setStockScores] = useState<StockScoreItem[] | null>(null);
+  const [recentSignals, setRecentSignals] = useState<RecentSignalItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rollbackLoading, setRollbackLoading] = useState(false);
-
   async function load() {
     setLoading(true);
     setError(null);
     try {
-      const [res, scoresRes] = await Promise.all([
+      const [res, scoresRes, signalsRes] = await Promise.all([
         getDashboardStats(),
         getStocksScores().catch(() => ({ stocks: [] as StockScoreItem[] })),
+        getRecentSignals(30).catch(() => [] as RecentSignalItem[]),
       ]);
       setData(res);
       setStockScores(Array.isArray(scoresRes?.stocks) ? scoresRes.stocks : []);
+      setRecentSignals(Array.isArray(signalsRes) ? signalsRes : []);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -54,23 +55,6 @@ export default function DashboardPage() {
   useEffect(() => {
     void load();
   }, []);
-
-  async function handleRollback() {
-    if (!confirm("直前のプロファイルにロールバックしますか？")) return;
-    setRollbackLoading(true);
-    setError(null);
-    try {
-      await request("/api/v1/score-profiles/rollback/", {
-        method: "POST",
-        body: JSON.stringify({ note: "rollback from dashboard" }),
-      });
-      await load();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setRollbackLoading(false);
-    }
-  }
 
   if (loading) {
     return (
@@ -93,8 +77,11 @@ export default function DashboardPage() {
   }
 
   const ops = data?.ops_summary;
-  const overview = data?.profile_overview;
   const chartData = data?.chart_data;
+  const activeId = data?.current_active_profile?.id;
+  const isUnderperforming =
+    activeId != null &&
+    (ops?.underperforming_profiles?.some((p) => p.id === activeId) ?? false);
   const successRateChartData =
     chartData?.profile_success_rate_rows.map((r) => ({
       name: formatLabel(r),
@@ -110,64 +97,73 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">ダッシュボード</h1>
 
-      {/* Upper cards: current active + counts */}
-      <section className="grid gap-4 md:grid-cols-[2fr,1fr]">
-        <div className="rounded-lg border bg-white p-4 shadow-sm">
-          <h2 className="mb-2 text-lg font-semibold">現在のアクティブプロファイル</h2>
-          {data?.current_active_profile ? (
-            <div className="space-y-1">
-              <div className="text-base font-medium">
-                {displayProfileName(data.current_active_profile.name)}{" "}
-                <span className="text-slate-500">({data.current_active_profile.version})</span>
-              </div>
-              <div className="text-xs text-slate-500">
-                id={data.current_active_profile.id}
-              </div>
-              {data.current_active_profile.description && (
-                <p className="mt-1 text-sm text-slate-700">
-                  {displayProfileDescription(data.current_active_profile.description)}
-                </p>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-slate-600">アクティブなプロファイルがありません。</p>
-          )}
-          <div className="mt-4">
-            <button
-              type="button"
-              onClick={handleRollback}
-              disabled={rollbackLoading}
-              className="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
-            >
-              {rollbackLoading ? "ロールバック中..." : "直前のプロファイルにロールバック"}
-            </button>
-          </div>
-        </div>
+      {/* 使用中プロファイル + 成績 */}
+      <section className="flex flex-wrap items-center gap-4 text-sm">
+        <span className="font-medium text-slate-700">
+          使用中プロファイル:{" "}
+          {data?.current_active_profile
+            ? displayProfileName(data.current_active_profile.name)
+            : "—"}
+        </span>
+        {data?.current_active_profile && (
+          <span
+            className={
+              isUnderperforming
+                ? "rounded bg-amber-100 px-2 py-0.5 font-medium text-amber-800"
+                : "rounded bg-slate-100 px-2 py-0.5 text-slate-700"
+            }
+          >
+            成績: {isUnderperforming ? "要見直し" : "良好"}
+          </span>
+        )}
+      </section>
 
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-slate-700">運用サマリ</h2>
-          <div className="grid gap-2">
-            <div className="rounded border bg-white px-3 py-2 text-sm shadow-sm">
-              <div className="text-slate-500">古いアクティブ</div>
-              <div className="text-xl font-semibold">{ops?.counts.stale_active_count ?? 0}</div>
-            </div>
-            <div className="rounded border bg-white px-3 py-2 text-sm shadow-sm">
-              <div className="text-slate-500">成績不振</div>
-              <div className="text-xl font-semibold">{ops?.counts.underperforming_count ?? 0}</div>
-            </div>
-            <div className="rounded border bg-white px-3 py-2 text-sm shadow-sm">
-              <div className="text-slate-500">採用済み・未反映</div>
-              <div className="text-xl font-semibold">
-                {ops?.counts.accepted_not_activated_count ?? 0}
-              </div>
-            </div>
+      {/* 直近のシグナル発報（スコアの上に表示） */}
+      <section className="rounded-lg border bg-white p-4 shadow-sm">
+        <h2 className="mb-3 text-lg font-semibold">直近のシグナル発報</h2>
+        {recentSignals && recentSignals.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full border text-sm">
+              <thead className="bg-slate-100">
+                <tr>
+                  <th className="border px-2 py-1 text-center">発報日時</th>
+                  <th className="border px-2 py-1 text-left">銘柄</th>
+                  <th className="border px-2 py-1 text-center">シグナル</th>
+                  <th className="border px-2 py-1 text-center">強さ</th>
+                  <th className="border px-2 py-1 text-right">価格</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentSignals.map((sig) => (
+                  <tr key={sig.id} className="odd:bg-slate-50">
+                    <td className="border px-2 py-1 text-center text-slate-600">
+                      {sig.created_at
+                        ? new Date(sig.created_at).toLocaleString("ja-JP")
+                        : sig.signal_date}
+                    </td>
+                    <td className="border px-2 py-1">
+                      <span className="font-mono">{sig.ticker}</span>
+                      <span className="ml-1 text-slate-600">{sig.stock_name}</span>
+                    </td>
+                    <td className="border px-2 py-1 text-center font-medium">
+                      {sig.signal_type === "buy" && <span className="text-emerald-700">買い</span>}
+                      {sig.signal_type === "sell" && <span className="text-red-700">売り</span>}
+                      {sig.signal_type === "neutral" && <span className="text-slate-600">様子見</span>}
+                    </td>
+                    <td className="border px-2 py-1 text-center text-xs text-slate-600">
+                      {sig.score_strength}
+                    </td>
+                    <td className="border px-2 py-1 text-right font-mono text-slate-700">
+                      {sig.signal_price ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          {overview && (
-            <div className="rounded border bg-slate-50 px-3 py-2 text-xs text-slate-600">
-              プロファイル: 合計 {overview.total_count}、アクティブ {overview.active_count}、提案由来 {overview.proposal_derived_count}
-            </div>
-          )}
-        </div>
+        ) : (
+          <p className="text-sm text-slate-500">発報されたシグナルはありません。</p>
+        )}
       </section>
 
       {/* 監視銘柄のスコア（買い・売り・様子見 ％） */}

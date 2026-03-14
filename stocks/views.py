@@ -1054,6 +1054,38 @@ class SignalViewSet(viewsets.ViewSet):
         rows = summarize_signals(qs)
         return Response(rows, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=["get"], url_path="recent")
+    def recent(self, request):
+        """
+        直近発報したシグナル一覧（ダッシュボード用）。
+        監視銘柄のシグナルを created_at 降順で返す。limit で件数指定（既定 30）。
+        """
+        limit = min(int(request.query_params.get("limit", 30)), 100)
+        qs = (
+            TradingSignal.objects.select_related("stock")
+            .filter(stock__is_active=True)
+            .order_by("-created_at", "-signal_date")[:limit]
+        )
+        results = []
+        for s in qs:
+            results.append(
+                {
+                    "id": s.id,
+                    "stock_id": s.stock_id,
+                    "ticker": s.stock.ticker,
+                    "stock_name": s.stock.name,
+                    "signal_date": s.signal_date.isoformat(),
+                    "signal_type": s.signal_type,
+                    "score_bias": s.score_bias,
+                    "score_strength": s.score_strength,
+                    "buy_score": float(s.buy_score),
+                    "sell_score": float(s.sell_score),
+                    "signal_price": str(s.signal_price) if s.signal_price is not None else None,
+                    "created_at": s.created_at.isoformat() if s.created_at else None,
+                }
+            )
+        return Response(results, status=status.HTTP_200_OK)
+
 
 def _default_weights():
     """手動作成用のデフォルト重み（マイグレーション 0006 と同様）。"""
@@ -1115,6 +1147,7 @@ class ScoreProfileViewSet(viewsets.ViewSet):
                     "version": p.version,
                     "is_active": p.is_active,
                     "description": p.description or "",
+                    "trading_style": getattr(p, "trading_style", ScoreProfile.TRADING_STYLE_SHORT_TERM),
                     "weights_json": p.weights_json,
                     "thresholds_json": p.thresholds_json,
                     "created_at": p.created_at.isoformat() if p.created_at else None,
@@ -1145,6 +1178,7 @@ class ScoreProfileViewSet(viewsets.ViewSet):
             "version": p.version,
             "is_active": p.is_active,
             "description": p.description or "",
+            "trading_style": getattr(p, "trading_style", ScoreProfile.TRADING_STYLE_SHORT_TERM),
             "weights_json": p.weights_json,
             "thresholds_json": p.thresholds_json,
             "created_at": p.created_at.isoformat() if p.created_at else None,
@@ -1169,6 +1203,9 @@ class ScoreProfileViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         description = (request.data.get("description") or "").strip()
+        trading_style = (request.data.get("trading_style") or "").strip() or ScoreProfile.TRADING_STYLE_SHORT_TERM
+        if trading_style not in [c[0] for c in ScoreProfile.TRADING_STYLE_CHOICES]:
+            trading_style = ScoreProfile.TRADING_STYLE_SHORT_TERM
         weights_json = request.data.get("weights_json")
         thresholds_json = request.data.get("thresholds_json")
         if not isinstance(weights_json, dict) or not weights_json:
@@ -1180,6 +1217,7 @@ class ScoreProfileViewSet(viewsets.ViewSet):
             version=version,
             is_active=False,
             description=description,
+            trading_style=trading_style,
             weights_json=weights_json,
             thresholds_json=thresholds_json,
         )
@@ -1189,6 +1227,7 @@ class ScoreProfileViewSet(viewsets.ViewSet):
             "version": profile.version,
             "is_active": profile.is_active,
             "description": profile.description or "",
+            "trading_style": profile.trading_style,
             "weights_json": profile.weights_json,
             "thresholds_json": profile.thresholds_json,
             "created_at": profile.created_at.isoformat() if profile.created_at else None,
@@ -1215,6 +1254,10 @@ class ScoreProfileViewSet(viewsets.ViewSet):
             profile.version = (request.data.get("version") or "").strip() or profile.version
         if "description" in request.data:
             profile.description = (request.data.get("description") or "").strip()
+        if request.data.get("trading_style") is not None:
+            ts = (request.data.get("trading_style") or "").strip()
+            if ts in [c[0] for c in ScoreProfile.TRADING_STYLE_CHOICES]:
+                profile.trading_style = ts
         if request.data.get("weights_json") is not None:
             w = request.data.get("weights_json")
             if isinstance(w, dict) and w:
@@ -1230,6 +1273,7 @@ class ScoreProfileViewSet(viewsets.ViewSet):
             "version": profile.version,
             "is_active": profile.is_active,
             "description": profile.description or "",
+            "trading_style": profile.trading_style,
             "weights_json": profile.weights_json,
             "thresholds_json": profile.thresholds_json,
             "created_at": profile.created_at.isoformat() if profile.created_at else None,

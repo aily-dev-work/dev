@@ -127,6 +127,7 @@ export type ScoreProfileListItem = {
   version: string;
   is_active: boolean;
   description: string;
+  trading_style: string;
   weights_json?: unknown;
   thresholds_json?: unknown;
   created_at?: string | null;
@@ -157,6 +158,22 @@ export type StockScoreItem = {
 };
 
 export type StockScoresResponse = { stocks: StockScoreItem[] };
+
+/** GET /api/v1/signals/recent/ の1件（直近シグナル発報） */
+export type RecentSignalItem = {
+  id: number;
+  stock_id: number;
+  ticker: string;
+  stock_name: string;
+  signal_date: string;
+  signal_type: string;
+  score_bias: string;
+  score_strength: string;
+  buy_score: number;
+  sell_score: number;
+  signal_price: string | null;
+  created_at: string | null;
+};
 
 export type ScoreProfileProposal = {
   id: number;

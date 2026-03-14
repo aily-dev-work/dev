@@ -65,8 +65,15 @@ def build_analysis_package_for_profile(
     指定された ScoreProfile とクエリパラメータをもとに、
     AI 分析に渡しやすい analysis package を構築する。
     trading_style により長期視点用のデータ量を調整する。
+    リクエストで未指定の場合はプロファイルの trading_style をフォールバックに使う。
     """
     trading_style = _get_trading_style(params)
+    if hasattr(profile, "trading_style") and profile.trading_style in TRADING_STYLE_CHOICES:
+        raw = params.get("trading_style")
+        if isinstance(raw, (list, tuple)) and raw:
+            raw = raw[0]
+        if not raw or raw not in TRADING_STYLE_CHOICES:
+            trading_style = profile.trading_style
     style_limit = STYLE_DEFAULT_LIMIT.get(trading_style, DEFAULT_DATASET_LIMIT)
     limit = _normalize_limit(params.get("limit") or style_limit)
     filters = _extract_filters(params)

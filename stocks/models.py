@@ -331,6 +331,15 @@ class ScoreProfile(models.Model):
     将来的に AI などから提案された設定を追加・切り替え可能にする。
     """
 
+    TRADING_STYLE_LONG_TERM = "long_term"
+    TRADING_STYLE_SHORT_TERM = "short_term"
+    TRADING_STYLE_DAY_TRADE = "day_trade"
+    TRADING_STYLE_CHOICES = [
+        (TRADING_STYLE_LONG_TERM, "長期（スイング・ポジション）"),
+        (TRADING_STYLE_SHORT_TERM, "短期（数日〜数週間）"),
+        (TRADING_STYLE_DAY_TRADE, "デイトレ"),
+    ]
+
     name = models.CharField(max_length=100)
     version = models.CharField(
         max_length=32,
@@ -345,6 +354,12 @@ class ScoreProfile(models.Model):
     description = models.TextField(
         blank=True,
         help_text="このプロファイルの用途やメモ（任意）",
+    )
+    trading_style = models.CharField(
+        max_length=16,
+        choices=TRADING_STYLE_CHOICES,
+        default=TRADING_STYLE_SHORT_TERM,
+        help_text="長期/短期/デイトレ。シグナル発報の時間軸・頻度の判断に使う。",
     )
     weights_json = models.JSONField(
         help_text="買い/売りスコアの重み定義（例: {'buy': {...}, 'sell': {...}}）",

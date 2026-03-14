@@ -45,6 +45,7 @@ export default function EditProfilePage() {
         if (ok) {
           setName(p.name);
           setDescription(p.description || "");
+          setTradingStyle(p.trading_style ?? "short_term");
           setWeights(normalizeWeights(p.weights_json ?? DEFAULT_WEIGHTS));
           setThresholds(normalizeThresholds(p.thresholds_json ?? DEFAULT_THRESHOLDS));
         }
@@ -72,6 +73,7 @@ export default function EditProfilePage() {
       await updateScoreProfile(id, {
         name: name.trim(),
         description: description.trim(),
+        trading_style: tradingStyle,
         weights_json: weightsToApi(weights),
         thresholds_json: thresholdsToApi(thresholds),
       });
@@ -160,6 +162,18 @@ export default function EditProfilePage() {
             rows={3}
             className="mt-1 block w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
           />
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">トレードスタイル（分類）</span>
+          <select
+            value={tradingStyle}
+            onChange={(e) => setTradingStyle(e.target.value)}
+            className="mt-1 block w-full rounded border border-slate-300 px-3 py-2 text-sm"
+          >
+            <option value="long_term">長期（スイング・ポジション）</option>
+            <option value="short_term">短期（数日〜数週間）</option>
+            <option value="day_trade">デイトレ</option>
+          </select>
         </label>
         <div className="block">
           <span className="text-sm font-medium text-slate-700">重み</span>

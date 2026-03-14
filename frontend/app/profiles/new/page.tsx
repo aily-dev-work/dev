@@ -19,6 +19,7 @@ export default function NewProfilePage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [tradingStyle, setTradingStyle] = useState<string>("short_term");
   const [weights, setWeights] = useState<WeightsFormValue>(() => normalizeWeights(DEFAULT_WEIGHTS));
   const [thresholds, setThresholds] = useState<ThresholdsFormValue>(() => normalizeThresholds(DEFAULT_THRESHOLDS));
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +38,7 @@ export default function NewProfilePage() {
         name: name.trim(),
         version: "",
         description: description.trim() || undefined,
+        trading_style: tradingStyle,
         weights_json: weightsToApi(weights),
         thresholds_json: thresholdsToApi(thresholds),
       });
@@ -85,6 +87,18 @@ export default function NewProfilePage() {
             className="mt-1 block w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
             placeholder="このプロファイルの用途やメモ"
           />
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">トレードスタイル（分類）</span>
+          <select
+            value={tradingStyle}
+            onChange={(e) => setTradingStyle(e.target.value)}
+            className="mt-1 block w-full rounded border border-slate-300 px-3 py-2 text-sm"
+          >
+            <option value="long_term">長期（スイング・ポジション）</option>
+            <option value="short_term">短期（数日〜数週間）</option>
+            <option value="day_trade">デイトレ</option>
+          </select>
         </label>
         <div className="block">
           <span className="text-sm font-medium text-slate-700">重み</span>

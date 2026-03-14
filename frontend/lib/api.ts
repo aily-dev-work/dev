@@ -300,6 +300,7 @@ export async function createScoreProfile(body: {
   name: string;
   version: string;
   description?: string;
+  trading_style?: string;
   weights_json?: Record<string, unknown>;
   thresholds_json?: Record<string, unknown>;
 }) {
@@ -316,6 +317,7 @@ export async function updateScoreProfile(
     name: string;
     version: string;
     description: string;
+    trading_style: string;
     weights_json: Record<string, unknown>;
     thresholds_json: Record<string, unknown>;
   }>,
@@ -342,6 +344,13 @@ export async function deleteActivationHistory(historyId: number) {
 /** 監視銘柄のスコア一覧（買い/売り/様子見％）。ダッシュボード用 */
 export async function getStocksScores() {
   return request<import("@/types/api").StockScoresResponse>("/api/v1/stocks/scores/");
+}
+
+/** 直近発報したシグナル一覧（ダッシュボード用） */
+export async function getRecentSignals(limit = 30) {
+  return request<import("@/types/api").RecentSignalItem[]>(
+    `/api/v1/signals/recent/?limit=${limit}`,
+  );
 }
 
 /** フェーズ23: ダッシュボード統計取得 */

@@ -2638,7 +2638,7 @@ class AnalysisPackageTests(TestCase):
         )
 
         # notes が固定文として入っている
-        self.assertIn("This package is intended as input for AI-based analysis", package["notes"])
+        self.assertIn("This package is intended for AI analysis", package["notes"])
 
     def test_limit_is_applied(self) -> None:
         params = {"ticker": "ANL", "limit": "1"}
