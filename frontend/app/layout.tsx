@@ -23,6 +23,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <Link href="/profiles/compare">比較</Link>
               <Link href="/proposals">提案</Link>
               <Link href="/history">履歴</Link>
+              <Link href="/help" className="text-slate-500 hover:text-slate-700">使い方</Link>
             </nav>
           </div>
         </header>
