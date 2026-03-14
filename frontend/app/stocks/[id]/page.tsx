@@ -52,7 +52,7 @@ export default function StockEditPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.ticker.trim() || !form.name.trim()) {
-      setError("ティッカーと銘柄名は必須です。");
+      setError("銘柄コードと銘柄名は必須です。");
       return;
     }
     setSaving(true);
@@ -122,7 +122,7 @@ export default function StockEditPage() {
       )}
       <form onSubmit={handleSubmit} className="max-w-lg space-y-4 rounded-lg border bg-white p-4 shadow-sm">
         <label className="block">
-          <span className="text-sm font-medium text-slate-700">ティッカー *</span>
+          <span className="text-sm font-medium text-slate-700">銘柄コード *</span>
           <input
             type="text"
             value={form.ticker}
@@ -154,7 +154,7 @@ export default function StockEditPage() {
             checked={form.is_active}
             onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
           />
-          <span className="text-sm font-medium text-slate-700">監視中</span>
+          <span className="text-sm font-medium text-slate-700">有効</span>
         </label>
         <label className="block">
           <span className="text-sm font-medium text-slate-700">メモ</span>

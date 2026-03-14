@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getScoreProfiles, request } from "@/lib/api";
+import { deleteScoreProfile, getScoreProfiles, request } from "@/lib/api";
 import type { ScoreProfileListItem } from "@/types/api";
 
 export default function ProfilesPage() {
@@ -10,6 +10,7 @@ export default function ProfilesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activatingId, setActivatingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   async function load() {
     setLoading(true);
@@ -28,8 +29,7 @@ export default function ProfilesPage() {
     void load();
   }, []);
 
-  async function handleActivate(id: number) {
-    if (!confirm(`プロファイル id=${id} をアクティブにしますか？`)) return;
+  async function handleUse(id: number) {
     setActivatingId(id);
     setError(null);
     try {
@@ -45,12 +45,36 @@ export default function ProfilesPage() {
     }
   }
 
+  async function handleDelete(id: number, name: string) {
+    if (!confirm(`プロファイル「${name}」(id=${id}) を削除しますか？\nアクティブなプロファイルは削除できません。`)) return;
+    setDeletingId(id);
+    setError(null);
+    try {
+      await deleteScoreProfile(id);
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">プロファイル</h1>
-      <p className="text-sm text-slate-600">
-        スコアプロファイルの一覧。ここからアクティブ化や比較ができます。
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">プロファイル</h1>
+          <p className="text-sm text-slate-600">
+            スコアプロファイルの一覧。「使用する」でスコア計算に使うプロファイルを切り替えられます。
+          </p>
+        </div>
+        <Link
+          href="/profiles/new"
+          className="rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-teal-700"
+        >
+          新規作成
+        </Link>
+      </div>
       {error && (
         <div className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
           {error}
@@ -62,10 +86,10 @@ export default function ProfilesPage() {
         <table className="min-w-full text-sm">
           <thead className="bg-slate-100">
             <tr>
+              <th className="w-24 border px-2 py-1 text-center">使用</th>
               <th className="border px-2 py-1 text-left">ID</th>
               <th className="border px-2 py-1 text-left">名前</th>
               <th className="border px-2 py-1 text-left">バージョン</th>
-              <th className="border px-2 py-1 text-left">アクティブ</th>
               <th className="border px-2 py-1 text-left">説明</th>
               <th className="border px-2 py-1 text-left">元の提案</th>
               <th className="border px-2 py-1 text-left">作成日</th>
@@ -76,12 +100,27 @@ export default function ProfilesPage() {
             {rows.map((p) => (
               <tr
                 key={p.id}
-                className={`${p.is_active ? "bg-emerald-50" : "odd:bg-slate-50"}`}
+                className={p.is_active ? "bg-teal-50" : "odd:bg-slate-50"}
               >
+                <td className="border px-2 py-1 text-center">
+                  {p.is_active ? (
+                    <span className="inline-flex items-center rounded-md bg-teal-600 px-2.5 py-1 text-xs font-medium text-white">
+                      使用中
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleUse(p.id)}
+                      disabled={activatingId === p.id}
+                      className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      {activatingId === p.id ? "適用中..." : "使用する"}
+                    </button>
+                  )}
+                </td>
                 <td className="border px-2 py-1">{p.id}</td>
                 <td className="border px-2 py-1 font-medium">{p.name}</td>
                 <td className="border px-2 py-1">{p.version}</td>
-                <td className="border px-2 py-1">{String(p.is_active)}</td>
                 <td className="max-w-[200px] truncate border px-2 py-1 text-slate-600">
                   {p.description || "-"}
                 </td>
@@ -102,20 +141,27 @@ export default function ProfilesPage() {
                 </td>
                 <td className="border px-2 py-1">
                   <span className="flex flex-wrap gap-1">
-                    <button
-                      type="button"
-                      onClick={() => handleActivate(p.id)}
-                      disabled={activatingId === p.id}
-                      className="rounded bg-slate-900 px-3 py-1 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-60"
+                    <Link
+                      href={`/profiles/${p.id}/edit`}
+                      className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
                     >
-                      {activatingId === p.id ? "反映中..." : "アクティブにする"}
-                    </button>
+                      編集
+                    </Link>
                     <Link
                       href={`/profiles/compare?base=${p.id}`}
                       className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
                     >
                       比較
                     </Link>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(p.id, p.name)}
+                      disabled={deletingId === p.id || p.is_active}
+                      className="rounded border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={p.is_active ? "使用中のプロファイルは削除できません" : undefined}
+                    >
+                      {deletingId === p.id ? "削除中..." : "削除"}
+                    </button>
                   </span>
                 </td>
               </tr>

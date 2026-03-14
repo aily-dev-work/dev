@@ -4,10 +4,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 import logging
+import time
 from datetime import date
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import models
+from django.db.utils import OperationalError
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +112,64 @@ class WatchStockViewSet(viewsets.ModelViewSet):
         }
 
         return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="scores")
+    def scores(self, request):
+        """
+        全監視銘柄について、現在アクティブなプロファイルで買い/売りスコアを計算し、
+        買い％・売り％・様子見％を返す。ダッシュボード表示用。
+        GET /api/v1/stocks/scores/
+        """
+        try:
+            get_active_score_profile()
+        except ImproperlyConfigured:
+            return Response(
+                {"detail": "アクティブなプロファイルがありません。プロファイルをアクティブにしてください。"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        stocks = WatchStock.objects.all().order_by("ticker")
+        results = []
+        for stock in stocks:
+            try:
+                summary = calculate_technical_summary(stock)
+                score_result = score_from_technical(summary)
+            except Exception as e:
+                results.append({
+                    "stock_id": stock.id,
+                    "ticker": stock.ticker,
+                    "name": stock.name or "",
+                    "buy_score": None,
+                    "sell_score": None,
+                    "bias": None,
+                    "strength": None,
+                    "buy_pct": None,
+                    "sell_pct": None,
+                    "wait_pct": None,
+                    "insufficient_data": True,
+                    "error": str(e),
+                })
+                continue
+            buy_score = score_result.buy_score
+            sell_score = score_result.sell_score
+            total = buy_score + sell_score + 100.0
+            buy_pct = round(100.0 * buy_score / total, 1) if total > 0 else 0
+            sell_pct = round(100.0 * sell_score / total, 1) if total > 0 else 0
+            wait_pct = round(100.0 - buy_pct - sell_pct, 1)
+            results.append({
+                "stock_id": stock.id,
+                "ticker": stock.ticker,
+                "name": stock.name or "",
+                "buy_score": buy_score,
+                "sell_score": sell_score,
+                "bias": score_result.bias,
+                "strength": score_result.strength,
+                "buy_pct": buy_pct,
+                "sell_pct": sell_pct,
+                "wait_pct": wait_pct,
+                "insufficient_data": score_result.insufficient_data,
+                "insufficient_reason": score_result.insufficient_reason,
+            })
+        return Response({"stocks": results}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["get"], url_path="prices")
     def prices(self, request, pk=None):
@@ -221,7 +281,7 @@ class WatchStockViewSet(viewsets.ModelViewSet):
         ticker = (stock.ticker or "").strip()
         if not ticker:
             return Response(
-                {"detail": "銘柄にティッカーが設定されていません。"},
+                {"detail": "銘柄に銘柄コードが設定されていません。"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -981,9 +1041,44 @@ class SignalViewSet(viewsets.ViewSet):
         return Response(rows, status=status.HTTP_200_OK)
 
 
+def _default_weights():
+    """手動作成用のデフォルト重み（マイグレーション 0006 と同様）。"""
+    return {
+        "buy": {
+            "trend_long_up": 20.0,
+            "trend_mid_up": 15.0,
+            "trend_short_up": 10.0,
+            "volume_high": 10.0,
+            "above_ma25": 10.0,
+            "above_ma75": 10.0,
+            "near_high_20": 10.0,
+            "near_low_20": 10.0,
+        },
+        "sell": {
+            "trend_long_down": 20.0,
+            "trend_mid_down": 15.0,
+            "trend_short_down": 10.0,
+            "volume_low": 10.0,
+            "below_ma25": 10.0,
+            "below_ma75": 10.0,
+            "near_low_20": 10.0,
+            "near_high_20": 10.0,
+        },
+    }
+
+
+def _default_thresholds():
+    """手動作成用のデフォルト閾値。"""
+    return {
+        "bias": {"neutral_abs_diff_lt": 10.0},
+        "strength": {"weak_abs_diff_lt": 15.0, "normal_abs_diff_lt": 30.0},
+    }
+
+
 class ScoreProfileViewSet(viewsets.ViewSet):
     """
-    スコア設定プロファイルを扱う ViewSet（現時点では read-only）。
+    スコア設定プロファイルを扱う ViewSet。
+    一覧・詳細・作成・更新・アクティブ化・ロールバックなどを提供する。
     """
 
     def list(self, request):
@@ -1046,6 +1141,111 @@ class ScoreProfileViewSet(viewsets.ViewSet):
         }
         return Response(data, status=status.HTTP_200_OK)
 
+    def create(self, request):
+        """
+        手動で ScoreProfile を新規作成する。
+        POST /api/v1/score-profiles/
+        body: name, version, description（任意）, weights_json（任意）, thresholds_json（任意）
+        """
+        name = (request.data.get("name") or "").strip()
+        version = (request.data.get("version") or "").strip()
+        if not name or not version:
+            return Response(
+                {"detail": "name と version は必須です。"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        description = (request.data.get("description") or "").strip()
+        weights_json = request.data.get("weights_json")
+        thresholds_json = request.data.get("thresholds_json")
+        if not isinstance(weights_json, dict) or not weights_json:
+            weights_json = _default_weights()
+        if not isinstance(thresholds_json, dict) or not thresholds_json:
+            thresholds_json = _default_thresholds()
+        profile = ScoreProfile.objects.create(
+            name=name,
+            version=version,
+            is_active=False,
+            description=description,
+            weights_json=weights_json,
+            thresholds_json=thresholds_json,
+        )
+        data = {
+            "id": profile.id,
+            "name": profile.name,
+            "version": profile.version,
+            "is_active": profile.is_active,
+            "description": profile.description or "",
+            "weights_json": profile.weights_json,
+            "thresholds_json": profile.thresholds_json,
+            "created_at": profile.created_at.isoformat() if profile.created_at else None,
+            "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
+        }
+        return Response(data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, pk=None):
+        """
+        既存 ScoreProfile を部分更新する。
+        PATCH /api/v1/score-profiles/<id>/
+        body: name, version, description, weights_json, thresholds_json のいずれか（任意）
+        """
+        try:
+            profile = ScoreProfile.objects.get(pk=pk)
+        except ScoreProfile.DoesNotExist:
+            return Response(
+                {"detail": "ScoreProfile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if request.data.get("name") is not None:
+            profile.name = (request.data.get("name") or "").strip() or profile.name
+        if request.data.get("version") is not None:
+            profile.version = (request.data.get("version") or "").strip() or profile.version
+        if "description" in request.data:
+            profile.description = (request.data.get("description") or "").strip()
+        if request.data.get("weights_json") is not None:
+            w = request.data.get("weights_json")
+            if isinstance(w, dict) and w:
+                profile.weights_json = w
+        if request.data.get("thresholds_json") is not None:
+            t = request.data.get("thresholds_json")
+            if isinstance(t, dict) and t:
+                profile.thresholds_json = t
+        profile.save()
+        data = {
+            "id": profile.id,
+            "name": profile.name,
+            "version": profile.version,
+            "is_active": profile.is_active,
+            "description": profile.description or "",
+            "weights_json": profile.weights_json,
+            "thresholds_json": profile.thresholds_json,
+            "created_at": profile.created_at.isoformat() if profile.created_at else None,
+            "updated_at": profile.updated_at.isoformat() if profile.updated_at else None,
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
+    def destroy(self, request, pk=None):
+        """
+        指定 ScoreProfile を削除する。
+        DELETE /api/v1/score-profiles/<id>/
+        アクティブなプロファイルは削除不可。
+        """
+        try:
+            profile = ScoreProfile.objects.get(pk=pk)
+        except ScoreProfile.DoesNotExist:
+            return Response(
+                {"detail": "ScoreProfile not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if profile.is_active:
+            return Response(
+                {
+                    "detail": "アクティブなプロファイルは削除できません。別のプロファイルをアクティブにしてから削除してください。",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        profile.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     @action(detail=False, methods=["get"], url_path="current")
     def current(self, request):
         """
@@ -1076,15 +1276,35 @@ class ScoreProfileViewSet(viewsets.ViewSet):
         except ScoreProfile.DoesNotExist:
             return Response({"detail": "ScoreProfile not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        note = request.data.get("note") or ""
-        profile = activate_score_profile(profile, note=note, activation_reason="manual_activate")
+        note = (getattr(request, "data", None) or {}).get("note") or ""
+        for attempt in range(3):
+            try:
+                profile = activate_score_profile(
+                    profile, note=note, activation_reason="manual_activate"
+                )
+                break
+            except OperationalError as e:
+                if "locked" in str(e).lower() and attempt < 2:
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
+                logger.exception("activate_score_profile failed for profile id=%s", pk)
+                return Response(
+                    {"detail": f"プロファイルの切り替えに失敗しました: {e!s}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+            except Exception as e:
+                logger.exception("activate_score_profile failed for profile id=%s", pk)
+                return Response(
+                    {"detail": f"プロファイルの切り替えに失敗しました: {e!s}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
         data = {
             "id": profile.id,
             "name": profile.name,
             "version": profile.version,
             "is_active": profile.is_active,
-            "description": profile.description,
+            "description": profile.description or "",
             "weights_json": profile.weights_json,
             "thresholds_json": profile.thresholds_json,
             "created_at": profile.created_at.isoformat() if profile.created_at else None,

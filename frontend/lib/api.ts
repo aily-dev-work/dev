@@ -295,6 +295,47 @@ export async function getScoreProfile(id: number) {
   return request<import("@/types/api").ScoreProfileDetail>(`/api/v1/score-profiles/${id}/`);
 }
 
+/** ScoreProfile 新規作成（手動） */
+export async function createScoreProfile(body: {
+  name: string;
+  version: string;
+  description?: string;
+  weights_json?: Record<string, unknown>;
+  thresholds_json?: Record<string, unknown>;
+}) {
+  return request<import("@/types/api").ScoreProfileDetail>("/api/v1/score-profiles/", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+/** ScoreProfile 部分更新（手動） */
+export async function updateScoreProfile(
+  id: number,
+  body: Partial<{
+    name: string;
+    version: string;
+    description: string;
+    weights_json: Record<string, unknown>;
+    thresholds_json: Record<string, unknown>;
+  }>,
+) {
+  return request<import("@/types/api").ScoreProfileDetail>(`/api/v1/score-profiles/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+/** ScoreProfile 削除（アクティブなプロファイルは削除不可） */
+export async function deleteScoreProfile(id: number) {
+  return request<null>(`/api/v1/score-profiles/${id}/`, { method: "DELETE" });
+}
+
+/** 監視銘柄のスコア一覧（買い/売り/様子見％）。ダッシュボード用 */
+export async function getStocksScores() {
+  return request<import("@/types/api").StockScoresResponse>("/api/v1/stocks/scores/");
+}
+
 /** フェーズ23: ダッシュボード統計取得 */
 export async function getDashboardStats(params?: {
   signal_date_from?: string;

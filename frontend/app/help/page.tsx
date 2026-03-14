@@ -55,8 +55,8 @@ export default function HelpPage() {
           <h3 className="font-semibold">銘柄</h3>
           <ul className="list-disc list-inside text-sm text-slate-700 space-y-1">
             <li><strong>監視したい企業（銘柄）</strong>をここで管理します。</li>
-            <li>一覧でティッカー・銘柄名・市場・監視中フラグ・メモを確認できます。</li>
-            <li>「新規追加」フォームでティッカーと銘柄名（必須）を入力して追加。</li>
+            <li>一覧で銘柄コード・銘柄名・市場・メモを確認できます。</li>
+            <li>「新規追加」フォームで銘柄コードと銘柄名（必須）を入力して追加。</li>
             <li>行の<strong>「編集」</strong>で銘柄の内容を変更、<strong>「削除」</strong>で監視リストから外せます。</li>
             <li><strong>「チャート」</strong>で5分足・日足・月足のグラフを表示。<strong>「価格」</strong>で日足・5分足・月足の価格データを一覧・追加・編集・削除できます。</li>
           </ul>

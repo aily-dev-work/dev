@@ -22,7 +22,7 @@
 
 | フィールド | 型 | 必須 | 備考 |
 |------------|-----|------|------|
-| `ticker` | CharField(32) | ○ | 一意・インデックス。銘柄コード／ティッカー（例: 7203.T, AAPL） |
+| `ticker` | CharField(32) | ○ | 一意・インデックス。銘柄コード（例: 7203.T, AAPL） |
 | `name` | CharField(255) | ○ | 銘柄名 |
 | `market` | CharField(32) | - | 市場区分（例: JP, US, TSE）。任意 |
 | `is_active` | BooleanField | - | 監視中フラグ。デフォルト True |

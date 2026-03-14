@@ -49,18 +49,24 @@ def activate_score_profile(
         .first()
     )
 
+    # スナップショットは CharField の max_length に収め、None は空文字に
+    def _snap(s: str | None, max_len: int) -> str:
+        if s is None:
+            return ""
+        return (s or "")[:max_len]
+
     ScoreProfileActivationHistory.objects.create(
         previous_profile=previous_active,
         activated_profile=profile,
         source_proposal=source_proposal,
-        previous_profile_name_snapshot=previous_active.name if previous_active else "",
-        previous_profile_version_snapshot=previous_active.version if previous_active else "",
-        activated_profile_name_snapshot=profile.name,
-        activated_profile_version_snapshot=profile.version,
-        source_proposal_name_snapshot=(
-            source_proposal.proposal_name if source_proposal else ""
+        previous_profile_name_snapshot=_snap(previous_active.name if previous_active else None, 100),
+        previous_profile_version_snapshot=_snap(previous_active.version if previous_active else None, 32),
+        activated_profile_name_snapshot=_snap(profile.name, 100),
+        activated_profile_version_snapshot=_snap(profile.version, 32),
+        source_proposal_name_snapshot=_snap(
+            source_proposal.proposal_name if source_proposal else None, 255
         ),
-        activation_reason=activation_reason,
+        activation_reason=(activation_reason or "manual_activate")[:50],
         note=note or "",
     )
 

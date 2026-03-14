@@ -174,56 +174,47 @@ export default function StocksPage() {
         <table className="min-w-full text-sm">
           <thead className="bg-slate-100">
             <tr>
-              <th className="border px-2 py-1 text-left">ティッカー</th>
-              <th className="border px-2 py-1 text-left">銘柄名</th>
-              <th className="border px-2 py-1 text-left">市場</th>
-              <th className="border px-2 py-1 text-left">監視中</th>
-              <th className="border px-2 py-1 text-left">メモ</th>
-              <th className="border px-2 py-1 text-left">更新日</th>
-              <th className="border px-2 py-1 text-left">操作</th>
+              <th className="border px-2 py-1 text-center">銘柄コード</th>
+              <th className="border px-2 py-1 text-center">銘柄名</th>
+              <th className="border px-2 py-1 text-center">市場</th>
+              <th className="border px-2 py-1 text-center">メモ</th>
+              <th className="border px-2 py-1 text-center">操作</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((s) => (
-              <tr
-                key={s.id}
-                className={s.is_active ? "bg-emerald-50" : "odd:bg-slate-50"}
-              >
+              <tr key={s.id} className="odd:bg-slate-50">
                 <td className="border px-2 py-1 font-mono">{s.ticker}</td>
                 <td className="border px-2 py-1 font-medium">{s.name}</td>
-                <td className="border px-2 py-1">{s.market || "-"}</td>
-                <td className="border px-2 py-1">{s.is_active ? "はい" : "いいえ"}</td>
+                <td className="border px-2 py-1 text-center">{s.market || "-"}</td>
                 <td className="max-w-[180px] truncate border px-2 py-1 text-slate-600">
                   {s.memo || "-"}
                 </td>
-                <td className="border px-2 py-1 text-xs text-slate-500">
-                  {s.updated_at ? new Date(s.updated_at).toLocaleDateString() : "-"}
-                </td>
-                <td className="border px-2 py-1">
-                  <span className="flex flex-wrap gap-1">
-                    <Link
-                      href={`/stocks/${s.id}`}
-                      className="rounded bg-slate-900 px-2 py-1 text-xs font-medium text-white hover:bg-slate-700"
-                    >
-                      編集
-                    </Link>
+                <td className="border px-2 py-1 text-center">
+                  <span className="flex flex-wrap gap-2 justify-center">
                     <Link
                       href={`/stocks/${s.id}/charts`}
-                      className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                      className="inline-flex items-center rounded-md bg-teal-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-teal-700"
                     >
                       チャート
                     </Link>
                     <Link
                       href={`/stocks/${s.id}/prices`}
-                      className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                      className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50"
                     >
                       価格
+                    </Link>
+                    <Link
+                      href={`/stocks/${s.id}`}
+                      className="inline-flex items-center rounded-md border border-slate-400 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-200"
+                    >
+                      編集
                     </Link>
                     <button
                       type="button"
                       onClick={() => handleDelete(s.id, s.ticker)}
                       disabled={deletingId === s.id}
-                      className="rounded border border-red-300 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-60"
+                      className="inline-flex items-center rounded-md border border-red-400 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-60"
                     >
                       {deletingId === s.id ? "削除中..." : "削除"}
                     </button>

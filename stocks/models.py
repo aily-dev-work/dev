@@ -11,7 +11,7 @@ class WatchStock(models.Model):
         max_length=32,
         unique=True,
         db_index=True,
-        help_text="ティッカー / 銘柄コード（例: 7203.T, AAPL）",
+        help_text="銘柄コード（例: 7203.T, AAPL）",
     )
     name = models.CharField(
         max_length=255,
@@ -24,7 +24,7 @@ class WatchStock(models.Model):
     )
     is_active = models.BooleanField(
         default=True,
-        help_text="監視中かどうか",
+        help_text="有効かどうか（無効は監視対象外）",
     )
     memo = models.TextField(
         blank=True,

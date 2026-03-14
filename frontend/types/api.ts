@@ -139,6 +139,25 @@ export type ScoreProfileListItem = {
 /** フェーズ22: ScoreProfile 詳細 API の返却型 */
 export type ScoreProfileDetail = ScoreProfileListItem;
 
+/** GET /api/v1/stocks/scores/ の1銘柄分（買い/売り/様子見％） */
+export type StockScoreItem = {
+  stock_id: number;
+  ticker: string;
+  name: string;
+  buy_score: number | null;
+  sell_score: number | null;
+  bias: string | null;
+  strength: string | null;
+  buy_pct: number | null;
+  sell_pct: number | null;
+  wait_pct: number | null;
+  insufficient_data: boolean;
+  insufficient_reason?: string | null;
+  error?: string;
+};
+
+export type StockScoresResponse = { stocks: StockScoreItem[] };
+
 export type ScoreProfileProposal = {
   id: number;
   score_profile_id: number;

@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { getDashboardStats, request } from "@/lib/api";
-import type { DashboardStatsResponse } from "@/types/api";
+import { getDashboardStats, getStocksScores, request } from "@/lib/api";
+import type { DashboardStatsResponse, StockScoreItem } from "@/types/api";
 
 const DashboardCharts = dynamic(
   () => import("@/app/components/DashboardCharts").then((m) => m.DashboardCharts),
@@ -29,6 +29,7 @@ function formatLabel(row: { profile_name: string; profile_version: string; signa
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardStatsResponse | null>(null);
+  const [stockScores, setStockScores] = useState<StockScoreItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rollbackLoading, setRollbackLoading] = useState(false);
@@ -37,8 +38,12 @@ export default function DashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await getDashboardStats();
+      const [res, scoresRes] = await Promise.all([
+        getDashboardStats(),
+        getStocksScores().catch(() => ({ stocks: [] as StockScoreItem[] })),
+      ]);
       setData(res);
+      setStockScores(Array.isArray(scoresRes?.stocks) ? scoresRes.stocks : []);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -164,6 +169,87 @@ export default function DashboardPage() {
           )}
         </div>
       </section>
+
+      {/* 監視銘柄のスコア（買い・売り・様子見 ％） */}
+      {stockScores && stockScores.length > 0 && (
+        <section className="rounded-lg border bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-lg font-semibold">監視銘柄のスコア（買い・売り・様子見）</h2>
+          <p className="mb-3 text-xs text-slate-500">
+            現在のアクティブプロファイルで算出したスコアを％で表示しています。
+          </p>
+          <div className="overflow-x-auto">
+            <table className="min-w-full border text-sm">
+              <thead className="bg-slate-100">
+                <tr>
+                  <th className="border px-2 py-1 text-left">銘柄コード</th>
+                  <th className="border px-2 py-1 text-left">銘柄名</th>
+                  <th className="border px-2 py-1 text-center">買い％</th>
+                  <th className="border px-2 py-1 text-center">売り％</th>
+                  <th className="border px-2 py-1 text-center">様子見％</th>
+                  <th className="border px-2 py-1 text-center">判定</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stockScores.map((s) => (
+                  <tr key={s.stock_id} className="odd:bg-slate-50">
+                    <td className="border px-2 py-1 font-mono">{s.ticker}</td>
+                    <td className="border px-2 py-1">{s.name || "-"}</td>
+                    <td className="border px-2 py-1 text-center">
+                      {s.insufficient_data ? (
+                        <span className="text-slate-400">-</span>
+                      ) : (
+                        <span className="font-medium text-emerald-700">{s.buy_pct}%</span>
+                      )}
+                    </td>
+                    <td className="border px-2 py-1 text-center">
+                      {s.insufficient_data ? (
+                        <span className="text-slate-400">-</span>
+                      ) : (
+                        <span className="font-medium text-red-700">{s.sell_pct}%</span>
+                      )}
+                    </td>
+                    <td className="border px-2 py-1 text-center">
+                      {s.insufficient_data ? (
+                        <span className="text-slate-400">-</span>
+                      ) : (
+                        <span className="text-slate-600">{s.wait_pct}%</span>
+                      )}
+                    </td>
+                    <td className="border px-2 py-1 text-center text-xs">
+                      {s.insufficient_data ? (
+                        <span className="text-amber-600">データ不足</span>
+                      ) : (
+                        <span>
+                          {s.bias === "buy" && "買い"}
+                          {s.bias === "sell" && "売り"}
+                          {s.bias === "neutral" && "様子見"} / {s.strength}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {stockScores && stockScores.length === 0 && data?.current_active_profile && (
+        <section className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+          <h2 className="mb-1 font-semibold text-slate-700">監視銘柄のスコア</h2>
+          <p>監視銘柄がありません。銘柄を追加すると、ここに買い・売り・様子見の％が表示されます。</p>
+        </section>
+      )}
+
+      {stockScores && stockScores.length === 0 && !data?.current_active_profile && (
+        <section className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <h2 className="mb-1 font-semibold">監視銘柄のスコア</h2>
+          <p>アクティブなプロファイルを設定すると、監視銘柄の買い・売り・様子見の％がここに表示されます。</p>
+          <Link href="/profiles" className="mt-2 inline-block text-amber-700 underline hover:no-underline">
+            プロファイルを設定 →
+          </Link>
+        </section>
+      )}
 
       {/* Charts (client-only to avoid Recharts SSR issues) */}
       <DashboardCharts
