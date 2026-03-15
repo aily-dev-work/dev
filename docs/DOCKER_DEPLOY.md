@@ -22,6 +22,9 @@
 | `RUN_5M_CRON_SECRET` | 5 分ジョブ用エンドポイントの認証 | ランダム文字列 |
 | `PORT` | 待ち受けポート（Render/Fly が自動設定するので通常は不要） | `8000` |
 | `CORS_ORIGINS` | フロントのオリジン（カンマ区切り・任意） | `https://your-app.vercel.app` |
+| `DJANGO_SUPERUSER_USERNAME` | 起動時に自動作成するスーパーユーザーのユーザー名（任意・Shell が使えない無料枠で便利） | `admin` |
+| `DJANGO_SUPERUSER_PASSWORD` | 上記スーパーユーザーのパスワード（上記とセットで設定すること） | 強めのパスワード |
+| `DJANGO_SUPERUSER_EMAIL` | 上記のメール（任意・空でも可） | `admin@example.com` |
 
 DB はデフォルトで SQLite（`db.sqlite3`）。コンテナ再作成で消えるため、**永続化**が必要なら以下どちらか。
 
