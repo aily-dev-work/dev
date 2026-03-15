@@ -305,10 +305,14 @@ class WatchStockViewSet(viewsets.ModelViewSet):
         connection.close()
 
         def _normalize_ts(ts):
-            """Yahoo がミリ秒で返す場合があるので秒に統一（fromtimestamp の OSError 防止）"""
-            if ts is None:
+            """Yahoo がミリ秒で返す場合があるので秒に統一（fromtimestamp の OSError 防止）。不正値は None。"""
+            try:
+                if ts is None:
+                    return None
+                n = int(float(ts))
+                return n / 1000 if n > 1e12 else n
+            except (TypeError, ValueError, OverflowError):
                 return None
-            return int(ts) / 1000 if int(ts) > 1e12 else int(ts)
 
         def fetch_yahoo(interval: str, range_param: str):
             url = (
@@ -325,13 +329,31 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                 return json.loads(resp.read().decode())
 
         def parse_quote(data):
-            result = (data.get("chart") or {}).get("result")
-            if not result:
+            """Yahoo chart API のレスポンスをパース。不正な形なら None を返し例外は出さない。"""
+            try:
+                if not data or not isinstance(data, dict):
+                    return None
+                result = (data.get("chart") or {}).get("result")
+                if not result or not isinstance(result, list) or len(result) == 0:
+                    return None
+                res = result[0]
+                if not isinstance(res, dict):
+                    return None
+                timestamps = res.get("timestamp") or []
+                if not isinstance(timestamps, list):
+                    timestamps = []
+                quote_list = (res.get("indicators") or {}).get("quote") or [{}]
+                quote = quote_list[0] if quote_list and isinstance(quote_list[0], dict) else {}
+                return (
+                    timestamps,
+                    quote.get("open") or [],
+                    quote.get("high") or [],
+                    quote.get("low") or [],
+                    quote.get("close") or [],
+                    quote.get("volume") or [],
+                )
+            except (IndexError, KeyError, TypeError, AttributeError):
                 return None
-            res = result[0]
-            timestamps = res.get("timestamp") or []
-            quote = ((res.get("indicators") or {}).get("quote") or [{}])[0]
-            return timestamps, quote.get("open") or [], quote.get("high") or [], quote.get("low") or [], quote.get("close") or [], quote.get("volume") or []
 
         try:
             created_daily = 0
@@ -371,9 +393,9 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                             stock=stock, date=d,
                             defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
                         )
-                        if was_created:
-                            created_daily += 1
-            except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
+                    if was_created:
+                        created_daily += 1
+            except Exception:
                 pass
 
             # 5分足（直近約2ヶ月）
@@ -409,9 +431,9 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                             stock=stock, datetime=dt,
                             defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
                         )
-                        if was_created:
-                            created_5m += 1
-            except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
+                    if was_created:
+                        created_5m += 1
+            except Exception:
                 pass
 
             # 週足（Yahoo は 1wk。5y が通らない銘柄があるので 2y で再試行）
@@ -454,7 +476,7 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                         if was_created:
                             created_weekly += 1
                     break
-                except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError) as e:
+                except Exception as e:
                     logger.warning("fetch_prices weekly ticker=%s range=%s: %s", ticker, range_param, e)
 
             # 月足（Yahoo は range に 10y まで。20y は無効で 500 の原因になる）
@@ -497,7 +519,7 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                         if was_created:
                             created_monthly += 1
                     break
-                except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError, KeyError, TypeError) as e:
+                except Exception as e:
                     logger.warning("fetch_prices monthly ticker=%s range=%s: %s", ticker, range_param, e)
 
             return Response({
