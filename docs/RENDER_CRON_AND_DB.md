@@ -4,7 +4,33 @@ Render に Django をデプロイしたあとに行う **5 分ジョブ（cron-j
 
 ---
 
-## 1. 5 分ジョブの設定（cron-job.org）
+## 時系列でやること一覧
+
+### 5 分ジョブ（cron-job.org）— ここで → こうする
+
+番号の順に 1 つずつ実行してください。
+
+| # | いまここにいる | する対処 |
+|---|----------------|----------|
+| 1 | ブラウザを開いた | https://cron-job.org を開く |
+| 2 | cron-job.org のトップ | **Sign up** でアカウントを作成し、ログインする |
+| 3 | ログイン後のダッシュボード | **Create cron job**（または **Cronjobs → Create cron job**）をクリックする |
+| 4 | ジョブ作成画面（Title / Address などの入力欄がある） | **Title** に `stocks 5min evaluate` など任意の名前を入力する |
+| 5 | 同じ画面 | **Address (URL)** に `https://【あなたのRenderのサービスURL】/api/v1/cron/run-5m-evaluate/` を入力する（例: `https://dev-3qx3.onrender.com/api/v1/cron/run-5m-evaluate/`） |
+| 6 | 同じ画面 | **Request method** で **POST** を選択する |
+| 7 | 同じ画面 | **Request headers** または **Advanced → Headers** を開き、**Name** に `X-Cron-Secret`、**Value** に Render の Environment で設定した **RUN_5M_CRON_SECRET** の値（目のアイコンで表示してコピー）を 1 つ追加する |
+| 8 | 同じ画面 | **Schedule** で **Every 5 minutes** を選択する（または Custom で `*/5 * * * *`） |
+| 9 | 入力し終えた | **Create cron job** または **Save** をクリックする |
+| 10 | ジョブ一覧に戻った | **Run now** で 1 回手動実行し、**Last run** や **Log** で HTTP 200 が出ているか確認する |
+| 11 | Render がスリープから起動に 50 秒かかってタイムアウトする場合 | cron-job.org のジョブ編集で **Timeout** を 60 秒以上に設定する |
+
+### DB 永続化（Supabase）— 時系列
+
+**Supabase で DB を永続化する**場合は、**[SUPABASE_SETUP_SIMPLE.md の「時系列でやること一覧」](SUPABASE_SETUP_SIMPLE.md#時系列でやること一覧ここで--こうする)** を **1 番から順に** 実行してください。同じ「いまここにいる → する対処」の表形式で、Render への環境変数追加やローカルでの migrate まで番号で並んでいます。
+
+---
+
+## 1. 5 分ジョブの設定（cron-job.org）— 詳細
 
 5 分ごとに「5 分足取得＋判定」を実行するために、cron-job.org で HTTP を叩くジョブを作成します。
 
@@ -116,8 +142,8 @@ Django の DB を Supabase の PostgreSQL に接続する方法です。**無料
    - 「Database」が見つからない場合は、ブラウザで次の URL を開く（`rxseqdafinorcuromehp` は自分の Project ID に置き換える）:
      `https://supabase.com/dashboard/project/rxseqdafinorcuromehp/settings/database`
 3. ページ内の **「Connection string」** というセクションまで下にスクロールする。
-4. **「URI」** タブを選択し、**Transaction mode**（ポート 6543）の URI を使う。
-   - 例: `postgresql://postgres.[プロジェクト参照]:[YOUR-PASSWORD]@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres`
+4. **「URI」** タブを選択し、**Session mode**（ポート **5432**）の URI を使う。**Transaction mode（6543）だと「Tenant or user not found」が出る場合があるので 5432 を使う。**
+   - 例: `postgresql://postgres.[プロジェクト参照]:[YOUR-PASSWORD]@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres`
 5. 表示されている URI の **「Copy」** ボタンでコピーする。
 6. コピーした文字列の中の **`[YOUR-PASSWORD]`** を、**2.2.1 で設定した Database Password** に**置き換える**。
    - メモ帳などに貼り付けて、`[YOUR-PASSWORD]` だけを実際のパスワードに書き換え、完成した 1 行を再度コピーする。
@@ -134,7 +160,7 @@ Django の DB を Supabase の PostgreSQL に接続する方法です。**無料
 4. 次のように入力する:
    - **KEY**: `DATABASE_URL`
    - **VALUE**: 2.2.2 で用意した **パスワードを置き換えた後の URI 全体**を貼り付ける。  
-     例: `postgresql://postgres.abcdefghij:MyPass123@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres`
+     例: `postgresql://postgres.abcdefghij:MyPass123@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres`
 5. **「Save Changes」** をクリックする。Render が自動で再デプロイする。
 
 #### 2.2.4 コードとデプロイの確認
@@ -143,7 +169,31 @@ Django の DB を Supabase の PostgreSQL に接続する方法です。**無料
 - 再デプロイ時にコンテナ内で `migrate` が実行され、**Supabase 上にテーブルが自動作成**されます。
 - デプロイが **Live** になり、管理画面（`https://dev-3qx3.onrender.com/admin/`）にログインできれば、Supabase への接続は成功しています。
 
-#### 2.2.5 既存の SQLite データがある場合
+#### 2.2.5 Supabase にテーブルができない場合（ローカルで migrate を実行する）
+
+Render の起動時に migrate がバックグラウンドで動き、接続エラーが出てもログに残りにくいことがあります。**ローカル**で Supabase 向けに migrate を 1 回実行すると、確実にテーブルが作成されます。
+
+1. **ターミナル**でプロジェクトのルート（`manage.py` があるディレクトリ）に移動する。
+2. **DATABASE_URL** を Supabase の接続 URI に設定して migrate を実行する。
+
+   **PowerShell の例:**
+   ```powershell
+   $env:DATABASE_URL="postgresql://postgres.rxseqdafinorcuromehp:あなたのパスワード@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
+   python manage.py migrate --noinput
+   ```
+
+   **bash の例:**
+   ```bash
+   export DATABASE_URL="postgresql://postgres.rxseqdafinorcuromehp:あなたのパスワード@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
+   python manage.py migrate --noinput
+   ```
+
+3. 成功すると「Applying ... OK」が並び、Supabase の **Table Editor** に `auth_user` や `stocks_*` などのテーブルができる。
+4. その後は Render の再デプロイや通常運用で、Django はその Supabase のテーブルを使う。
+
+**注意**: パスワードに `@` や `#` が含まれる場合は URL エンコード（`@` → `%40`、`#` → `%23`）する。
+
+#### 2.2.6 既存の SQLite データがある場合
 
 - いま Render の SQLite にだけあるデータを Supabase に移したい場合は、**データのエクスポート／インポート**や **Django の dumpdata / loaddata** など、別途データ移行が必要です。
 - 「これから本番は Supabase だけ使う」場合は、上記のとおり `DATABASE_URL` を設定するだけでよく、初回は空の DB に migrate がかかります。スーパーユーザーは環境変数（`DJANGO_SUPERUSER_USERNAME` / `DJANGO_SUPERUSER_PASSWORD`）で自動作成されるか、移行後に手動で 1 人作成し直す形になります。
