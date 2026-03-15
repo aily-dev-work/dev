@@ -15,9 +15,15 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.http import JsonResponse
 from django.urls import include, path
 
+def root(_request):
+    """ルートパス / 用。フロントは別 URL なので、API の案内だけ返す。"""
+    return JsonResponse({"message": "API server. Use /admin/ or /api/v1/."})
+
 urlpatterns = [
+    path("", root),
     path("admin/", admin.site.urls),
     path("accounts/", include("django.contrib.auth.urls")),
     path("api/v1/", include("stocks.urls")),
