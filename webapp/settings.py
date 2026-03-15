@@ -34,6 +34,14 @@ ALLOWED_HOSTS = [x.strip() for x in _allowed.split(',') if x.strip()]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 
+# 本番 HTTPS でログイン等の POST を通す（ALLOWED_HOSTS から https:// のオリジンを作成）
+_csrf_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+CSRF_TRUSTED_ORIGINS = [x.strip() for x in _csrf_origins.split(',') if x.strip()]
+if not CSRF_TRUSTED_ORIGINS and ALLOWED_HOSTS:
+    for h in ALLOWED_HOSTS:
+        if h and not h.startswith(('.', 'localhost', '127.')):
+            CSRF_TRUSTED_ORIGINS.append(f'https://{h}')
+
 # CORS: 環境変数 CORS_ORIGINS で追加（カンマ区切り）。未設定時は localhost のみ
 _default_cors = ['http://localhost:3000', 'http://127.0.0.1:3000']
 _extra = os.environ.get('CORS_ORIGINS', '')
