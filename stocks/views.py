@@ -291,7 +291,7 @@ class WatchStockViewSet(viewsets.ModelViewSet):
         import urllib.error
         import urllib.parse
         import urllib.request
-        from datetime import date, datetime
+        from datetime import date, datetime, timezone as dt_utc
         from decimal import Decimal
 
         stock = self.get_object()
@@ -390,7 +390,7 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                         ts_sec = _normalize_ts(ts)
                         if ts_sec is None:
                             continue
-                        dt = datetime.fromtimestamp(ts_sec, tz=timezone.utc)
+                        dt = datetime.fromtimestamp(ts_sec, tz=dt_utc.utc)
                         o = opens[i] if i < len(opens) else None
                         h = highs[i] if i < len(highs) else None
                         l_ = lows[i] if i < len(lows) else None

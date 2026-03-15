@@ -8,12 +8,11 @@ import json
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
 from django.db import connection
-from django.utils import timezone
 
 from ..models import StockPrice5Min, WatchStock
 
