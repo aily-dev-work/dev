@@ -96,10 +96,18 @@ WSGI_APPLICATION = 'webapp.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-# 開発初期は SQLite。MariaDB に切り替える場合は環境変数 DJANGO_DB_ENGINE=mysql を設定し、
-# DB_NAME, DB_USER, DB_PASSWORD, DB_HOST, DB_PORT を設定する。
+# SQLite がデフォルト。PostgreSQL は DATABASE_URL（Supabase 等）、MySQL は DJANGO_DB_ENGINE=mysql で。
 
-if os.environ.get('DJANGO_DB_ENGINE') == 'mysql':
+if os.environ.get('DATABASE_URL'):
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=os.environ.get('DATABASE_URL'),
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
+elif os.environ.get('DJANGO_DB_ENGINE') == 'mysql':
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
