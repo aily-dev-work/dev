@@ -37,8 +37,6 @@ const SEGMENT_LABELS: Record<string, string> = {
   volume_low: "出来低",
   below_ma25: "MA25下",
   below_ma75: "MA75下",
-  near_low_20: "安値20",
-  near_high_20: "高値20",
 };
 
 const SEGMENT_COLORS = [
