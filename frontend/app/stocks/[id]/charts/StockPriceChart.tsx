@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { createChart, CandlestickSeries, type IChartApi, type ISeriesApi } from "lightweight-charts";
+import { createChart, CandlestickSeries, ColorType, type IChartApi, type ISeriesApi } from "lightweight-charts";
 
 type ChartPoint = {
   label: string;
@@ -57,7 +57,7 @@ export default function StockPriceChart({ data }: { data: ChartPoint[] }) {
     if (!chartRef.current) {
       const chart = createChart(containerRef.current, {
         layout: {
-          background: { type: "solid", color: "#fff" },
+          background: { type: ColorType.Solid, color: "#fff" },
           textColor: "#374151",
         },
         grid: {
