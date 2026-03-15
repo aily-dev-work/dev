@@ -7,6 +7,8 @@ django-cors-headers>=4.3,<5
 
 # 本番 WSGI サーバー（Docker デプロイ用）
 gunicorn>=23.0,<24
+# 本番で静的ファイル（admin CSS 等）を配信
+whitenoise>=6.6,<7
 
 # 将来 MariaDB に切り替える場合:
 # mysqlclient>=2.2

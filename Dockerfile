@@ -7,6 +7,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
+RUN python manage.py collectstatic --noinput --clear
 
 # 本番: migrate 後に gunicorn。PORT は Render/Fly 等が設定（未設定時 8000）
 RUN chmod +x /app/scripts/docker_entry.sh
