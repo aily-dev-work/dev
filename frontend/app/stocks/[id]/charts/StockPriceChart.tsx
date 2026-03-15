@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { createChart, CandlestickSeries, ColorType, type IChartApi, type ISeriesApi } from "lightweight-charts";
+import {
+  createChart,
+  CandlestickSeries,
+  ColorType,
+  type IChartApi,
+  type ISeriesApi,
+  type CandlestickData,
+  type Time,
+} from "lightweight-charts";
 
 type ChartPoint = {
   label: string;
@@ -24,7 +32,7 @@ function toChartTime(fullLabel: string): string | number {
   return s.slice(0, 10);
 }
 
-function toCandlestickData(data: ChartPoint[]) {
+function toCandlestickData(data: ChartPoint[]): CandlestickData<Time>[] {
   return data
     .filter((d) => d.close != null && Number.isFinite(d.close))
     .map((d) => {
@@ -33,7 +41,7 @@ function toCandlestickData(data: ChartPoint[]) {
       const l = d.low ?? Math.min(o, d.close);
       const c = d.close;
       return {
-        time: toChartTime(d.fullLabel),
+        time: toChartTime(d.fullLabel) as Time,
         open: round2(o),
         high: round2(h),
         low: round2(l),
