@@ -8,6 +8,7 @@ import time
 from datetime import date
 
 from django.conf import settings
+from django.utils import timezone
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import connection, models
 from django.db.utils import OperationalError
@@ -375,7 +376,7 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     ts = timestamps[i]
                     if ts is None:
                         continue
-                    dt = datetime.fromtimestamp(ts)
+                    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
                     o = opens[i] if i < len(opens) else None
                     h = highs[i] if i < len(highs) else None
                     l_ = lows[i] if i < len(lows) else None

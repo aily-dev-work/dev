@@ -13,6 +13,7 @@ from decimal import Decimal
 from typing import Optional
 
 from django.db import connection
+from django.utils import timezone
 
 from ..models import StockPrice5Min, WatchStock
 
@@ -76,7 +77,7 @@ def fetch_and_save_5m_prices(stock: WatchStock) -> int:
         ts = timestamps[i]
         if ts is None:
             continue
-        dt = datetime.fromtimestamp(ts)
+        dt = datetime.fromtimestamp(ts, tz=timezone.utc)
         o = opens[i] if i < len(opens) else None
         h = highs[i] if i < len(highs) else None
         l_ = lows[i] if i < len(lows) else None
