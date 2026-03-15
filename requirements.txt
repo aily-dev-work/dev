@@ -5,5 +5,8 @@ djangorestframework>=3.16,<4
 # CORS (フロント localhost:3000 から API へアクセスするため)
 django-cors-headers>=4.3,<5
 
+# 本番 WSGI サーバー（Docker デプロイ用）
+gunicorn>=23.0,<24
+
 # 将来 MariaDB に切り替える場合:
 # mysqlclient>=2.2

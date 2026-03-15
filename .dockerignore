@@ -9,3 +9,6 @@ db.sqlite3
 *.log
 .idea
 .vscode
+# フロント（別デプロイする場合はイメージに含めない）
+frontend/node_modules
+frontend/.next
