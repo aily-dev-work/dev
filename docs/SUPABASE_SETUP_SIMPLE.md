@@ -216,6 +216,17 @@ python manage.py migrate --noinput
   `postgresql://postgres:MyPass123@db.rxseqdafinorcuromehp.supabase.co:5432/postgres`  
   Project Settings → General で **Project ID** を再確認し、`db.xxxxx.supabase.co` の xxxxx がその ID と完全一致しているか確認する。
 
+### 「Network is unreachable」（Render で DATABASE_URL を直接接続にしているとき）
+
+- **意味**: Render のネットワークは **IPv4 のみ**。Supabase の **直接接続**（`db.xxx.supabase.co`）は **IPv6** のため届かない。
+- **対処**: Render の **DATABASE_URL** を **プーラー（Session mode）** の 1 行に切り替える。形式（【プロジェクトID】【パスワード】【リージョン】を置き換え）:
+  ```
+  postgresql://postgres.【プロジェクトID】:【パスワード】@aws-0-【リージョン】.pooler.supabase.com:5432/postgres
+  ```
+  例: プロジェクト ID `rxseqdafinorcuromehp`、リージョン `ap-southeast-1` なら  
+  `postgresql://postgres.rxseqdafinorcuromehp:【あなたのパスワード】@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres`  
+  Render の **Environment** でこの 1 行に更新し、**Save Changes** して再デプロイする。ローカルでの migrate は従来どおり直接接続（`db.xxx.supabase.co`）でよい。
+
 ### 「password authentication failed」
 
 - **意味**: パスワードが違う。
