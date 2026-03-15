@@ -61,6 +61,16 @@ export default function DashboardPage() {
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold">ダッシュボード</h1>
         <p className="text-sm text-slate-600">読み込み中...</p>
+        <p className="text-xs text-slate-500">
+          初回はサーバー起動のため1分ほどかかることがあります。しばらく待っても表示されない場合は「再試行」を押してください。
+        </p>
+        <button
+          type="button"
+          onClick={() => void load()}
+          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+        >
+          再試行
+        </button>
       </div>
     );
   }
