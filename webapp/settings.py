@@ -42,10 +42,11 @@ if not CSRF_TRUSTED_ORIGINS and ALLOWED_HOSTS:
         if h and not h.startswith(('.', 'localhost', '127.')):
             CSRF_TRUSTED_ORIGINS.append(f'https://{h}')
 
-# CORS: 環境変数 CORS_ORIGINS で追加（カンマ区切り）。未設定時は localhost のみ
+# CORS: 環境変数 CORS_ORIGINS で追加（カンマ区切り）。http(s):// で始まるものだけ有効（誤ってシークレット等を入れても落ちない）
 _default_cors = ['http://localhost:3000', 'http://127.0.0.1:3000']
 _extra = os.environ.get('CORS_ORIGINS', '')
-CORS_ALLOWED_ORIGINS = _default_cors + [x.strip() for x in _extra.split(',') if x.strip()]
+_valid_origins = [x.strip() for x in _extra.split(',') if x.strip() and (x.strip().startswith('http://') or x.strip().startswith('https://'))]
+CORS_ALLOWED_ORIGINS = _default_cors + _valid_origins
 
 # Application definition
 
@@ -111,10 +112,16 @@ if os.environ.get('DJANGO_DB_ENGINE') == 'mysql':
         }
     }
 else:
+    # Render 等で /app が読取専用の場合は環境変数で /tmp 等を指定
+    _sqlite_path = os.environ.get('DATABASE_SQLITE_PATH')
+    if _sqlite_path:
+        _sqlite_name = Path(_sqlite_path)
+    else:
+        _sqlite_name = BASE_DIR / 'db.sqlite3'
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+            'NAME': _sqlite_name,
             'OPTIONS': {
                 'timeout': 30,
             },
