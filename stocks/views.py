@@ -843,8 +843,16 @@ class Run5mEvaluateView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
         no_fetch = request.query_params.get("no_fetch", "").lower() in ("1", "true", "yes")
-        result = run_5m_fetch_and_evaluate(skip_fetch=no_fetch)
-        return Response(result, status=status.HTTP_200_OK)
+        try:
+            result = run_5m_fetch_and_evaluate(skip_fetch=no_fetch)
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as e:
+            import traceback
+            logger.exception("run_5m_fetch_and_evaluate failed: %s", e)
+            return Response(
+                {"detail": str(e), "traceback": traceback.format_exc()},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 class MarketSearchView(APIView):

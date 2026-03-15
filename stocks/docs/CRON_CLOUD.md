@@ -106,3 +106,36 @@ curl -X POST "http://localhost:8000/api/v1/cron/run-5m-evaluate/" \
 ```
 
 `RUN_5M_CRON_SECRET` を設定していないと 403 が返る。
+
+---
+
+## 6. 5 分ジョブがエラーになる場合の調査
+
+ジョブが「途中からずっとエラー」になる場合、次の順で原因を切り分ける。
+
+### 6.1 cron-job.org で確認する
+
+1. 該当ジョブの **Log** または **Last run** を開く。
+2. **HTTP ステータス** を確認する:
+   - **403** → `X-Cron-Secret` が Render の `RUN_5M_CRON_SECRET` と一致していない。cron のヘッダー値と Render の Environment を照合する。
+   - **500** → サーバー側で例外発生。**レスポンス本文**（Response body）に `detail` や `traceback` が出ていれば、その内容で原因を特定できる。あわせて 6.2 の Render ログを確認する。
+   - **タイムアウト** → Render がスリープから起動するまで 50 秒以上かかっている。cron の **Timeout** を **90 秒以上** にし、可能なら 10 分ごとに `GET https://あなたのRenderのURL/` を叩く「キープ用」ジョブを別途作成する。
+   - **接続失敗** → Render のサービスが落ちているか、URL が誤っている。Render ダッシュボードで Live か確認する。
+
+### 6.2 Render の Logs で確認する
+
+1. **https://dashboard.render.com** → 対象の Web サービス（例: dev-3qx3）→ **Logs**。
+2. cron が実行された時刻あたりのログを探す。
+3. **`run_5m_fetch_and_evaluate failed:`** や **`Traceback`**、**`OperationalError`** などが出ていれば、その直後の数行が原因（DB 接続失敗、Yahoo API エラー、銘柄ごとの例外など）。
+
+### 6.3 手動でエンドポイントを叩いて試す
+
+PowerShell の例（Render の `RUN_5M_CRON_SECRET` を実際の値に置き換える）:
+
+```powershell
+$secret = "RenderのEnvironmentに設定したRUN_5M_CRON_SECRETの値"
+Invoke-RestMethod -Uri "https://dev-3qx3.onrender.com/api/v1/cron/run-5m-evaluate/" -Method POST -Headers @{ "X-Cron-Secret" = $secret }
+```
+
+- 成功時: 上記の JSON（`stocks_count`, `5m_created`, `errors` など）が返る。`errors` に銘柄ごとのエラーが入ることがある。
+- 500 時: レスポンスに `detail` と `traceback` が含まれるので、その内容で原因を特定する。
