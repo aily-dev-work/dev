@@ -26,13 +26,18 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-nj#ev1%xy3b1r)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('1', 'true', 'yes')
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
+# 本番: 環境変数 ALLOWED_HOSTS にカンマ区切りで指定（例: .onrender.com,api.example.com）
+_allowed = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0')
+ALLOWED_HOSTS = [x.strip() for x in _allowed.split(',') if x.strip()]
 
-# CORS: フロント (localhost:3000) から API を呼ぶために許可
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-]
+# Render 等のリバースプロキシ経由では Host が X-Forwarded-Host で渡るため信頼する
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+
+# CORS: 環境変数 CORS_ORIGINS で追加（カンマ区切り）。未設定時は localhost のみ
+_default_cors = ['http://localhost:3000', 'http://127.0.0.1:3000']
+_extra = os.environ.get('CORS_ORIGINS', '')
+CORS_ALLOWED_ORIGINS = _default_cors + [x.strip() for x in _extra.split(',') if x.strip()]
 
 # Application definition
 
