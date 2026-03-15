@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 
 import logging
 import time
+import traceback
 from datetime import date
 
 from django.conf import settings
@@ -303,6 +304,12 @@ class WatchStockViewSet(viewsets.ModelViewSet):
         # Yahoo 取得中は DB 接続を解放し、他リクエスト（activate 等）がロックを取れるようにする
         connection.close()
 
+        def _normalize_ts(ts):
+            """Yahoo がミリ秒で返す場合があるので秒に統一（fromtimestamp の OSError 防止）"""
+            if ts is None:
+                return None
+            return int(ts) / 1000 if int(ts) > 1e12 else int(ts)
+
         def fetch_yahoo(interval: str, range_param: str):
             url = (
                 f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(ticker)}"
@@ -326,169 +333,189 @@ class WatchStockViewSet(viewsets.ModelViewSet):
             quote = ((res.get("indicators") or {}).get("quote") or [{}])[0]
             return timestamps, quote.get("open") or [], quote.get("high") or [], quote.get("low") or [], quote.get("close") or [], quote.get("volume") or []
 
-        created_daily = 0
-        created_5m = 0
-        created_weekly = 0
-        created_monthly = 0
-
-        # 日足
         try:
-            data = fetch_yahoo("1d", "2y")
-            parsed = parse_quote(data)
-            if parsed:
-                timestamps, opens, highs, lows, closes, volumes = parsed
-                for i in range(len(timestamps)):
-                    ts = timestamps[i]
-                    if ts is None:
-                        continue
-                    d = date.fromtimestamp(ts)
-                    o = opens[i] if i < len(opens) else None
-                    h = highs[i] if i < len(highs) else None
-                    l_ = lows[i] if i < len(lows) else None
-                    c = closes[i] if i < len(closes) else None
-                    v = volumes[i] if i < len(volumes) else None
-                    if c is None and o is None and h is None and l_ is None:
-                        continue
-                    close_val = Decimal(str(c)) if c is not None else (Decimal(str(o)) if o is not None else None)
-                    if close_val is None:
-                        continue
-                    open_val = Decimal(str(o)) if o is not None else close_val
-                    high_val = Decimal(str(h)) if h is not None else close_val
-                    low_val = Decimal(str(l_)) if l_ is not None else close_val
-                    vol = int(v) if v is not None and v == v else None
-                    _, was_created = StockPriceDaily.objects.update_or_create(
-                        stock=stock, date=d,
-                        defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
-                    )
-                    if was_created:
-                        created_daily += 1
-        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
-            pass
+            created_daily = 0
+            created_5m = 0
+            created_weekly = 0
+            created_monthly = 0
 
-        # 5分足（直近約2ヶ月）
-        connection.close()
-        try:
-            data = fetch_yahoo("5m", "60d")
-            parsed = parse_quote(data)
-            if parsed:
-                timestamps, opens, highs, lows, closes, volumes = parsed
-                for i in range(len(timestamps)):
-                    ts = timestamps[i]
-                    if ts is None:
-                        continue
-                    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
-                    o = opens[i] if i < len(opens) else None
-                    h = highs[i] if i < len(highs) else None
-                    l_ = lows[i] if i < len(lows) else None
-                    c = closes[i] if i < len(closes) else None
-                    v = volumes[i] if i < len(volumes) else None
-                    if c is None and o is None and h is None and l_ is None:
-                        continue
-                    close_val = Decimal(str(c)) if c is not None else (Decimal(str(o)) if o is not None else None)
-                    if close_val is None:
-                        continue
-                    open_val = Decimal(str(o)) if o is not None else close_val
-                    high_val = Decimal(str(h)) if h is not None else close_val
-                    low_val = Decimal(str(l_)) if l_ is not None else close_val
-                    vol = int(v) if v is not None and v == v else None
-                    _, was_created = StockPrice5Min.objects.update_or_create(
-                        stock=stock, datetime=dt,
-                        defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
-                    )
-                    if was_created:
-                        created_5m += 1
-        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
-            pass
-
-        # 週足（Yahoo は 1wk。5y が通らない銘柄があるので 2y で再試行）
-        connection.close()
-        for range_param in ("5y", "2y", "1y"):
+            # 日足
             try:
-                data = fetch_yahoo("1wk", range_param)
+                data = fetch_yahoo("1d", "2y")
                 parsed = parse_quote(data)
-                if not parsed:
-                    continue
-                timestamps, opens, highs, lows, closes, volumes = parsed
-                if not timestamps:
-                    continue
-                for i in range(len(timestamps)):
-                    ts = timestamps[i]
-                    if ts is None:
-                        continue
-                    d = date.fromtimestamp(ts)
-                    o = opens[i] if i < len(opens) else None
-                    h = highs[i] if i < len(highs) else None
-                    l_ = lows[i] if i < len(lows) else None
-                    c = closes[i] if i < len(closes) else None
-                    v = volumes[i] if i < len(volumes) else None
-                    if c is None and o is None and h is None and l_ is None:
-                        continue
-                    close_val = Decimal(str(c)) if c is not None else (Decimal(str(o)) if o is not None else None)
-                    if close_val is None:
-                        continue
-                    open_val = Decimal(str(o)) if o is not None else close_val
-                    high_val = Decimal(str(h)) if h is not None else close_val
-                    low_val = Decimal(str(l_)) if l_ is not None else close_val
-                    vol = int(v) if v is not None and v == v else None
-                    _, was_created = StockPriceWeekly.objects.update_or_create(
-                        stock=stock, date=d,
-                        defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
-                    )
-                    if was_created:
-                        created_weekly += 1
-                break
-            except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError) as e:
-                logger.warning("fetch_prices weekly ticker=%s range=%s: %s", ticker, range_param, e)
+                if parsed:
+                    timestamps, opens, highs, lows, closes, volumes = parsed
+                    for i in range(len(timestamps)):
+                        ts = timestamps[i]
+                        if ts is None:
+                            continue
+                        ts_sec = _normalize_ts(ts)
+                        if ts_sec is None:
+                            continue
+                        d = date.fromtimestamp(ts_sec)
+                        o = opens[i] if i < len(opens) else None
+                        h = highs[i] if i < len(highs) else None
+                        l_ = lows[i] if i < len(lows) else None
+                        c = closes[i] if i < len(closes) else None
+                        v = volumes[i] if i < len(volumes) else None
+                        if c is None and o is None and h is None and l_ is None:
+                            continue
+                        close_val = Decimal(str(c)) if c is not None else (Decimal(str(o)) if o is not None else None)
+                        if close_val is None:
+                            continue
+                        open_val = Decimal(str(o)) if o is not None else close_val
+                        high_val = Decimal(str(h)) if h is not None else close_val
+                        low_val = Decimal(str(l_)) if l_ is not None else close_val
+                        vol = int(v) if v is not None and v == v else None
+                        _, was_created = StockPriceDaily.objects.update_or_create(
+                            stock=stock, date=d,
+                            defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
+                        )
+                        if was_created:
+                            created_daily += 1
+            except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
+                pass
 
-        # 月足（Yahoo は range に 10y まで。20y は無効で 500 の原因になる）
-        connection.close()
-        for range_param in ("10y", "5y", "2y"):
+            # 5分足（直近約2ヶ月）
+            connection.close()
             try:
-                data = fetch_yahoo("1mo", range_param)
+                data = fetch_yahoo("5m", "60d")
                 parsed = parse_quote(data)
-                if not parsed:
-                    continue
-                timestamps, opens, highs, lows, closes, volumes = parsed
-                if not timestamps:
-                    continue
-                for i in range(len(timestamps)):
-                    ts = timestamps[i]
-                    if ts is None:
-                        continue
-                    d = date.fromtimestamp(ts)
-                    o = opens[i] if i < len(opens) else None
-                    h = highs[i] if i < len(highs) else None
-                    l_ = lows[i] if i < len(lows) else None
-                    c = closes[i] if i < len(closes) else None
-                    v = volumes[i] if i < len(volumes) else None
-                    if c is None and o is None and h is None and l_ is None:
-                        continue
-                    close_val = Decimal(str(c)) if c is not None else (Decimal(str(o)) if o is not None else None)
-                    if close_val is None:
-                        continue
-                    open_val = Decimal(str(o)) if o is not None else close_val
-                    high_val = Decimal(str(h)) if h is not None else close_val
-                    low_val = Decimal(str(l_)) if l_ is not None else close_val
-                    vol = int(v) if v is not None and v == v else None
-                    _, was_created = StockPriceMonthly.objects.update_or_create(
-                        stock=stock, date=d,
-                        defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
-                    )
-                    if was_created:
-                        created_monthly += 1
-                break
-            except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError, KeyError, TypeError) as e:
-                logger.warning("fetch_prices monthly ticker=%s range=%s: %s", ticker, range_param, e)
+                if parsed:
+                    timestamps, opens, highs, lows, closes, volumes = parsed
+                    for i in range(len(timestamps)):
+                        ts = timestamps[i]
+                        if ts is None:
+                            continue
+                        ts_sec = _normalize_ts(ts)
+                        if ts_sec is None:
+                            continue
+                        dt = datetime.fromtimestamp(ts_sec, tz=timezone.utc)
+                        o = opens[i] if i < len(opens) else None
+                        h = highs[i] if i < len(highs) else None
+                        l_ = lows[i] if i < len(lows) else None
+                        c = closes[i] if i < len(closes) else None
+                        v = volumes[i] if i < len(volumes) else None
+                        if c is None and o is None and h is None and l_ is None:
+                            continue
+                        close_val = Decimal(str(c)) if c is not None else (Decimal(str(o)) if o is not None else None)
+                        if close_val is None:
+                            continue
+                        open_val = Decimal(str(o)) if o is not None else close_val
+                        high_val = Decimal(str(h)) if h is not None else close_val
+                        low_val = Decimal(str(l_)) if l_ is not None else close_val
+                        vol = int(v) if v is not None and v == v else None
+                        _, was_created = StockPrice5Min.objects.update_or_create(
+                            stock=stock, datetime=dt,
+                            defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
+                        )
+                        if was_created:
+                            created_5m += 1
+            except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
+                pass
 
-        return Response({
-            "stock_id": stock.id,
-            "ticker": stock.ticker,
-            "created": created_daily + created_5m + created_weekly + created_monthly,
-            "daily": {"created": created_daily},
-            "5m": {"created": created_5m},
-            "weekly": {"created": created_weekly},
-            "monthly": {"created": created_monthly},
-        })
+            # 週足（Yahoo は 1wk。5y が通らない銘柄があるので 2y で再試行）
+            connection.close()
+            for range_param in ("5y", "2y", "1y"):
+                try:
+                    data = fetch_yahoo("1wk", range_param)
+                    parsed = parse_quote(data)
+                    if not parsed:
+                        continue
+                    timestamps, opens, highs, lows, closes, volumes = parsed
+                    if not timestamps:
+                        continue
+                    for i in range(len(timestamps)):
+                        ts = timestamps[i]
+                        if ts is None:
+                            continue
+                        ts_sec = _normalize_ts(ts)
+                        if ts_sec is None:
+                            continue
+                        d = date.fromtimestamp(ts_sec)
+                        o = opens[i] if i < len(opens) else None
+                        h = highs[i] if i < len(highs) else None
+                        l_ = lows[i] if i < len(lows) else None
+                        c = closes[i] if i < len(closes) else None
+                        v = volumes[i] if i < len(volumes) else None
+                        if c is None and o is None and h is None and l_ is None:
+                            continue
+                        close_val = Decimal(str(c)) if c is not None else (Decimal(str(o)) if o is not None else None)
+                        if close_val is None:
+                            continue
+                        open_val = Decimal(str(o)) if o is not None else close_val
+                        high_val = Decimal(str(h)) if h is not None else close_val
+                        low_val = Decimal(str(l_)) if l_ is not None else close_val
+                        vol = int(v) if v is not None and v == v else None
+                        _, was_created = StockPriceWeekly.objects.update_or_create(
+                            stock=stock, date=d,
+                            defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
+                        )
+                        if was_created:
+                            created_weekly += 1
+                    break
+                except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError) as e:
+                    logger.warning("fetch_prices weekly ticker=%s range=%s: %s", ticker, range_param, e)
+
+            # 月足（Yahoo は range に 10y まで。20y は無効で 500 の原因になる）
+            connection.close()
+            for range_param in ("10y", "5y", "2y"):
+                try:
+                    data = fetch_yahoo("1mo", range_param)
+                    parsed = parse_quote(data)
+                    if not parsed:
+                        continue
+                    timestamps, opens, highs, lows, closes, volumes = parsed
+                    if not timestamps:
+                        continue
+                    for i in range(len(timestamps)):
+                        ts = timestamps[i]
+                        if ts is None:
+                            continue
+                        ts_sec = _normalize_ts(ts)
+                        if ts_sec is None:
+                            continue
+                        d = date.fromtimestamp(ts_sec)
+                        o = opens[i] if i < len(opens) else None
+                        h = highs[i] if i < len(highs) else None
+                        l_ = lows[i] if i < len(lows) else None
+                        c = closes[i] if i < len(closes) else None
+                        v = volumes[i] if i < len(volumes) else None
+                        if c is None and o is None and h is None and l_ is None:
+                            continue
+                        close_val = Decimal(str(c)) if c is not None else (Decimal(str(o)) if o is not None else None)
+                        if close_val is None:
+                            continue
+                        open_val = Decimal(str(o)) if o is not None else close_val
+                        high_val = Decimal(str(h)) if h is not None else close_val
+                        low_val = Decimal(str(l_)) if l_ is not None else close_val
+                        vol = int(v) if v is not None and v == v else None
+                        _, was_created = StockPriceMonthly.objects.update_or_create(
+                            stock=stock, date=d,
+                            defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
+                        )
+                        if was_created:
+                            created_monthly += 1
+                    break
+                except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError, KeyError, TypeError) as e:
+                    logger.warning("fetch_prices monthly ticker=%s range=%s: %s", ticker, range_param, e)
+
+            return Response({
+                "stock_id": stock.id,
+                "ticker": stock.ticker,
+                "created": created_daily + created_5m + created_weekly + created_monthly,
+                "daily": {"created": created_daily},
+                "5m": {"created": created_5m},
+                "weekly": {"created": created_weekly},
+                "monthly": {"created": created_monthly},
+            })
+        except Exception as e:
+            logger.exception("fetch_prices failed: stock_id=%s ticker=%s", stock.id, ticker)
+            return Response(
+                {"detail": str(e), "traceback": traceback.format_exc()},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     def score(self, request, pk=None):
         """
         1銘柄分の買い/売りスコアを返す。
