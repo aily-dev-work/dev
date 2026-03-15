@@ -107,7 +107,7 @@ export default function StockPriceChart({ data }: { data: ChartPoint[] }) {
 
     const candlestickData = toCandlestickData(data);
     if (candlestickData.length > 0 && seriesRef.current) {
-      seriesRef.current.setData(candlestickData);
+      seriesRef.current.setData(candlestickData as Parameters<ISeriesApi<"Candlestick">["setData"]>[0]);
       chartRef.current?.timeScale().fitContent();
     }
   }, [data]);
