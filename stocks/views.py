@@ -428,8 +428,22 @@ class WatchStockViewSet(viewsets.ModelViewSet):
         from datetime import date, datetime, timezone as stdlib_tz
         from decimal import Decimal
 
+        logger.warning("stocks.fetch-prices entered pk=%s", pk)
+        get_obj_start = time.monotonic()
+        logger.warning("stocks.fetch-prices get_object start pk=%s", pk)
         stock = self.get_object()
+        get_obj_end = time.monotonic()
+        logger.warning(
+            "stocks.fetch-prices get_object done pk=%s duration=%.3f",
+            pk,
+            get_obj_end - get_obj_start,
+        )
         ticker = (stock.ticker or "").strip()
+        logger.warning(
+            "stocks.fetch-prices ticker resolved stock_id=%s ticker=%s",
+            stock.id,
+            ticker,
+        )
         if not ticker:
             return Response(
                 {"detail": "銘柄に銘柄コードが設定されていません。"},
