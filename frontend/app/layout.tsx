@@ -1,7 +1,7 @@
 import "./globals.css";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { AutoFetchPrices } from "./components/AutoFetchPrices";
+import { RouteLogger } from "./RouteLogger";
 
 export const metadata = {
   title: "株価スコア管理",
@@ -13,7 +13,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ja">
       <body className="min-h-screen flex flex-col">
-        <AutoFetchPrices />
+        <RouteLogger />
         <header className="border-b bg-white">
           <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
             <Link href="/" className="text-lg font-semibold">

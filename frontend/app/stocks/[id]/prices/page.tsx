@@ -34,24 +34,76 @@ export default function StockPricesPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    console.log("[StockPricesPage] mount id", id);
+    return () => {
+      console.log("[StockPricesPage] unmount id", id);
+    };
+  }, [id]);
+
+  useEffect(() => {
     if (Number.isNaN(id)) return;
+    console.log("[StockPricesPage] fetch stock start", id);
     getStock(id)
-      .then(setStock)
-      .catch((e) => setError((e as Error).message))
+      .then((s) => {
+        console.log("[StockPricesPage] fetch stock success", id);
+        setStock(s);
+      })
+      .catch((e) => {
+        const msg = (e as Error).message;
+        console.log("[StockPricesPage] fetch stock error", id, msg);
+        setError(msg);
+      })
       .finally(() => setLoading(false));
   }, [id]);
 
   useEffect(() => {
     if (Number.isNaN(id)) return;
+    console.log("[StockPricesPage] fetch prices start", id, resolution);
     setError(null);
     if (resolution === "1d") {
-      getStockPricesDaily(id).then(setDailyRows).catch((e) => setError((e as Error).message));
+      getStockPricesDaily(id)
+        .then((rows) => {
+          console.log("[StockPricesPage] fetch prices success", id, resolution, rows.length);
+          setDailyRows(rows);
+        })
+        .catch((e) => {
+          const msg = (e as Error).message;
+          console.log("[StockPricesPage] fetch prices error", id, resolution, msg);
+          setError(msg);
+        });
     } else if (resolution === "1w") {
-      getStockPricesWeekly(id).then(setWeeklyRows).catch((e) => setError((e as Error).message));
+      getStockPricesWeekly(id)
+        .then((rows) => {
+          console.log("[StockPricesPage] fetch prices success", id, resolution, rows.length);
+          setWeeklyRows(rows);
+        })
+        .catch((e) => {
+          const msg = (e as Error).message;
+          console.log("[StockPricesPage] fetch prices error", id, resolution, msg);
+          setError(msg);
+        });
     } else if (resolution === "5m") {
-      getStockPrices5m(id).then(setRows5m).catch((e) => setError((e as Error).message));
+      getStockPrices5m(id)
+        .then((rows) => {
+          console.log("[StockPricesPage] fetch prices success", id, resolution, rows.length);
+          setRows5m(rows);
+        })
+        .catch((e) => {
+          const msg = (e as Error).message;
+          console.log("[StockPricesPage] fetch prices error", id, resolution, msg);
+          setError(msg);
+        });
     } else {
-      getStockPricesMonthly(id).then(setMonthlyRows).catch((e) => setError((e as Error).message));
+      getStockPricesMonthly(id)
+        .then((rows) => {
+          console.log("[StockPricesPage] fetch prices success", id, resolution, rows.length);
+          setMonthlyRows(rows);
+        })
+        .catch((e) => {
+          const msg = (e as Error).message;
+          console.log("[StockPricesPage] fetch prices error", id, resolution, msg);
+          setError(msg);
+        });
     }
   }, [id, resolution]);
 

@@ -20,20 +20,27 @@ export default function StocksPage() {
   const [addingSymbol, setAddingSymbol] = useState<string | null>(null);
 
   async function load() {
+    console.log("[StocksPage] load start");
     setLoading(true);
     setError(null);
     try {
       const list = await getStocks();
       setRows(list);
+      console.log("[StocksPage] load success rows", list.length);
     } catch (e) {
       setError((e as Error).message);
+      console.log("[StocksPage] load error", (e as Error).message);
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
+    console.log("[StocksPage] mount");
     void load();
+    return () => {
+      console.log("[StocksPage] unmount");
+    };
   }, []);
 
   useEffect(() => {

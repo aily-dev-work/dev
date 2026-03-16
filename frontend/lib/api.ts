@@ -16,6 +16,8 @@ async function fetchWithTimeout(
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const start = performance.now();
+  console.log("[api] request start", path, init?.method ?? "GET");
   const headers: Record<string, string> = {
     ...(init?.headers as Record<string, string> | undefined),
   };
@@ -33,8 +35,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     });
   } catch (e) {
     if (e instanceof DOMException && e.name === "AbortError") {
+      console.log(
+        "[api] request timeout",
+        path,
+        "duration",
+        (performance.now() - start).toFixed(1),
+      );
       throw new Error(`Request timeout: ${path}`);
     }
+    console.log(
+      "[api] request error",
+      path,
+      "duration",
+      (performance.now() - start).toFixed(1),
+      e,
+    );
     throw e;
   }
 
@@ -48,6 +63,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       // ignore
     }
+    console.log(
+      "[api] request non-ok",
+      path,
+      res.status,
+      res.statusText,
+      "duration",
+      (performance.now() - start).toFixed(1),
+      detail,
+    );
     throw new Error(detail);
   }
 
@@ -56,7 +80,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     return null;
   }
 
-  return (await res.json()) as T;
+  const json = (await res.json()) as T;
+  console.log(
+    "[api] request success",
+    path,
+    "duration",
+    (performance.now() - start).toFixed(1),
+  );
+  return json;
 }
 
 export { request, API_BASE_URL };
