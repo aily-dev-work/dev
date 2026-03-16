@@ -184,6 +184,11 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     summary = calculate_technical_summary(stock)
                     score_result = score_from_technical(summary)
                 except Exception as e:
+                    logger.exception(
+                        "stocks.scores per-stock error stock_id=%s ticker=%s",
+                        getattr(stock, "id", None),
+                        getattr(stock, "ticker", None),
+                    )
                     results.append({
                         "stock_id": stock.id,
                         "ticker": stock.ticker,
