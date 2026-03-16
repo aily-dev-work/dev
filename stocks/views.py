@@ -435,6 +435,12 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                 {"detail": "銘柄に銘柄コードが設定されていません。"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        overall_start = time.monotonic()
+        logger.info(
+            "stocks.fetch-prices start stock_id=%s ticker=%s",
+            stock.id,
+            ticker,
+        )
         # Yahoo 取得中は DB 接続を解放し、他リクエスト（activate 等）がロックを取れるようにする
         connection.close()
 
@@ -496,6 +502,7 @@ class WatchStockViewSet(viewsets.ModelViewSet):
             created_monthly = 0
 
             # 日足
+            daily_start = time.monotonic()
             try:
                 data = fetch_yahoo("1d", "2y")
                 parsed = parse_quote(data)
@@ -529,16 +536,31 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                         )
                     if was_created:
                         created_daily += 1
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(
+                    "stocks.fetch-prices daily error stock_id=%s ticker=%s error=%s",
+                    stock.id,
+                    ticker,
+                    e,
+                )
+            daily_end = time.monotonic()
+            logger.info(
+                "stocks.fetch-prices daily duration=%.3f created=%d",
+                daily_end - daily_start,
+                created_daily,
+            )
 
             # 5分足（直近約2ヶ月）
             connection.close()
+            five_start = time.monotonic()
+            five_bars_total = 0
+            five_bars_saved = 0
             try:
                 data = fetch_yahoo("5m", "60d")
                 parsed = parse_quote(data)
                 if parsed:
                     timestamps, opens, highs, lows, closes, volumes = parsed
+                    five_bars_total = len(timestamps)
                     for i in range(len(timestamps)):
                         ts = timestamps[i]
                         if ts is None:
@@ -565,14 +587,32 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                             stock=stock, datetime=dt,
                             defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
                         )
-                    if was_created:
+                        if was_created:
+                            five_bars_saved += 1
+                    if five_bars_saved:
                         created_5m += 1
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(
+                    "stocks.fetch-prices 5m error stock_id=%s ticker=%s error=%s",
+                    stock.id,
+                    ticker,
+                    e,
+                )
+            five_end = time.monotonic()
+            logger.info(
+                "stocks.fetch-prices 5m duration=%.3f bars_total=%d bars_saved=%d created=%d",
+                five_end - five_start,
+                five_bars_total,
+                five_bars_saved,
+                created_5m,
+            )
 
             # 週足（Yahoo は 1wk。5y が通らない銘柄があるので 2y で再試行）
             connection.close()
+            weekly_start = time.monotonic()
             for range_param in ("5y", "2y", "1y"):
+                range_start = time.monotonic()
+                range_parsed_count = 0
                 try:
                     data = fetch_yahoo("1wk", range_param)
                     parsed = parse_quote(data)
@@ -581,6 +621,7 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     timestamps, opens, highs, lows, closes, volumes = parsed
                     if not timestamps:
                         continue
+                    range_parsed_count = len(timestamps)
                     for i in range(len(timestamps)):
                         ts = timestamps[i]
                         if ts is None:
@@ -609,13 +650,37 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                         )
                         if was_created:
                             created_weekly += 1
+                    range_end = time.monotonic()
+                    logger.info(
+                        "stocks.fetch-prices weekly range=%s duration=%.3f parsed=%d",
+                        range_param,
+                        range_end - range_start,
+                        range_parsed_count,
+                    )
                     break
                 except Exception as e:
-                    logger.warning("fetch_prices weekly ticker=%s range=%s: %s", ticker, range_param, e)
+                    range_end = time.monotonic()
+                    logger.warning(
+                        "stocks.fetch-prices weekly error stock_id=%s ticker=%s range=%s duration=%.3f error=%s",
+                        stock.id,
+                        ticker,
+                        range_param,
+                        range_end - range_start,
+                        e,
+                    )
+            weekly_end = time.monotonic()
+            logger.info(
+                "stocks.fetch-prices weekly duration=%.3f created=%d",
+                weekly_end - weekly_start,
+                created_weekly,
+            )
 
             # 月足（Yahoo は range に 10y まで。20y は無効で 500 の原因になる）
             connection.close()
+            monthly_start = time.monotonic()
             for range_param in ("10y", "5y", "2y"):
+                range_start = time.monotonic()
+                range_parsed_count = 0
                 try:
                     data = fetch_yahoo("1mo", range_param)
                     parsed = parse_quote(data)
@@ -624,6 +689,7 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     timestamps, opens, highs, lows, closes, volumes = parsed
                     if not timestamps:
                         continue
+                    range_parsed_count = len(timestamps)
                     for i in range(len(timestamps)):
                         ts = timestamps[i]
                         if ts is None:
@@ -652,21 +718,56 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                         )
                         if was_created:
                             created_monthly += 1
+                    range_end = time.monotonic()
+                    logger.info(
+                        "stocks.fetch-prices monthly range=%s duration=%.3f parsed=%d",
+                        range_param,
+                        range_end - range_start,
+                        range_parsed_count,
+                    )
                     break
                 except Exception as e:
-                    logger.warning("fetch_prices monthly ticker=%s range=%s: %s", ticker, range_param, e)
+                    range_end = time.monotonic()
+                    logger.warning(
+                        "stocks.fetch-prices monthly error stock_id=%s ticker=%s range=%s duration=%.3f error=%s",
+                        stock.id,
+                        ticker,
+                        range_param,
+                        range_end - range_start,
+                        e,
+                    )
+            monthly_end = time.monotonic()
+            logger.info(
+                "stocks.fetch-prices monthly duration=%.3f created=%d",
+                monthly_end - monthly_start,
+                created_monthly,
+            )
+
+            overall_end = time.monotonic()
+            total_created = created_daily + created_5m + created_weekly + created_monthly
+            logger.info(
+                "stocks.fetch-prices finish stock_id=%s ticker=%s duration=%.3f total_created=%d",
+                stock.id,
+                ticker,
+                overall_end - overall_start,
+                total_created,
+            )
 
             return Response({
                 "stock_id": stock.id,
                 "ticker": stock.ticker,
-                "created": created_daily + created_5m + created_weekly + created_monthly,
+                "created": total_created,
                 "daily": {"created": created_daily},
                 "5m": {"created": created_5m},
                 "weekly": {"created": created_weekly},
                 "monthly": {"created": created_monthly},
             })
         except Exception as e:
-            logger.exception("fetch_prices failed: stock_id=%s ticker=%s", stock.id, ticker)
+            logger.exception(
+                "stocks.fetch-prices error stock_id=%s ticker=%s",
+                stock.id,
+                ticker,
+            )
             return Response(
                 {"detail": str(e), "traceback": traceback.format_exc()},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
