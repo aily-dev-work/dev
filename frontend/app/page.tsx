@@ -37,14 +37,41 @@ export default function DashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const [res, scoresRes, signalsRes] = await Promise.all([
+      const [statsResult, scoresResult, signalsResult] = await Promise.allSettled([
         getDashboardStats(),
-        getStocksScores().catch(() => ({ stocks: [] as StockScoreItem[] })),
-        getRecentSignals(30).catch(() => [] as RecentSignalItem[]),
+        getStocksScores(),
+        getRecentSignals(30),
       ]);
-      setData(res);
-      setStockScores(Array.isArray(scoresRes?.stocks) ? scoresRes.stocks : []);
-      setRecentSignals(Array.isArray(signalsRes) ? signalsRes : []);
+
+      if (statsResult.status === "fulfilled") {
+        setData(statsResult.value);
+      } else {
+        const message =
+          statsResult.reason instanceof Error
+            ? statsResult.reason.message
+            : "ダッシュボード統計の取得に失敗しました。";
+        setError(message);
+        setData(null);
+        setStockScores(null);
+        setRecentSignals(null);
+        return;
+      }
+
+      if (scoresResult.status === "fulfilled") {
+        const scoresValue = scoresResult.value as { stocks?: StockScoreItem[] };
+        setStockScores(
+          Array.isArray(scoresValue?.stocks) ? (scoresValue.stocks as StockScoreItem[]) : [],
+        );
+      } else {
+        setStockScores([]);
+      }
+
+      if (signalsResult.status === "fulfilled") {
+        const signalsValue = signalsResult.value as RecentSignalItem[];
+        setRecentSignals(Array.isArray(signalsValue) ? signalsValue : []);
+      } else {
+        setRecentSignals([]);
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {

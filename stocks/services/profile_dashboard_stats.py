@@ -4,6 +4,8 @@ ops-summary / compare / activation-history を再利用し、1レスポンスに
 """
 from __future__ import annotations
 
+import logging
+import time
 from typing import Any, Dict, List
 
 from ..models import ScoreProfile, ScoreProfileActivationHistory
@@ -18,6 +20,8 @@ from .profile_review_targets import (
 )
 from .scoring_profile import get_active_score_profile
 from .signal_summary import build_summary_queryset, summarize_signals
+
+logger = logging.getLogger(__name__)
 
 RECENT_ACTIVATION_HISTORY_LIMIT = 10
 
@@ -164,7 +168,10 @@ def build_dashboard_stats(
     """
     from django.core.exceptions import ImproperlyConfigured
 
+    t0 = time.monotonic()
+
     # current_active_profile（成績 5 段階 + 未判定を付与）
+    t1 = time.monotonic()
     params_for_review: Dict[str, Any] = {}
     if signal_date_from:
         params_for_review["signal_date_from"] = signal_date_from
@@ -185,8 +192,15 @@ def build_dashboard_stats(
         }
     except ImproperlyConfigured:
         current_active_profile = None
+    t2 = time.monotonic()
+    logger.info(
+        "dashboard-stats section current_active_profile duration=%.3f has_active=%s",
+        t2 - t1,
+        bool(current_active_profile),
+    )
 
     # ops_summary（既存 service を再利用）
+    t3 = time.monotonic()
     ops_summary = build_ops_summary(
         signal_date_from=signal_date_from,
         signal_date_to=signal_date_to,
@@ -194,14 +208,33 @@ def build_dashboard_stats(
         stale_days=stale_days,
         min_evaluated_count=min_evaluated_count,
     )
+    t4 = time.monotonic()
+    logger.info(
+        "dashboard-stats section ops_summary duration=%.3f",
+        t4 - t3,
+    )
 
     # recent_activation_history
+    t5 = time.monotonic()
     recent_activation_history = _recent_activation_history(limit=RECENT_ACTIVATION_HISTORY_LIMIT)
+    t6 = time.monotonic()
+    logger.info(
+        "dashboard-stats section recent_activation_history duration=%.3f count=%d",
+        t6 - t5,
+        len(recent_activation_history),
+    )
 
     # profile_overview
+    t7 = time.monotonic()
     profile_overview = _profile_overview()
+    t8 = time.monotonic()
+    logger.info(
+        "dashboard-stats section profile_overview duration=%.3f",
+        t8 - t7,
+    )
 
     # compare_snapshot（両方指定時のみ）
+    t9 = time.monotonic()
     compare_snapshot = None
     if base_profile_id is not None and candidate_profile_id is not None:
         compare_snapshot = compare_profiles(
@@ -210,12 +243,30 @@ def build_dashboard_stats(
             signal_date_from=signal_date_from,
             signal_date_to=signal_date_to,
         )
+    t10 = time.monotonic()
+    logger.info(
+        "dashboard-stats section compare_snapshot duration=%.3f has_compare=%s",
+        t10 - t9,
+        bool(compare_snapshot),
+    )
 
     # chart_data
+    t11 = time.monotonic()
     chart_data = _chart_data(
         signal_date_from=signal_date_from,
         signal_date_to=signal_date_to,
     )
+    t12 = time.monotonic()
+    profile_success_rows = chart_data.get("profile_success_rate_rows") or []
+    profile_avg_rows = chart_data.get("profile_avg_return_rows") or []
+    logger.info(
+        "dashboard-stats section chart_data duration=%.3f rows_success=%d rows_return=%d",
+        t12 - t11,
+        len(profile_success_rows),
+        len(profile_avg_rows),
+    )
+
+    logger.info("dashboard-stats total duration=%.3f", t12 - t0)
 
     return {
         "current_active_profile": current_active_profile,

@@ -1,6 +1,20 @@
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
 
+async function fetchWithTimeout(
+  input: RequestInfo,
+  init?: RequestInit,
+  timeoutMs = 20000,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
     ...(init?.headers as Record<string, string> | undefined),
@@ -10,11 +24,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    cache: "no-store",
-    ...init,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
+      cache: "no-store",
+      ...init,
+      headers,
+    });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new Error(`Request timeout: ${path}`);
+    }
+    throw e;
+  }
 
   if (!res.ok) {
     let detail = `${res.status} ${res.statusText}`;

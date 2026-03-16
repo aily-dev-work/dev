@@ -143,60 +143,88 @@ class WatchStockViewSet(viewsets.ModelViewSet):
         買い％・売り％・様子見％を返す。ダッシュボード表示用。
         GET /api/v1/stocks/scores/
         """
+        start = time.monotonic()
+        path = getattr(request, "path", "")
+        query_params = dict(request.query_params)
+        logger.info("stocks.scores start path=%s query=%s", path, query_params)
+        response = None
         try:
-            get_active_score_profile()
-        except ImproperlyConfigured:
-            return Response(
-                {"detail": "アクティブなプロファイルがありません。プロファイルをアクティブにしてください。"},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-        stocks = WatchStock.objects.all().order_by("ticker")
-        results = []
-        for stock in stocks:
             try:
-                summary = calculate_technical_summary(stock)
-                score_result = score_from_technical(summary)
-            except Exception as e:
+                get_active_score_profile()
+            except ImproperlyConfigured:
+                response = Response(
+                    {"detail": "アクティブなプロファイルがありません。プロファイルをアクティブにしてください。"},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+                return response
+
+            stocks = WatchStock.objects.all().order_by("ticker")
+            results = []
+            for stock in stocks:
+                try:
+                    summary = calculate_technical_summary(stock)
+                    score_result = score_from_technical(summary)
+                except Exception as e:
+                    results.append({
+                        "stock_id": stock.id,
+                        "ticker": stock.ticker,
+                        "name": stock.name or "",
+                        "buy_score": None,
+                        "sell_score": None,
+                        "bias": None,
+                        "strength": None,
+                        "buy_pct": None,
+                        "sell_pct": None,
+                        "wait_pct": None,
+                        "long_term_trend": None,
+                        "short_term_trend": None,
+                        "insufficient_data": True,
+                        "error": str(e),
+                    })
+                    continue
+                buy_score = score_result.buy_score
+                sell_score = score_result.sell_score
+                total = buy_score + sell_score + 100.0
+                buy_pct = round(100.0 * buy_score / total, 1) if total > 0 else 0
+                sell_pct = round(100.0 * sell_score / total, 1) if total > 0 else 0
+                wait_pct = round(100.0 - buy_pct - sell_pct, 1)
                 results.append({
                     "stock_id": stock.id,
                     "ticker": stock.ticker,
                     "name": stock.name or "",
-                    "buy_score": None,
-                    "sell_score": None,
-                    "bias": None,
-                    "strength": None,
-                    "buy_pct": None,
-                    "sell_pct": None,
-                    "wait_pct": None,
-                    "long_term_trend": None,
-                    "short_term_trend": None,
-                    "insufficient_data": True,
-                    "error": str(e),
+                    "buy_score": buy_score,
+                    "sell_score": sell_score,
+                    "bias": score_result.bias,
+                    "strength": score_result.strength,
+                    "buy_pct": buy_pct,
+                    "sell_pct": sell_pct,
+                    "wait_pct": wait_pct,
+                    "long_term_trend": summary.long_term_trend,
+                    "short_term_trend": summary.short_term_trend,
+                    "insufficient_data": score_result.insufficient_data,
+                    "insufficient_reason": score_result.insufficient_reason,
                 })
-                continue
-            buy_score = score_result.buy_score
-            sell_score = score_result.sell_score
-            total = buy_score + sell_score + 100.0
-            buy_pct = round(100.0 * buy_score / total, 1) if total > 0 else 0
-            sell_pct = round(100.0 * sell_score / total, 1) if total > 0 else 0
-            wait_pct = round(100.0 - buy_pct - sell_pct, 1)
-            results.append({
-                "stock_id": stock.id,
-                "ticker": stock.ticker,
-                "name": stock.name or "",
-                "buy_score": buy_score,
-                "sell_score": sell_score,
-                "bias": score_result.bias,
-                "strength": score_result.strength,
-                "buy_pct": buy_pct,
-                "sell_pct": sell_pct,
-                "wait_pct": wait_pct,
-                "long_term_trend": summary.long_term_trend,
-                "short_term_trend": summary.short_term_trend,
-                "insufficient_data": score_result.insufficient_data,
-                "insufficient_reason": score_result.insufficient_reason,
-            })
-        return Response({"stocks": results}, status=status.HTTP_200_OK)
+            response = Response({"stocks": results}, status=status.HTTP_200_OK)
+            return response
+        except Exception:
+            logger.exception("stocks.scores error path=%s query=%s", path, query_params)
+            raise
+        finally:
+            duration = time.monotonic() - start
+            result_count = 0
+            try:
+                if response is not None and isinstance(response.data, dict):
+                    stocks_data = response.data.get("stocks")
+                    if isinstance(stocks_data, list):
+                        result_count = len(stocks_data)
+            except Exception:
+                result_count = -1
+            logger.info(
+                "stocks.scores finish path=%s duration=%.3f result_count=%s",
+                path,
+                duration,
+                result_count,
+            )
 
     @action(detail=True, methods=["get"], url_path="prices")
     def prices(self, request, pk=None):
@@ -1828,56 +1856,94 @@ class ScoreProfileViewSet(viewsets.ViewSet):
         クエリ: signal_date_from, signal_date_to, base_profile_id, candidate_profile_id,
                threshold_success_rate, stale_days, min_evaluated_count
         """
+        start = time.monotonic()
+        path = getattr(request, "path", "")
+        query_params = dict(request.query_params)
+        logger.info(
+            "score-profiles.dashboard-stats start path=%s query=%s",
+            path,
+            query_params,
+        )
+        response = None
         q = request.query_params
-        signal_date_from = q.get("signal_date_from") or None
-        signal_date_to = q.get("signal_date_to") or None
-        base_id = q.get("base_profile_id")
-        candidate_id = q.get("candidate_profile_id")
         try:
-            threshold_success_rate = float(
-                q.get("threshold_success_rate") or DEFAULT_THRESHOLD_SUCCESS_RATE
-            )
-        except (TypeError, ValueError):
-            threshold_success_rate = DEFAULT_THRESHOLD_SUCCESS_RATE
-        try:
-            stale_days = int(q.get("stale_days") or DEFAULT_STALE_DAYS)
-        except (TypeError, ValueError):
-            stale_days = DEFAULT_STALE_DAYS
-        try:
-            min_evaluated_count = int(
-                q.get("min_evaluated_count") or DEFAULT_MIN_EVALUATED_COUNT
-            )
-        except (TypeError, ValueError):
-            min_evaluated_count = DEFAULT_MIN_EVALUATED_COUNT
-
-        base_pk = None
-        candidate_pk = None
-        if base_id and candidate_id:
+            signal_date_from = q.get("signal_date_from") or None
+            signal_date_to = q.get("signal_date_to") or None
+            base_id = q.get("base_profile_id")
+            candidate_id = q.get("candidate_profile_id")
             try:
-                base_pk = int(base_id)
-                candidate_pk = int(candidate_id)
-            except (TypeError, ValueError):
-                return Response(
-                    {"detail": "base_profile_id and candidate_profile_id must be integers."},
-                    status=status.HTTP_400_BAD_REQUEST,
+                threshold_success_rate = float(
+                    q.get("threshold_success_rate") or DEFAULT_THRESHOLD_SUCCESS_RATE
                 )
+            except (TypeError, ValueError):
+                threshold_success_rate = DEFAULT_THRESHOLD_SUCCESS_RATE
+            try:
+                stale_days = int(q.get("stale_days") or DEFAULT_STALE_DAYS)
+            except (TypeError, ValueError):
+                stale_days = DEFAULT_STALE_DAYS
+            try:
+                min_evaluated_count = int(
+                    q.get("min_evaluated_count") or DEFAULT_MIN_EVALUATED_COUNT
+                )
+            except (TypeError, ValueError):
+                min_evaluated_count = DEFAULT_MIN_EVALUATED_COUNT
 
-        try:
-            data = build_dashboard_stats(
-                signal_date_from=signal_date_from,
-                signal_date_to=signal_date_to,
-                base_profile_id=base_pk,
-                candidate_profile_id=candidate_pk,
-                threshold_success_rate=threshold_success_rate,
-                stale_days=stale_days,
-                min_evaluated_count=min_evaluated_count,
+            base_pk = None
+            candidate_pk = None
+            if base_id and candidate_id:
+                try:
+                    base_pk = int(base_id)
+                    candidate_pk = int(candidate_id)
+                except (TypeError, ValueError):
+                    response = Response(
+                        {"detail": "base_profile_id and candidate_profile_id must be integers."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                    return response
+
+            try:
+                data = build_dashboard_stats(
+                    signal_date_from=signal_date_from,
+                    signal_date_to=signal_date_to,
+                    base_profile_id=base_pk,
+                    candidate_profile_id=candidate_pk,
+                    threshold_success_rate=threshold_success_rate,
+                    stale_days=stale_days,
+                    min_evaluated_count=min_evaluated_count,
+                )
+            except ValueError as exc:
+                response = Response(
+                    {"detail": str(exc)},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+                return response
+            response = Response(data, status=status.HTTP_200_OK)
+            return response
+        except Exception:
+            logger.exception(
+                "score-profiles.dashboard-stats error path=%s query=%s",
+                path,
+                query_params,
             )
-        except ValueError as exc:
-            return Response(
-                {"detail": str(exc)},
-                status=status.HTTP_404_NOT_FOUND,
+            raise
+        finally:
+            duration = time.monotonic() - start
+            result_count = 0
+            try:
+                if response is not None and isinstance(response.data, dict):
+                    chart_data = response.data.get("chart_data")
+                    if isinstance(chart_data, dict):
+                        profile_success_rows = chart_data.get("profile_success_rate_rows")
+                        if isinstance(profile_success_rows, list):
+                            result_count = len(profile_success_rows)
+            except Exception:
+                result_count = -1
+            logger.info(
+                "score-profiles.dashboard-stats finish path=%s duration=%.3f result_count=%s",
+                path,
+                duration,
+                result_count,
             )
-        return Response(data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["get"], url_path="current/analysis-package")
     def current_analysis_package(self, request):
