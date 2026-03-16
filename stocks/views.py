@@ -977,17 +977,31 @@ class StockPriceDailyViewSet(viewsets.ModelViewSet):
         ?stock=<id> または ?ticker=<ticker> で絞り込み可能。
         いずれも無指定の場合は全件（新しい日付順）。
         """
-        qs = StockPriceDaily.objects.select_related("stock").all()
-
         stock_id = self.request.query_params.get("stock")
         ticker = self.request.query_params.get("ticker")
+        logger.info("stock-prices get_queryset start stock_id=%s ticker=%s", stock_id, ticker)
+
+        qs = StockPriceDaily.objects.select_related("stock").all()
 
         if stock_id:
             qs = qs.filter(stock_id=stock_id)
         if ticker:
             qs = qs.filter(stock__ticker=ticker)
 
+        logger.info("stock-prices get_queryset end stock_id=%s ticker=%s", stock_id, ticker)
         return qs
+
+    def list(self, request, *args, **kwargs):
+        stock_id = request.query_params.get("stock")
+        ticker = request.query_params.get("ticker")
+        logger.info("stock-prices list start stock_id=%s ticker=%s", stock_id, ticker)
+        response = super().list(request, *args, **kwargs)
+        try:
+            count = len(response.data)
+        except Exception:
+            count = "unknown"
+        logger.info("stock-prices list end stock_id=%s ticker=%s count=%s", stock_id, ticker, count)
+        return response
 
 
 class StockPrice5MinViewSet(viewsets.ModelViewSet):
