@@ -118,7 +118,7 @@ def calculate_technical_summary(stock: WatchStock) -> TechnicalSummary:
             short_term_trend=None,
         )
 
-        latest = prices[0]
+    latest = prices[0]
     closes = [p.close_price for p in prices]
 
     # 移動平均
