@@ -149,6 +149,7 @@ class WatchStockViewSet(viewsets.ModelViewSet):
         logger.info("stocks.scores start path=%s query=%s", path, query_params)
         response = None
         try:
+            section_start = time.monotonic()
             try:
                 get_active_score_profile()
             except ImproperlyConfigured:
@@ -156,11 +157,29 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     {"detail": "アクティブなプロファイルがありません。プロファイルをアクティブにしてください。"},
                     status=status.HTTP_503_SERVICE_UNAVAILABLE,
                 )
+                logger.info(
+                    "stocks.scores active_profile duration=%.3f result=none",
+                    time.monotonic() - section_start,
+                )
                 return response
+            logger.info(
+                "stocks.scores active_profile duration=%.3f result=ok",
+                time.monotonic() - section_start,
+            )
 
+            section_start = time.monotonic()
             stocks = WatchStock.objects.all().order_by("ticker")
+            stocks_list = list(stocks)
+            logger.info(
+                "stocks.scores load_stocks duration=%.3f count=%d",
+                time.monotonic() - section_start,
+                len(stocks_list),
+            )
+
+            loop_start = time.monotonic()
             results = []
-            for stock in stocks:
+            for idx, stock in enumerate(stocks_list, start=1):
+                per_stock_start = time.monotonic()
                 try:
                     summary = calculate_technical_summary(stock)
                     score_result = score_from_technical(summary)
@@ -204,6 +223,20 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     "insufficient_data": score_result.insufficient_data,
                     "insufficient_reason": score_result.insufficient_reason,
                 })
+                per_stock_duration = time.monotonic() - per_stock_start
+                if idx <= 5 or idx % 20 == 0:
+                    logger.info(
+                        "stocks.scores stock_loop idx=%d stock_id=%s ticker=%s duration=%.3f",
+                        idx,
+                        getattr(stock, "id", None),
+                        getattr(stock, "ticker", None),
+                        per_stock_duration,
+                    )
+            logger.info(
+                "stocks.scores stock_loop total_duration=%.3f count=%d",
+                time.monotonic() - loop_start,
+                len(stocks_list),
+            )
             response = Response({"stocks": results}, status=status.HTTP_200_OK)
             return response
         except Exception:

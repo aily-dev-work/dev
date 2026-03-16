@@ -4,8 +4,12 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Optional
+import logging
+import time
 
 from ..models import StockPrice5Min, StockPriceDaily, WatchStock
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -77,10 +81,20 @@ def calculate_technical_summary(stock: WatchStock) -> TechnicalSummary:
     指定した WatchStock について、日足データからテクニカル指標を集計する。
     データが足りない指標は None を返す。
     """
+    t0 = time.monotonic()
     # ordering = ["-date", "-updated_at"] なので、新しい順に取得される
     qs = StockPriceDaily.objects.filter(stock=stock).order_by("-date")
 
+    t1 = time.monotonic()
     prices = list(qs[: max(75, 20)])  # 最大 75 日分あれば十分
+    t2 = time.monotonic()
+    logger.info(
+        "technical_summary daily_fetch stock_id=%s ticker=%s duration=%.3f count=%d",
+        getattr(stock, "id", None),
+        getattr(stock, "ticker", None),
+        t2 - t1,
+        len(prices),
+    )
 
     if not prices:
         empty_ma = MovingAverages(ma5=None, ma25=None, ma75=None)
@@ -104,7 +118,7 @@ def calculate_technical_summary(stock: WatchStock) -> TechnicalSummary:
             short_term_trend=None,
         )
 
-    latest = prices[0]
+        latest = prices[0]
     closes = [p.close_price for p in prices]
 
     # 移動平均
@@ -172,7 +186,7 @@ def calculate_technical_summary(stock: WatchStock) -> TechnicalSummary:
     long_term_trend = _trend_label(trend_long)
     short_term_trend = _trend_label(trend_mid)
 
-    return TechnicalSummary(
+    summary = TechnicalSummary(
         stock=stock,
         latest_date=str(latest.date),
         latest_close=latest_close,
@@ -183,6 +197,14 @@ def calculate_technical_summary(stock: WatchStock) -> TechnicalSummary:
         long_term_trend=long_term_trend,
         short_term_trend=short_term_trend,
     )
+    t3 = time.monotonic()
+    logger.info(
+        "technical_summary daily_total stock_id=%s ticker=%s duration=%.3f",
+        getattr(stock, "id", None),
+        getattr(stock, "ticker", None),
+        t3 - t0,
+    )
+    return summary
 
 
 def calculate_technical_summary_5m(stock: WatchStock) -> TechnicalSummary:
