@@ -203,6 +203,7 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                         "long_term_trend": None,
                         "short_term_trend": None,
                         "insufficient_data": True,
+                        "insufficient_reason": None,
                         "error": str(e),
                     })
                     continue
