@@ -593,6 +593,20 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                 ticker,
             )
             try:
+                # 既存データの最新 datetime を取得（差分保存の基準）
+                latest_dt = (
+                    StockPrice5Min.objects.filter(stock=stock)
+                    .order_by("-datetime")
+                    .values_list("datetime", flat=True)
+                    .first()
+                )
+                logger.warning(
+                    "stocks.fetch-prices 5m latest_dt stock_id=%s ticker=%s latest_dt=%s",
+                    stock.id,
+                    ticker,
+                    latest_dt,
+                )
+
                 logger.warning(
                     'stocks.fetch-prices 5m fetch_yahoo interval="5m" range="60d" before',
                 )
@@ -624,6 +638,11 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                         if ts_sec is None:
                             continue
                         dt = datetime.fromtimestamp(ts_sec, tz=stdlib_tz.utc)
+
+                        # 差分保存: 既存の最新 datetime より新しいバーのみ対象
+                        if latest_dt is not None and dt <= latest_dt:
+                            continue
+
                         o = opens[i] if i < len(opens) else None
                         h = highs[i] if i < len(highs) else None
                         l_ = lows[i] if i < len(lows) else None
@@ -639,7 +658,8 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                         low_val = Decimal(str(l_)) if l_ is not None else close_val
                         vol = int(v) if v is not None and v == v else None
                         _, was_created = StockPrice5Min.objects.update_or_create(
-                            stock=stock, datetime=dt,
+                            stock=stock,
+                            datetime=dt,
                             defaults={
                                 "open_price": open_val,
                                 "high_price": high_val,
