@@ -2,7 +2,9 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const headers: HeadersInit = { ...(init?.headers ?? {}) };
+  const headers: Record<string, string> = {
+    ...(init?.headers as Record<string, string> | undefined),
+  };
   // GET などボディのないリクエストでは Content-Type を付けず、プリフライトを避ける
   if (init?.body != null && !("Content-Type" in headers)) {
     headers["Content-Type"] = "application/json";
