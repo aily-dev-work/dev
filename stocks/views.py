@@ -90,14 +90,71 @@ class WatchStockViewSet(viewsets.ModelViewSet):
     serializer_class = WatchStockSerializer
 
     def list(self, request, *args, **kwargs):
-        logger.info("watch-stocks list start")
-        response = super().list(request, *args, **kwargs)
+        path = getattr(request, "path", "")
+        query = dict(request.query_params)
+        start = time.monotonic()
+        logger.info("watch-stocks list start path=%s query=%s", path, query)
+
+        response: Response | None = None
         try:
-            count = len(response.data)
+            # B: queryset 構築
+            qs_build_start = time.monotonic()
+            queryset = self.filter_queryset(self.get_queryset())
+            qs_build_end = time.monotonic()
+            logger.info(
+                "watch-stocks list queryset_built duration=%.3f",
+                qs_build_end - qs_build_start,
+            )
+
+            # C: queryset 評価（DB から実体取得）＋件数
+            eval_start = time.monotonic()
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                objects = list(page)
+            else:
+                objects = list(queryset)
+            eval_end = time.monotonic()
+            logger.info(
+                "watch-stocks list queryset_evaluated duration=%.3f count=%d",
+                eval_end - eval_start,
+                len(objects),
+            )
+
+            # D: serializer 初期化
+            ser_init_start = time.monotonic()
+            serializer = self.get_serializer(objects, many=True)
+            ser_init_end = time.monotonic()
+            logger.info(
+                "watch-stocks list serializer_init duration=%.3f",
+                ser_init_end - ser_init_start,
+            )
+
+            # E: serializer.data 評価
+            ser_data_start = time.monotonic()
+            data = serializer.data
+            ser_data_end = time.monotonic()
+            logger.info(
+                "watch-stocks list serializer_data duration=%.3f",
+                ser_data_end - ser_data_start,
+            )
+
+            # F: response 生成（ページング維持）
+            if page is not None:
+                response = self.get_paginated_response(data)
+            else:
+                response = Response(data)
+            return response
+
         except Exception:
-            count = "unknown"
-        logger.info("watch-stocks list end count=%s", count)
-        return response
+            logger.exception("watch-stocks list error path=%s query=%s", path, query)
+            raise
+        finally:
+            total = time.monotonic() - start
+            logger.info(
+                "watch-stocks list finish path=%s duration=%.3f",
+                path,
+                total,
+            )
 
     @action(detail=True, methods=["get"], url_path="technical")
     def technical(self, request, pk=None):
