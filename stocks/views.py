@@ -89,6 +89,16 @@ class WatchStockViewSet(viewsets.ModelViewSet):
     queryset = WatchStock.objects.all()
     serializer_class = WatchStockSerializer
 
+    def list(self, request, *args, **kwargs):
+        logger.info("watch-stocks list start")
+        response = super().list(request, *args, **kwargs)
+        try:
+            count = len(response.data)
+        except Exception:
+            count = "unknown"
+        logger.info("watch-stocks list end count=%s", count)
+        return response
+
     @action(detail=True, methods=["get"], url_path="technical")
     def technical(self, request, pk=None):
         """
