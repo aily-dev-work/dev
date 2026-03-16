@@ -517,11 +517,28 @@ class WatchStockViewSet(viewsets.ModelViewSet):
 
             # 日足
             daily_start = time.monotonic()
+            logger.warning(
+                "stocks.fetch-prices daily start stock_id=%s ticker=%s",
+                stock.id,
+                ticker,
+            )
             try:
+                logger.warning(
+                    'stocks.fetch-prices daily fetch_yahoo interval="1d" range="2y" before',
+                )
                 data = fetch_yahoo("1d", "2y")
+                logger.warning(
+                    'stocks.fetch-prices daily fetch_yahoo interval="1d" range="2y" done',
+                )
                 parsed = parse_quote(data)
                 if parsed:
                     timestamps, opens, highs, lows, closes, volumes = parsed
+                    logger.warning(
+                        "stocks.fetch-prices daily parsed stock_id=%s ticker=%s bars=%d",
+                        stock.id,
+                        ticker,
+                        len(timestamps),
+                    )
                     for i in range(len(timestamps)):
                         ts = timestamps[i]
                         if ts is None:
@@ -569,12 +586,29 @@ class WatchStockViewSet(viewsets.ModelViewSet):
             five_start = time.monotonic()
             five_bars_total = 0
             five_bars_saved = 0
+            logger.warning(
+                "stocks.fetch-prices 5m start stock_id=%s ticker=%s",
+                stock.id,
+                ticker,
+            )
             try:
+                logger.warning(
+                    'stocks.fetch-prices 5m fetch_yahoo interval="5m" range="60d" before',
+                )
                 data = fetch_yahoo("5m", "60d")
+                logger.warning(
+                    'stocks.fetch-prices 5m fetch_yahoo interval="5m" range="60d" done',
+                )
                 parsed = parse_quote(data)
                 if parsed:
                     timestamps, opens, highs, lows, closes, volumes = parsed
                     five_bars_total = len(timestamps)
+                    logger.warning(
+                        "stocks.fetch-prices 5m parsed stock_id=%s ticker=%s bars_total=%d",
+                        stock.id,
+                        ticker,
+                        five_bars_total,
+                    )
                     for i in range(len(timestamps)):
                         ts = timestamps[i]
                         if ts is None:
@@ -624,6 +658,11 @@ class WatchStockViewSet(viewsets.ModelViewSet):
             # 週足（Yahoo は 1wk。5y が通らない銘柄があるので 2y で再試行）
             connection.close()
             weekly_start = time.monotonic()
+            logger.warning(
+                "stocks.fetch-prices weekly start stock_id=%s ticker=%s",
+                stock.id,
+                ticker,
+            )
             for range_param in ("5y", "2y", "1y"):
                 range_start = time.monotonic()
                 range_parsed_count = 0
@@ -692,6 +731,11 @@ class WatchStockViewSet(viewsets.ModelViewSet):
             # 月足（Yahoo は range に 10y まで。20y は無効で 500 の原因になる）
             connection.close()
             monthly_start = time.monotonic()
+            logger.warning(
+                "stocks.fetch-prices monthly start stock_id=%s ticker=%s",
+                stock.id,
+                ticker,
+            )
             for range_param in ("10y", "5y", "2y"):
                 range_start = time.monotonic()
                 range_parsed_count = 0
@@ -759,6 +803,13 @@ class WatchStockViewSet(viewsets.ModelViewSet):
 
             overall_end = time.monotonic()
             total_created = created_daily + created_5m + created_weekly + created_monthly
+            logger.warning(
+                "stocks.fetch-prices finish (pre-response) stock_id=%s ticker=%s duration=%.3f total_created=%d",
+                stock.id,
+                ticker,
+                overall_end - overall_start,
+                total_created,
+            )
             logger.info(
                 "stocks.fetch-prices finish stock_id=%s ticker=%s duration=%.3f total_created=%d",
                 stock.id,
