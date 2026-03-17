@@ -150,7 +150,7 @@ def run_5m_fetch_and_evaluate(
             "stopped_at_step": "technical_error",
         }
 
-    # score（新たに有効化するステージ）
+    # score（先頭1件のみ）
     try:
         score_start = time.monotonic()
         logger.warning(
@@ -171,22 +171,6 @@ def run_5m_fetch_and_evaluate(
             getattr(score_result, "bias", None),
             getattr(score_result, "strength", None),
         )
-        elapsed_total = time.monotonic() - started_at
-        return {
-            "stocks_count": len(stocks),
-            "processed_count": 1,
-            "success_count": 1,
-            "error_count": 0,
-            "remaining_count": max(len(stocks) - 1, 0),
-            "stopped_by_limit": False,
-            "elapsed_seconds": round(elapsed_total, 3),
-            "5m_created": 0,
-            "signals_updated": 0,
-            "bar_start": None,
-            "errors": [],
-            "current_stock_ticker": first.ticker,
-            "stopped_at_step": "after_score",
-        }
     except Exception as e:
         logger.exception(
             "run_5m score_5m error ticker=%s id=%s",
@@ -209,6 +193,66 @@ def run_5m_fetch_and_evaluate(
             "errors": errors,
             "current_stock_ticker": first.ticker,
             "stopped_at_step": "score_error",
+        }
+
+    # signal（先頭1件のみ）
+    try:
+        signal_start = time.monotonic()
+        logger.warning(
+            "run_5m before signal ticker=%s id=%s",
+            first.ticker,
+            first.id,
+        )
+        bar_start = _round_to_5min_bar(timezone.now())
+        signal = generate_trading_signal_5m(first, summary, score_result, bar_start)
+        signal_end = time.monotonic()
+        signal_duration = signal_end - signal_start
+        logger.warning(
+            "run_5m after signal ticker=%s id=%s duration=%.3f signal_type=%s action=%s",
+            first.ticker,
+            first.id,
+            signal_duration,
+            getattr(signal, "signal_type", None),
+            getattr(signal, "score_bias", None),
+        )
+        elapsed_total = time.monotonic() - started_at
+        return {
+            "stocks_count": len(stocks),
+            "processed_count": 1,
+            "success_count": 1,
+            "error_count": 0,
+            "remaining_count": max(len(stocks) - 1, 0),
+            "stopped_by_limit": False,
+            "elapsed_seconds": round(elapsed_total, 3),
+            "5m_created": 0,
+            "signals_updated": 1,
+            "bar_start": bar_start.isoformat(),
+            "errors": [],
+            "current_stock_ticker": first.ticker,
+            "stopped_at_step": "after_signal",
+        }
+    except Exception as e:
+        logger.exception(
+            "run_5m signal_5m error ticker=%s id=%s",
+            first.ticker,
+            first.id,
+        )
+        errors.append(f"signal_5m {first.ticker}: {e}")
+        elapsed_total = time.monotonic() - started_at
+        return {
+            "stocks_count": len(stocks),
+            "processed_count": 1,
+            "success_count": 0,
+            "error_count": 1,
+            "remaining_count": max(len(stocks) - 1, 0),
+            "stopped_by_limit": False,
+            "elapsed_seconds": round(elapsed_total, 3),
+            "5m_created": 0,
+            "signals_updated": 0,
+            "bar_start": None,
+            "errors": errors,
+            "current_stock_ticker": first.ticker,
+            "stopped_at_step": "signal_error",
         }
     """
     全監視銘柄の 5 分足を取得（省略可）し、各銘柄でテクニカル・スコア判定してシグナルを保存する。
