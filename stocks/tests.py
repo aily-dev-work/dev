@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal
 import json
+from unittest.mock import patch
 
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
@@ -38,6 +39,7 @@ from .services.technical_analysis import (
     TechnicalSignals,
     TechnicalSummary,
 )
+from .views import _default_weights
 
 
 class SignalDatasetServiceTests(TestCase):
@@ -1614,6 +1616,172 @@ class ScoreProfileActivationHistoryAPITests(TestCase):
             "/api/v1/score-profiles/activation-history/999999/",
         )
         self.assertEqual(response.status_code, 404)
+
+
+class StocksScoresBreakdownAPITests(TestCase):
+    """
+    /api/v1/stocks/scores/ の breakdown 対応に関するテスト。
+    """
+
+    def setUp(self) -> None:
+        ScoreProfile.objects.all().delete()
+        # デフォルト長期順張りプロファイルをそのまま active にする
+        self.profile = ScoreProfile.objects.create(
+            name="BreakdownProfile",
+            version="v1",
+            is_active=True,
+            description="for breakdown tests",
+            weights_json=_default_weights(),
+            thresholds_json={},
+        )
+        # 対象銘柄（実際のスコア計算はモックする）
+        self.stock = WatchStock.objects.create(
+            ticker="BD1",
+            name="BreakdownStock",
+            market="JP",
+        )
+
+    def _build_mock_score_result(self) -> ScoreResult:
+        """
+        breakdown / score の整合性を検証しやすい固定データを返す。
+        """
+        buy_w = self.profile.weights_json["buy"]
+        sell_w = self.profile.weights_json["sell"]
+        breakdown_buy = {
+            # マッチしている条件
+            "trend_long_up": float(buy_w["trend_long_up"]),
+            "above_ma75": float(buy_w["above_ma75"]),
+            # マッチしていない（points=0）条件
+            "near_high_20": 0.0,
+        }
+        breakdown_sell = {
+            "trend_long_down": float(sell_w["trend_long_down"]),
+            "below_ma75": 0.0,
+        }
+        buy_score = sum(breakdown_buy.values())
+        sell_score = sum(breakdown_sell.values())
+        return ScoreResult(
+            buy_score=buy_score,
+            sell_score=sell_score,
+            breakdown_buy=breakdown_buy,
+            breakdown_sell=breakdown_sell,
+            insufficient_data=False,
+            insufficient_reason=None,
+            bias="buy",
+            strength="normal",
+        )
+
+    def _call_scores_api(self, include_breakdown: str | None = None):
+        params = {}
+        if include_breakdown is not None:
+            params["include_breakdown"] = include_breakdown
+        with patch("stocks.views.calculate_technical_summary") as mock_calc, patch(
+            "stocks.views.score_from_technical"
+        ) as mock_score:
+            mock_calc.return_value = TechnicalSummary(
+                stock=self.stock,
+                latest_date="2026-03-13",
+                latest_close=Decimal("100.0000"),
+                moving_averages=MovingAverages(
+                    ma5=Decimal("100.0000"),
+                    ma25=Decimal("100.0000"),
+                    ma75=Decimal("100.0000"),
+                ),
+                high_low=HighLow(
+                    high_20=Decimal("110.0000"),
+                    low_20=Decimal("90.0000"),
+                ),
+                average_volume=AverageVolume(
+                    avg_volume_5=1000.0,
+                    avg_volume_20=1000.0,
+                ),
+                signals=TechnicalSignals(
+                    trend_short="up",
+                    trend_mid="up",
+                    trend_long="up",
+                    volume_trend="high",
+                ),
+                long_term_trend="up",
+                short_term_trend="up",
+            )
+            mock_score.return_value = self._build_mock_score_result()
+            response = self.client.get("/api/v1/stocks/scores/", data=params)
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertIn("stocks", body)
+        self.assertGreaterEqual(len(body["stocks"]), 1)
+        return body["stocks"][0]
+
+    def test_scores_without_breakdown_does_not_include_breakdown_fields(self) -> None:
+        item = self._call_scores_api(include_breakdown=None)
+        self.assertNotIn("buy_breakdown", item)
+        self.assertNotIn("sell_breakdown", item)
+        # 既存フィールドは維持されていること
+        for key in ["buy_score", "sell_score", "bias", "strength"]:
+            self.assertIn(key, item)
+
+    def test_scores_with_breakdown_includes_breakdown_fields(self) -> None:
+        item = self._call_scores_api(include_breakdown="1")
+        self.assertIn("buy_breakdown", item)
+        self.assertIn("sell_breakdown", item)
+
+    def test_breakdown_structure_and_matched_consistency(self) -> None:
+        item = self._call_scores_api(include_breakdown="1")
+        for side in ["buy_breakdown", "sell_breakdown"]:
+            bd = item[side]
+            self.assertIsInstance(bd, list)
+            for entry in bd:
+                self.assertIn("key", entry)
+                self.assertIn("matched", entry)
+                self.assertIn("weight", entry)
+                self.assertIn("points", entry)
+                # matched の定義: points > 0
+                self.assertEqual(entry["matched"], entry["points"] > 0)
+
+    def test_breakdown_weights_and_scores_are_consistent_with_profile(self) -> None:
+        item = self._call_scores_api(include_breakdown="1")
+        profile = get_active_score_profile()
+        buy_weights = {k: float(v) for k, v in profile.weights_json["buy"].items()}
+        sell_weights = {k: float(v) for k, v in profile.weights_json["sell"].items()}
+
+        def _assert_side(side_key: str, weights: dict, score_key: str) -> None:
+            bd = item[side_key]
+            total_points = 0.0
+            for entry in bd:
+                key = entry["key"]
+                weight = float(entry["weight"])
+                points = float(entry["points"])
+                # プロファイルの weight と一致
+                self.assertAlmostEqual(weight, float(weights.get(key, 0.0)))
+                total_points += points
+            self.assertAlmostEqual(total_points, float(item[score_key]))
+
+        _assert_side("buy_breakdown", buy_weights, "buy_score")
+        _assert_side("sell_breakdown", sell_weights, "sell_score")
+
+    def test_breakdown_contains_zero_point_conditions(self) -> None:
+        """
+        points=0 の条件（near 系や volume_low など）も breakdown に含まれていることを確認する。
+        """
+        item = self._call_scores_api(include_breakdown="1")
+        buy_bd = item["buy_breakdown"]
+        sell_bd = item["sell_breakdown"]
+
+        buy_keys = {e["key"] for e in buy_bd}
+        sell_keys = {e["key"] for e in sell_bd}
+
+        # プロファイルに存在する全てのキーが breakdown に含まれていること
+        self.assertTrue(set(self.profile.weights_json["buy"].keys()).issubset(buy_keys))
+        self.assertTrue(set(self.profile.weights_json["sell"].keys()).issubset(sell_keys))
+
+        # 初期値0の代表的なキーが points=0 で含まれていること
+        zero_buy = next(e for e in buy_bd if e["key"] == "near_high_20")
+        self.assertEqual(float(zero_buy["weight"]), 0.0)
+        self.assertEqual(float(zero_buy["points"]), 0.0)
+
+        zero_sell = next(e for e in sell_bd if e["key"] == "volume_low")
+        self.assertEqual(float(zero_sell["weight"]), 0.0)
+        self.assertEqual(float(zero_sell["points"]), 0.0)
 
 
 class ScoreProfileListAPITests(TestCase):
