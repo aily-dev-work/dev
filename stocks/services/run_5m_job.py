@@ -105,6 +105,7 @@ def run_5m_fetch_and_evaluate(
         first.id,
     )
 
+    # technical
     try:
         tech_start = time.monotonic()
         logger.warning(
@@ -115,40 +116,16 @@ def run_5m_fetch_and_evaluate(
         summary = calculate_technical_summary_5m(first)
         tech_end = time.monotonic()
         technical_duration = tech_end - tech_start
-        if summary is None:
-            logger.warning(
-                "run_5m technical result is None ticker=%s id=%s duration=%.3f",
-                first.ticker,
-                first.id,
-                technical_duration,
-            )
-        else:
-            # 型名と代表的な属性有無だけをログに出す（詳細な構造には踏み込まない）
-            has_latest = hasattr(summary, "latest_close")
-            logger.warning(
-                "run_5m technical done ticker=%s id=%s duration=%.3f type=%s has_latest_close=%s",
-                first.ticker,
-                first.id,
-                technical_duration,
-                type(summary).__name__,
-                has_latest,
-            )
-        elapsed_total = time.monotonic() - started_at
-        return {
-            "stocks_count": len(stocks),
-            "processed_count": 1,
-            "success_count": 1,
-            "error_count": 0,
-            "remaining_count": max(len(stocks) - 1, 0),
-            "stopped_by_limit": False,
-            "elapsed_seconds": round(elapsed_total, 3),
-            "5m_created": 0,
-            "signals_updated": 0,
-            "bar_start": None,
-            "errors": [],
-            "current_stock_ticker": first.ticker,
-            "stopped_at_step": "after_technical",
-        }
+        # technical の結果概要をログ
+        has_latest = hasattr(summary, "latest_close")
+        logger.warning(
+            "run_5m technical done ticker=%s id=%s duration=%.3f type=%s has_latest_close=%s",
+            first.ticker,
+            first.id,
+            technical_duration,
+            type(summary).__name__,
+            has_latest,
+        )
     except Exception as e:
         logger.exception(
             "run_5m technical_5m error ticker=%s id=%s",
@@ -171,6 +148,67 @@ def run_5m_fetch_and_evaluate(
             "errors": errors,
             "current_stock_ticker": first.ticker,
             "stopped_at_step": "technical_error",
+        }
+
+    # score（新たに有効化するステージ）
+    try:
+        score_start = time.monotonic()
+        logger.warning(
+            "run_5m before score ticker=%s id=%s",
+            first.ticker,
+            first.id,
+        )
+        score_result = score_from_technical(summary)
+        score_end = time.monotonic()
+        score_duration = score_end - score_start
+        logger.warning(
+            "run_5m after score ticker=%s id=%s duration=%.3f buy=%.1f sell=%.1f bias=%s strength=%s",
+            first.ticker,
+            first.id,
+            score_duration,
+            getattr(score_result, "buy_score", 0.0),
+            getattr(score_result, "sell_score", 0.0),
+            getattr(score_result, "bias", None),
+            getattr(score_result, "strength", None),
+        )
+        elapsed_total = time.monotonic() - started_at
+        return {
+            "stocks_count": len(stocks),
+            "processed_count": 1,
+            "success_count": 1,
+            "error_count": 0,
+            "remaining_count": max(len(stocks) - 1, 0),
+            "stopped_by_limit": False,
+            "elapsed_seconds": round(elapsed_total, 3),
+            "5m_created": 0,
+            "signals_updated": 0,
+            "bar_start": None,
+            "errors": [],
+            "current_stock_ticker": first.ticker,
+            "stopped_at_step": "after_score",
+        }
+    except Exception as e:
+        logger.exception(
+            "run_5m score_5m error ticker=%s id=%s",
+            first.ticker,
+            first.id,
+        )
+        errors.append(f"score_5m {first.ticker}: {e}")
+        elapsed_total = time.monotonic() - started_at
+        return {
+            "stocks_count": len(stocks),
+            "processed_count": 1,
+            "success_count": 0,
+            "error_count": 1,
+            "remaining_count": max(len(stocks) - 1, 0),
+            "stopped_by_limit": False,
+            "elapsed_seconds": round(elapsed_total, 3),
+            "5m_created": 0,
+            "signals_updated": 0,
+            "bar_start": None,
+            "errors": errors,
+            "current_stock_ticker": first.ticker,
+            "stopped_at_step": "score_error",
         }
     """
     全監視銘柄の 5 分足を取得（省略可）し、各銘柄でテクニカル・スコア判定してシグナルを保存する。
