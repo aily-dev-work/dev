@@ -13,8 +13,11 @@ from decimal import Decimal
 from typing import Optional
 
 from django.db import connection
+import logging
 
 from ..models import StockPrice5Min, WatchStock
+
+logger = logging.getLogger(__name__)
 
 
 def _fetch_yahoo_chart(ticker: str, interval: str, range_param: str, timeout: int = 8) -> Optional[dict]:
@@ -29,10 +32,33 @@ def _fetch_yahoo_chart(ticker: str, interval: str, range_param: str, timeout: in
         },
     )
     try:
+        logger.warning(
+            "price_fetcher yahoo request start ticker=%s interval=%s range=%s timeout=%s",
+            ticker,
+            interval,
+            range_param,
+            timeout,
+        )
         # timeout は接続+読み取りの上限秒数（長くなりすぎないよう 8 秒程度に制限）
+        start = datetime.now(timezone.utc)
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode())
-    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
+            body = resp.read().decode()
+        end = datetime.now(timezone.utc)
+        duration = (end - start).total_seconds()
+        logger.warning(
+            "price_fetcher yahoo request done ticker=%s status=%s duration=%.3f",
+            ticker,
+            getattr(resp, "status", None) if "resp" in locals() else None,
+            duration,
+        )
+        return json.loads(body)
+    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError) as e:
+        logger.exception(
+            "price_fetcher yahoo request error ticker=%s interval=%s range=%s",
+            ticker,
+            interval,
+            range_param,
+        )
         return None
 
 
@@ -62,17 +88,48 @@ def fetch_and_save_5m_prices(stock: WatchStock) -> int:
     if not ticker:
         return 0
 
+    logger.warning(
+        "price_fetcher fetch_and_save_5m_prices entered ticker=%s id=%s",
+        ticker,
+        getattr(stock, "id", None),
+    )
+
     connection.close()
+    yahoo_start = datetime.now(timezone.utc)
     data = _fetch_yahoo_chart(ticker, "5m", "60d")
+    yahoo_end = datetime.now(timezone.utc)
+    yahoo_duration = (yahoo_end - yahoo_start).total_seconds()
     if not data:
+        logger.warning(
+            "price_fetcher yahoo data missing ticker=%s duration=%.3f",
+            ticker,
+            yahoo_duration,
+        )
         return 0
 
+    parse_start = datetime.now(timezone.utc)
     parsed = _parse_quote(data)
+    parse_end = datetime.now(timezone.utc)
+    parse_duration = (parse_end - parse_start).total_seconds()
     if not parsed:
+        logger.warning(
+            "price_fetcher parse failed ticker=%s duration=%.3f",
+            ticker,
+            parse_duration,
+        )
         return 0
 
     timestamps, opens, highs, lows, closes, volumes = parsed
+    logger.warning(
+        "price_fetcher parse done ticker=%s duration=%.3f bars=%d",
+        ticker,
+        parse_duration,
+        len(timestamps),
+    )
+
+    save_start = datetime.now(timezone.utc)
     created = 0
+    updated = 0
     for i in range(len(timestamps)):
         ts = timestamps[i]
         if ts is None:
@@ -92,7 +149,7 @@ def fetch_and_save_5m_prices(stock: WatchStock) -> int:
         high_val = Decimal(str(h)) if h is not None else close_val
         low_val = Decimal(str(l_)) if l_ is not None else close_val
         vol = int(v) if v is not None and v == v else None
-        _, was_created = StockPrice5Min.objects.update_or_create(
+        obj, was_created = StockPrice5Min.objects.update_or_create(
             stock=stock,
             datetime=dt,
             defaults={
@@ -105,4 +162,21 @@ def fetch_and_save_5m_prices(stock: WatchStock) -> int:
         )
         if was_created:
             created += 1
+        else:
+            updated += 1
+    save_end = datetime.now(timezone.utc)
+    save_duration = (save_end - save_start).total_seconds()
+    logger.warning(
+        "price_fetcher save done ticker=%s duration=%.3f created=%d updated=%d",
+        ticker,
+        save_duration,
+        created,
+        updated,
+    )
+    total_duration = (save_end - yahoo_start).total_seconds()
+    logger.warning(
+        "price_fetcher fetch_and_save_5m_prices finished ticker=%s total_duration=%.3f",
+        ticker,
+        total_duration,
+    )
     return created

@@ -87,7 +87,7 @@ def run_5m_fetch_and_evaluate(
             "stopped_at_step": "before_loop",
         }
 
-    # 段階的切り分け: 先頭1件のみ technical を実行する
+    # 段階的切り分け: 先頭1件のみ処理する
     first = stocks[0]
     logger.warning(
         "run_5m first stock selected ticker=%s id=%s",
@@ -99,10 +99,71 @@ def run_5m_fetch_and_evaluate(
         first.ticker,
         first.id,
     )
+    # fetch ステージ（skip_fetch=False のときのみ実行し、ここで一旦返す）
+    if not skip_fetch:
+        try:
+            fetch_start = time.monotonic()
+            logger.warning(
+                "run_5m before fetch ticker=%s id=%s",
+                first.ticker,
+                first.id,
+            )
+            created = fetch_and_save_5m_prices(first)
+            fetch_end = time.monotonic()
+            fetch_duration = fetch_end - fetch_start
+            logger.warning(
+                "run_5m after fetch ticker=%s id=%s duration=%.3f created=%d",
+                first.ticker,
+                first.id,
+                fetch_duration,
+                created,
+            )
+            elapsed_total = time.monotonic() - started_at
+            return {
+                "stocks_count": len(stocks),
+                "processed_count": 1,
+                "success_count": 1,
+                "error_count": 0,
+                "remaining_count": max(len(stocks) - 1, 0),
+                "stopped_by_limit": False,
+                "elapsed_seconds": round(elapsed_total, 3),
+                "5m_created": created,
+                "signals_updated": 0,
+                "bar_start": None,
+                "errors": [],
+                "current_stock_ticker": first.ticker,
+                "stopped_at_step": "after_fetch",
+            }
+        except Exception as e:
+            logger.exception(
+                "run_5m fetch_5m error ticker=%s id=%s",
+                first.ticker,
+                first.id,
+            )
+            errors.append(f"fetch_5m {first.ticker}: {e}")
+            elapsed_total = time.monotonic() - started_at
+            return {
+                "stocks_count": len(stocks),
+                "processed_count": 1,
+                "success_count": 0,
+                "error_count": 1,
+                "remaining_count": max(len(stocks) - 1, 0),
+                "stopped_by_limit": False,
+                "elapsed_seconds": round(elapsed_total, 3),
+                "5m_created": 0,
+                "signals_updated": 0,
+                "bar_start": None,
+                "errors": errors,
+                "current_stock_ticker": first.ticker,
+                "stopped_at_step": "fetch_error",
+            }
+
+    # ここから先は skip_fetch=True（no_fetch=1）専用の technical / score / signal チェーン
     logger.warning(
-        "run_5m before technical ticker=%s id=%s",
+        "run_5m before technical ticker=%s id=%s (skip_fetch=%s)",
         first.ticker,
         first.id,
+        skip_fetch,
     )
 
     # technical
@@ -116,7 +177,6 @@ def run_5m_fetch_and_evaluate(
         summary = calculate_technical_summary_5m(first)
         tech_end = time.monotonic()
         technical_duration = tech_end - tech_start
-        # technical の結果概要をログ
         has_latest = hasattr(summary, "latest_close")
         logger.warning(
             "run_5m technical done ticker=%s id=%s duration=%.3f type=%s has_latest_close=%s",
