@@ -1249,7 +1249,12 @@ class Run5mEvaluateView(APIView):
             )
         no_fetch = request.query_params.get("no_fetch", "").lower() in ("1", "true", "yes")
         try:
-            result = run_5m_fetch_and_evaluate(skip_fetch=no_fetch)
+            # cron-job.org の 30 秒制限を考慮し、リクエスト1回あたりの処理時間を抑える
+            result = run_5m_fetch_and_evaluate(
+                skip_fetch=no_fetch,
+                max_seconds=25.0,
+                max_stocks=None,
+            )
             return Response(result, status=status.HTTP_200_OK)
         except Exception as e:
             import traceback
