@@ -76,11 +76,20 @@ def score_from_technical(summary: TechnicalSummary) -> ScoreResult:
         breakdown_sell["trend_short_down"] = 0.0
 
     # ---------- 出来高 ----------
-    if signals.volume_trend == "high":
+    # 買い側の出来高シグナル: 上昇系トレンド + 出来高増加のときのみ加点（長期順張り寄り）
+    if (
+        signals.volume_trend == "high"
+        and (
+            signals.trend_long == "up"
+            or signals.trend_mid == "up"
+            or signals.trend_short == "up"
+        )
+    ):
         breakdown_buy["volume_high"] = buy_weights.get("volume_high", 0.0)
     else:
         breakdown_buy["volume_high"] = 0.0
 
+    # 売り側の出来高シグナル: 出来高が少ないとき（長期順張り初期値では weight=0 として非推奨扱い）
     if signals.volume_trend == "low":
         breakdown_sell["volume_low"] = sell_weights.get("volume_low", 0.0)
     else:

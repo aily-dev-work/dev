@@ -1971,27 +1971,43 @@ class SignalViewSet(viewsets.ViewSet):
 
 
 def _default_weights():
-    """手動作成用のデフォルト重み（マイグレーション 0006 と同様）。"""
+    """手動作成用のデフォルト重み（長期順張りプロファイル想定）。"""
     return {
         "buy": {
-            "trend_long_up": 20.0,
-            "trend_mid_up": 15.0,
+            # 長期トレンドが上向き
+            "trend_long_up": 35.0,
+            # 中期トレンドが上向き
+            "trend_mid_up": 20.0,
+            # 短期トレンドが上向き
             "trend_short_up": 10.0,
+            # 上昇局面で出来高が増えている
             "volume_high": 10.0,
-            "above_ma25": 10.0,
+            # 株価が75日移動平均より上
             "above_ma75": 10.0,
+            # 株価が25日移動平均より上
+            "above_ma25": 5.0,
+            # 直近20日高値付近（順張り寄り、補助的に扱う）
             "near_high_20": 10.0,
-            "near_low_20": 10.0,
+            # 直近20日安値付近（逆張り寄り。長期順張りでは0推奨）
+            "near_low_20": 0.0,
         },
         "sell": {
-            "trend_long_down": 20.0,
-            "trend_mid_down": 15.0,
+            # 長期トレンドが下向き
+            "trend_long_down": 35.0,
+            # 中期トレンドが下向き
+            "trend_mid_down": 20.0,
+            # 短期トレンドが下向き
             "trend_short_down": 10.0,
-            "volume_low": 10.0,
-            "below_ma25": 10.0,
+            # 出来高が少ない（逆張り寄り。長期順張りでは0推奨）
+            "volume_low": 0.0,
+            # 株価が75日移動平均より下
             "below_ma75": 10.0,
+            # 株価が25日移動平均より下
+            "below_ma25": 5.0,
+            # 直近20日安値付近
             "near_low_20": 10.0,
-            "near_high_20": 10.0,
+            # 直近20日高値付近（逆張り寄り。長期順張りでは0推奨）
+            "near_high_20": 0.0,
         },
     }
 
@@ -2002,6 +2018,62 @@ def _default_thresholds():
         "bias": {"neutral_abs_diff_lt": 10.0},
         "strength": {"weak_abs_diff_lt": 15.0, "normal_abs_diff_lt": 30.0},
     }
+
+
+def _validate_profile_config(weights: dict, thresholds: dict) -> dict:
+    """
+    weights_json / thresholds_json の整合性チェック。
+    - 買い/売りそれぞれの合計が 100 かどうか
+    - 閾値の大小関係: neutral < weak < normal
+    """
+    errors: dict[str, str] = {}
+
+    buy = (weights or {}).get("buy", {}) or {}
+    sell = (weights or {}).get("sell", {}) or {}
+
+    def _sum_side(side: dict) -> float:
+        total = 0.0
+        for v in side.values():
+            try:
+                total += float(v)
+            except (TypeError, ValueError):
+                continue
+        return total
+
+    buy_total = _sum_side(buy)
+    sell_total = _sum_side(sell)
+
+    # 許容誤差を設けて 100 判定
+    if abs(buy_total - 100.0) > 1e-6:
+        errors["buy_weights_total"] = f"Buy weights total must equal 100 (actual: {buy_total:.2f})"
+    if abs(sell_total - 100.0) > 1e-6:
+        errors["sell_weights_total"] = f"Sell weights total must equal 100 (actual: {sell_total:.2f})"
+
+    # 閾値順序チェック（3つともあれば判定）
+    bias_cfg = (thresholds or {}).get("bias", {}) or {}
+    strength_cfg = (thresholds or {}).get("strength", {}) or {}
+
+    try:
+        neutral = float(bias_cfg.get("neutral_abs_diff_lt"))
+    except (TypeError, ValueError):
+        neutral = None
+    try:
+        weak = float(strength_cfg.get("weak_abs_diff_lt"))
+    except (TypeError, ValueError):
+        weak = None
+    try:
+        normal = float(strength_cfg.get("normal_abs_diff_lt"))
+    except (TypeError, ValueError):
+        normal = None
+
+    if neutral is not None and weak is not None and normal is not None:
+        if not (neutral < weak < normal):
+            errors["threshold_order"] = (
+                "Expected neutral_abs_diff_lt < weak_abs_diff_lt < normal_abs_diff_lt "
+                f"(got neutral={neutral}, weak={weak}, normal={normal})"
+            )
+
+    return errors
 
 
 class ScoreProfileViewSet(viewsets.ViewSet):
@@ -2095,6 +2167,10 @@ class ScoreProfileViewSet(viewsets.ViewSet):
             weights_json = _default_weights()
         if not isinstance(thresholds_json, dict) or not thresholds_json:
             thresholds_json = _default_thresholds()
+
+        errors = _validate_profile_config(weights_json, thresholds_json)
+        if errors:
+            return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
         profile = ScoreProfile.objects.create(
             name=name,
             version=version,
@@ -2145,10 +2221,36 @@ class ScoreProfileViewSet(viewsets.ViewSet):
             w = request.data.get("weights_json")
             if isinstance(w, dict) and w:
                 profile.weights_json = w
+        # weights_json / thresholds_json は既存値とマージした最終値に対してバリデーション
+        current_weights = profile.weights_json or _default_weights()
+        current_thresholds = profile.thresholds_json or _default_thresholds()
+
+        if request.data.get("weights_json") is not None:
+            w = request.data.get("weights_json")
+            if isinstance(w, dict) and w:
+                # buy/sell ごとに shallow merge
+                merged = {
+                    "buy": {**current_weights.get("buy", {}), **w.get("buy", {})},
+                    "sell": {**current_weights.get("sell", {}), **w.get("sell", {})},
+                }
+                current_weights = merged
+
         if request.data.get("thresholds_json") is not None:
             t = request.data.get("thresholds_json")
             if isinstance(t, dict) and t:
-                profile.thresholds_json = t
+                merged_th = {
+                    "bias": {**current_thresholds.get("bias", {}), **t.get("bias", {})},
+                    "strength": {**current_thresholds.get("strength", {}), **t.get("strength", {})},
+                }
+                current_thresholds = merged_th
+
+        errors = _validate_profile_config(current_weights, current_thresholds)
+        if errors:
+            return Response({"errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        # バリデーション通過後にのみ保存
+        profile.weights_json = current_weights
+        profile.thresholds_json = current_thresholds
         profile.save()
         data = {
             "id": profile.id,
