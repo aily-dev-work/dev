@@ -34,12 +34,44 @@ def run_5m_fetch_and_evaluate(
         max_stocks,
         max_seconds,
     )
+
+    # 段階的切り分け: まずは queryset と対象件数のみ確認して返す
+    total_all = WatchStock.objects.count()
+    total_active = WatchStock.objects.filter(is_active=True).count()
+    total_with_ticker = (
+        WatchStock.objects.filter(is_active=True)
+        .exclude(ticker="")
+        .exclude(ticker__isnull=True)
+        .count()
+    )
+    logger.warning(
+        "run_5m_fetch_and_evaluate stocks counts total_all=%d total_active=%d total_active_with_ticker=%d",
+        total_all,
+        total_active,
+        total_with_ticker,
+    )
+
+    stocks_qs = (
+        WatchStock.objects.filter(is_active=True)
+        .exclude(ticker="")
+        .exclude(ticker__isnull=True)
+        .order_by("updated_at", "id")
+    )
+    stocks = list(stocks_qs)
+    logger.warning(
+        "run_5m_fetch_and_evaluate stocks queryset evaluated skip_fetch=%s max_stocks=%s max_seconds=%s stocks_count=%d",
+        skip_fetch,
+        max_stocks,
+        max_seconds,
+        len(stocks),
+    )
+
     return {
-        "stocks_count": 0,
+        "stocks_count": len(stocks),
         "processed_count": 0,
         "success_count": 0,
         "error_count": 0,
-        "remaining_count": 0,
+        "remaining_count": len(stocks),
         "stopped_by_limit": False,
         "elapsed_seconds": 0.0,
         "5m_created": 0,
@@ -47,7 +79,7 @@ def run_5m_fetch_and_evaluate(
         "bar_start": None,
         "errors": [],
         "current_stock_ticker": None,
-        "stopped_at_step": None,
+        "stopped_at_step": "before_loop",
     }
     """
     全監視銘柄の 5 分足を取得（省略可）し、各銘柄でテクニカル・スコア判定してシグナルを保存する。
