@@ -1928,16 +1928,26 @@ class SignalViewSet(viewsets.ViewSet):
     def recent(self, request):
         """
         直近発報したシグナル一覧（ダッシュボード用）。
-        監視銘柄のシグナルを created_at 降順で返す。limit で件数指定（既定 30）。
+
+        仕様:
+        - 監視銘柄ごとに「最新の1件」だけを返す
+        - created_at の降順（同一日の場合は signal_date 降順）で並べる
+        - limit（既定30）は「最大銘柄数」として扱う
         """
         limit = min(int(request.query_params.get("limit", 30)), 100)
-        qs = (
+        base_qs = (
             TradingSignal.objects.select_related("stock")
             .filter(stock__is_active=True)
-            .order_by("-created_at", "-signal_date")[:limit]
+            .order_by("-created_at", "-signal_date")
         )
-        results = []
-        for s in qs:
+
+        seen_stock_ids: set[int] = set()
+        results: list[dict] = []
+
+        for s in base_qs:
+            if s.stock_id in seen_stock_ids:
+                continue
+            seen_stock_ids.add(s.stock_id)
             results.append(
                 {
                     "id": s.id,
@@ -1954,6 +1964,9 @@ class SignalViewSet(viewsets.ViewSet):
                     "created_at": s.created_at.isoformat() if s.created_at else None,
                 }
             )
+            if len(results) >= limit:
+                break
+
         return Response(results, status=status.HTTP_200_OK)
 
 
