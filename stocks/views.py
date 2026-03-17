@@ -518,6 +518,8 @@ class WatchStockViewSet(viewsets.ModelViewSet):
             updated_weekly = 0
             weekly_existing_count = 0
             created_monthly = 0
+            updated_monthly = 0
+            monthly_existing_count = 0
 
             # 日足
             daily_start = time.monotonic()
@@ -1033,11 +1035,21 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                 stock.id,
                 ticker,
             )
+            monthly_timestamps = monthly_opens = monthly_highs = monthly_lows = monthly_closes = monthly_volumes = None
+            monthly_range_used = None
             for range_param in ("10y", "5y", "2y"):
                 range_start = time.monotonic()
                 range_parsed_count = 0
                 try:
+                    logger.warning(
+                        'stocks.fetch-prices monthly fetch_yahoo interval="1mo" range="%s" before',
+                        range_param,
+                    )
                     data = fetch_yahoo("1mo", range_param)
+                    logger.warning(
+                        'stocks.fetch-prices monthly fetch_yahoo interval="1mo" range="%s" done',
+                        range_param,
+                    )
                     parsed = parse_quote(data)
                     if not parsed:
                         continue
@@ -1045,37 +1057,18 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     if not timestamps:
                         continue
                     range_parsed_count = len(timestamps)
-                    for i in range(len(timestamps)):
-                        ts = timestamps[i]
-                        if ts is None:
-                            continue
-                        ts_sec = _normalize_ts(ts)
-                        if ts_sec is None:
-                            continue
-                        d = date.fromtimestamp(ts_sec)
-                        o = opens[i] if i < len(opens) else None
-                        h = highs[i] if i < len(highs) else None
-                        l_ = lows[i] if i < len(lows) else None
-                        c = closes[i] if i < len(closes) else None
-                        v = volumes[i] if i < len(volumes) else None
-                        if c is None and o is None and h is None and l_ is None:
-                            continue
-                        close_val = Decimal(str(c)) if c is not None else (Decimal(str(o)) if o is not None else None)
-                        if close_val is None:
-                            continue
-                        open_val = Decimal(str(o)) if o is not None else close_val
-                        high_val = Decimal(str(h)) if h is not None else close_val
-                        low_val = Decimal(str(l_)) if l_ is not None else close_val
-                        vol = int(v) if v is not None and v == v else None
-                        _, was_created = StockPriceMonthly.objects.update_or_create(
-                            stock=stock, date=d,
-                            defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
-                        )
-                        if was_created:
-                            created_monthly += 1
+                    monthly_timestamps = timestamps
+                    monthly_opens = opens
+                    monthly_highs = highs
+                    monthly_lows = lows
+                    monthly_closes = closes
+                    monthly_volumes = volumes
+                    monthly_range_used = range_param
                     range_end = time.monotonic()
                     logger.info(
-                        "stocks.fetch-prices monthly range=%s duration=%.3f parsed=%d",
+                        "stocks.fetch-prices monthly parsed stock_id=%s ticker=%s range=%s duration=%.3f bars=%d",
+                        stock.id,
+                        ticker,
                         range_param,
                         range_end - range_start,
                         range_parsed_count,
@@ -1091,11 +1084,149 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                         range_end - range_start,
                         e,
                     )
+
+            updated_monthly = 0
+            monthly_existing_count = 0
+            if monthly_timestamps:
+                existing_start = time.monotonic()
+                existing_qs = StockPriceMonthly.objects.filter(stock=stock)
+                existing_by_date: dict[date, StockPriceMonthly] = {
+                    row.date: row for row in existing_qs
+                }
+                monthly_existing_count = len(existing_by_date)
+                existing_end = time.monotonic()
+                logger.warning(
+                    "stocks.fetch-prices monthly existing rows load done stock_id=%s ticker=%s duration=%.3f existing_count=%d",
+                    stock.id,
+                    ticker,
+                    existing_end - existing_start,
+                    monthly_existing_count,
+                )
+
+                diff_start = time.monotonic()
+                to_create: list[StockPriceMonthly] = []
+                to_update: list[StockPriceMonthly] = []
+
+                for i in range(len(monthly_timestamps)):
+                    ts = monthly_timestamps[i]
+                    if ts is None:
+                        continue
+                    ts_sec = _normalize_ts(ts)
+                    if ts_sec is None:
+                        continue
+                    d = date.fromtimestamp(ts_sec)
+                    o = monthly_opens[i] if i < len(monthly_opens) else None
+                    h = monthly_highs[i] if i < len(monthly_highs) else None
+                    l_ = monthly_lows[i] if i < len(monthly_lows) else None
+                    c = monthly_closes[i] if i < len(monthly_closes) else None
+                    v = monthly_volumes[i] if i < len(monthly_volumes) else None
+                    if c is None and o is None and h is None and l_ is None:
+                        continue
+                    close_val = Decimal(str(c)) if c is not None else (Decimal(str(o)) if o is not None else None)
+                    if close_val is None:
+                        continue
+                    open_val = Decimal(str(o)) if o is not None else close_val
+                    high_val = Decimal(str(h)) if h is not None else close_val
+                    low_val = Decimal(str(l_)) if l_ is not None else close_val
+                    vol = int(v) if v is not None and v == v else None
+
+                    existing = existing_by_date.get(d)
+                    if existing is None:
+                        to_create.append(
+                            StockPriceMonthly(
+                                stock=stock,
+                                date=d,
+                                open_price=open_val,
+                                high_price=high_val,
+                                low_price=low_val,
+                                close_price=close_val,
+                                volume=vol,
+                            )
+                        )
+                    else:
+                        if (
+                            existing.open_price != open_val
+                            or existing.high_price != high_val
+                            or existing.low_price != low_val
+                            or existing.close_price != close_val
+                            or existing.volume != vol
+                        ):
+                            existing.open_price = open_val
+                            existing.high_price = high_val
+                            existing.low_price = low_val
+                            existing.close_price = close_val
+                            existing.volume = vol
+                            to_update.append(existing)
+
+                diff_end = time.monotonic()
+                logger.warning(
+                    "stocks.fetch-prices monthly diff build done stock_id=%s ticker=%s range=%s duration=%.3f to_create=%d to_update=%d",
+                    stock.id,
+                    ticker,
+                    monthly_range_used,
+                    diff_end - diff_start,
+                    len(to_create),
+                    len(to_update),
+                )
+
+                save_phase_start = time.monotonic()
+                if to_create:
+                    bulk_start = time.monotonic()
+                    logger.warning(
+                        "stocks.fetch-prices monthly bulk_create start stock_id=%s ticker=%s count=%d",
+                        stock.id,
+                        ticker,
+                        len(to_create),
+                    )
+                    created_monthly = len(
+                        StockPriceMonthly.objects.bulk_create(to_create, ignore_conflicts=True)
+                    )
+                    bulk_end = time.monotonic()
+                    logger.warning(
+                        "stocks.fetch-prices monthly bulk_create done stock_id=%s ticker=%s duration=%.3f created=%d",
+                        stock.id,
+                        ticker,
+                        bulk_end - bulk_start,
+                        created_monthly,
+                    )
+
+                if to_update:
+                    bulk_u_start = time.monotonic()
+                    logger.warning(
+                        "stocks.fetch-prices monthly bulk_update start stock_id=%s ticker=%s count=%d",
+                        stock.id,
+                        ticker,
+                        len(to_update),
+                    )
+                    StockPriceMonthly.objects.bulk_update(
+                        to_update,
+                        ["open_price", "high_price", "low_price", "close_price", "volume"],
+                    )
+                    bulk_u_end = time.monotonic()
+                    updated_monthly = len(to_update)
+                    logger.warning(
+                        "stocks.fetch-prices monthly bulk_update done stock_id=%s ticker=%s duration=%.3f updated=%d",
+                        stock.id,
+                        ticker,
+                        bulk_u_end - bulk_u_start,
+                        updated_monthly,
+                    )
+
+                save_phase_end = time.monotonic()
+                logger.warning(
+                    "stocks.fetch-prices monthly save total stock_id=%s ticker=%s duration=%.3f",
+                    stock.id,
+                    ticker,
+                    save_phase_end - save_phase_start,
+                )
+
             monthly_end = time.monotonic()
             logger.info(
-                "stocks.fetch-prices monthly duration=%.3f created=%d",
+                "stocks.fetch-prices monthly duration=%.3f created=%d updated=%d existing_count=%d",
                 monthly_end - monthly_start,
                 created_monthly,
+                updated_monthly,
+                monthly_existing_count,
             )
 
             overall_end = time.monotonic()
@@ -1132,7 +1263,11 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     "updated": updated_weekly,
                     "existing_count": weekly_existing_count,
                 },
-                "monthly": {"created": created_monthly},
+                "monthly": {
+                    "created": created_monthly,
+                    "updated": updated_monthly,
+                    "existing_count": monthly_existing_count,
+                },
             })
         except Exception as e:
             logger.exception(
