@@ -31,6 +31,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardStatsResponse | null>(null);
   const [stockScores, setStockScores] = useState<StockScoreItem[] | null>(null);
   const [recentSignals, setRecentSignals] = useState<RecentSignalItem[] | null>(null);
+  const [visibleSignalCount, setVisibleSignalCount] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   async function load() {
@@ -40,7 +41,7 @@ export default function DashboardPage() {
       const [statsResult, scoresResult, signalsResult] = await Promise.allSettled([
         getDashboardStats(),
         getStocksScores(),
-        getRecentSignals(30),
+        getRecentSignals(100),
       ]);
 
       if (statsResult.status === "fulfilled") {
@@ -68,9 +69,12 @@ export default function DashboardPage() {
 
       if (signalsResult.status === "fulfilled") {
         const signalsValue = signalsResult.value as RecentSignalItem[];
-        setRecentSignals(Array.isArray(signalsValue) ? signalsValue : []);
+        const list = Array.isArray(signalsValue) ? signalsValue : [];
+        setRecentSignals(list);
+        setVisibleSignalCount(10);
       } else {
         setRecentSignals([]);
+        setVisibleSignalCount(10);
       }
     } catch (e) {
       setError((e as Error).message);
@@ -188,7 +192,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {recentSignals.map((sig) => (
+                {recentSignals.slice(0, visibleSignalCount).map((sig) => (
                   <tr key={sig.id} className="odd:bg-slate-50">
                     <td className="border px-2 py-1 text-center text-slate-600">
                       {sig.created_at
@@ -214,6 +218,19 @@ export default function DashboardPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        ))}
+        {recentSignals && recentSignals.length > visibleSignalCount && (
+          <div className="mt-2 flex justify-center">
+            <button
+              type="button"
+              onClick={() =>
+                setVisibleSignalCount((prev) => Math.min(prev + 10, recentSignals.length))
+              }
+              className="rounded border border-slate-300 bg-white px-3 py-1 text-xs text-slate-700 hover:bg-slate-50"
+            >
+              もっと見る（次の10件）
+            </button>
           </div>
         ) : (
           <p className="text-sm text-slate-500">発報されたシグナルはありません。</p>
