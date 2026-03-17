@@ -31,7 +31,6 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardStatsResponse | null>(null);
   const [stockScores, setStockScores] = useState<StockScoreItem[] | null>(null);
   const [recentSignals, setRecentSignals] = useState<RecentSignalItem[] | null>(null);
-  const [visibleSignalCount, setVisibleSignalCount] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   async function load() {
@@ -71,10 +70,8 @@ export default function DashboardPage() {
         const signalsValue = signalsResult.value as RecentSignalItem[];
         const list = Array.isArray(signalsValue) ? signalsValue : [];
         setRecentSignals(list);
-        setVisibleSignalCount(10);
       } else {
         setRecentSignals([]);
-        setVisibleSignalCount(10);
       }
     } catch (e) {
       setError((e as Error).message);
@@ -180,7 +177,7 @@ export default function DashboardPage() {
       <section className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="mb-3 text-lg font-semibold">直近のシグナル発報</h2>
         {recentSignals && recentSignals.length > 0 ? (
-          <div className="overflow-x-auto">
+          <div className="max-h-80 overflow-y-auto overflow-x-auto">
             <table className="min-w-full border text-sm">
               <thead className="bg-slate-100">
                 <tr>
@@ -192,7 +189,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {recentSignals.slice(0, visibleSignalCount).map((sig) => (
+                {recentSignals.map((sig) => (
                   <tr key={sig.id} className="odd:bg-slate-50">
                     <td className="border px-2 py-1 text-center text-slate-600">
                       {sig.created_at
@@ -218,19 +215,6 @@ export default function DashboardPage() {
                 ))}
               </tbody>
             </table>
-          </div>
-        ))}
-        {recentSignals && recentSignals.length > visibleSignalCount && (
-          <div className="mt-2 flex justify-center">
-            <button
-              type="button"
-              onClick={() =>
-                setVisibleSignalCount((prev) => Math.min(prev + 10, recentSignals.length))
-              }
-              className="rounded border border-slate-300 bg-white px-3 py-1 text-xs text-slate-700 hover:bg-slate-50"
-            >
-              もっと見る（次の10件）
-            </button>
           </div>
         ) : (
           <p className="text-sm text-slate-500">発報されたシグナルはありません。</p>
