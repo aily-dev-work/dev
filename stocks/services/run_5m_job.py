@@ -84,7 +84,7 @@ def run_5m_fetch_and_evaluate(
             "stopped_at_step": "before_loop",
         }
 
-    # 段階的切り分け: まずは先頭1件の選択と stock start まで戻す
+    # 段階的切り分け: 先頭1件の選択と technical 実行直前まで戻す
     first = stocks[0]
     logger.warning(
         "run_5m first stock selected ticker=%s id=%s",
@@ -92,7 +92,12 @@ def run_5m_fetch_and_evaluate(
         first.id,
     )
     logger.warning(
-        "run_5m stock start ticker=%s id=%s (debug stage: after_stock_start)",
+        "run_5m stock start ticker=%s id=%s",
+        first.ticker,
+        first.id,
+    )
+    logger.warning(
+        "run_5m before technical ticker=%s id=%s (debug stage: before_technical)",
         first.ticker,
         first.id,
     )
@@ -110,7 +115,7 @@ def run_5m_fetch_and_evaluate(
         "bar_start": None,
         "errors": [],
         "current_stock_ticker": first.ticker,
-        "stopped_at_step": "after_stock_start",
+        "stopped_at_step": "before_technical",
     }
     """
     全監視銘柄の 5 分足を取得（省略可）し、各銘柄でテクニカル・スコア判定してシグナルを保存する。
