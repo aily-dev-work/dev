@@ -31,5 +31,11 @@ urlpatterns = [
     path("market-search/", MarketSearchView.as_view(), name="market-search"),
     path("cron/run-5m-evaluate/", Run5mEvaluateView.as_view(), name="cron-run-5m-evaluate"),
     path("cron/ping/", CronPingView.as_view(), name="cron-ping"),
+    # DRF の router に依存せず、明示的に scores アクションのパスを配線しておく
+    path(
+        "stocks/scores/",
+        WatchStockViewSet.as_view({"get": "scores"}),
+        name="watchstock-scores",
+    ),
 ] + router.urls
 
