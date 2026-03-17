@@ -50,6 +50,7 @@ from .services.scoring_profile import get_active_score_profile
 from .services.signal_evaluation import evaluate_signal
 from .services.signal_generation import generate_trading_signal
 from .services.signal_scoring import score_from_technical
+from .services.scoring_profile import get_active_scoring_config
 from .services.technical_analysis import calculate_technical_summary
 from .services.run_5m_job import run_5m_fetch_and_evaluate
 from .services.profile_proposal import save_profile_proposal
@@ -88,6 +89,28 @@ class WatchStockViewSet(viewsets.ModelViewSet):
 
     queryset = WatchStock.objects.all()
     serializer_class = WatchStockSerializer
+
+
+def _build_breakdown_response(breakdown: dict, weights: dict) -> list[dict]:
+    """
+    breakdown(dict[key, points]) と weights(dict[key, weight]) から
+    [{"key", "matched", "weight", "points"}, ...] のリストを構築する。
+    """
+    keys = set(weights.keys()) | set(breakdown.keys())
+    result: list[dict] = []
+    for key in sorted(keys):
+        weight = float(weights.get(key, 0.0))
+        points = float(breakdown.get(key, 0.0))
+        matched = points > 0.0
+        result.append(
+            {
+                "key": key,
+                "matched": matched,
+                "weight": weight,
+                "points": points,
+            }
+        )
+    return result
 
     def list(self, request, *args, **kwargs):
         path = getattr(request, "path", "")
@@ -203,6 +226,11 @@ class WatchStockViewSet(viewsets.ModelViewSet):
         start = time.monotonic()
         path = getattr(request, "path", "")
         query_params = dict(request.query_params)
+        include_breakdown = str(request.query_params.get("include_breakdown", "")).lower() in {
+            "1",
+            "true",
+            "yes",
+        }
         logger.info("stocks.scores start path=%s query=%s", path, query_params)
         response = None
         try:
@@ -223,6 +251,11 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                 "stocks.scores active_profile duration=%.3f result=ok",
                 time.monotonic() - section_start,
             )
+
+            # breakdown を構築するための重み設定（アクティブ ScoreProfile から取得）
+            scoring_config = get_active_scoring_config()
+            buy_weights = scoring_config.buy_weights
+            sell_weights = scoring_config.sell_weights
 
             section_start = time.monotonic()
             stocks = WatchStock.objects.all().order_by("ticker")
@@ -270,7 +303,7 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                 buy_pct = round(100.0 * buy_score / total, 1) if total > 0 else 0
                 sell_pct = round(100.0 * sell_score / total, 1) if total > 0 else 0
                 wait_pct = round(100.0 - buy_pct - sell_pct, 1)
-                results.append({
+                item = {
                     "stock_id": stock.id,
                     "ticker": stock.ticker,
                     "name": stock.name or "",
@@ -285,7 +318,17 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     "short_term_trend": summary.short_term_trend,
                     "insufficient_data": score_result.insufficient_data,
                     "insufficient_reason": score_result.insufficient_reason,
-                })
+                }
+                if include_breakdown:
+                    item["buy_breakdown"] = _build_breakdown_response(
+                        score_result.breakdown_buy,
+                        buy_weights,
+                    )
+                    item["sell_breakdown"] = _build_breakdown_response(
+                        score_result.breakdown_sell,
+                        sell_weights,
+                    )
+                results.append(item)
                 per_stock_duration = time.monotonic() - per_stock_start
                 if idx <= 5 or idx % 20 == 0:
                     logger.info(
