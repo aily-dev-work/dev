@@ -511,6 +511,8 @@ class WatchStockViewSet(viewsets.ModelViewSet):
 
         try:
             created_daily = 0
+            updated_daily = 0
+            daily_existing_count = 0
             created_5m = 0
             created_weekly = 0
             created_monthly = 0
@@ -539,6 +541,27 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                         ticker,
                         len(timestamps),
                     )
+
+                    # 既存日足をまとめて取得し、差分だけを一括保存
+                    existing_start = time.monotonic()
+                    existing_qs = StockPriceDaily.objects.filter(stock=stock)
+                    existing_by_date: dict[date, StockPriceDaily] = {
+                        row.date: row for row in existing_qs
+                    }
+                    daily_existing_count = len(existing_by_date)
+                    existing_end = time.monotonic()
+                    logger.warning(
+                        "stocks.fetch-prices daily existing rows load done stock_id=%s ticker=%s duration=%.3f existing_count=%d",
+                        stock.id,
+                        ticker,
+                        existing_end - existing_start,
+                        daily_existing_count,
+                    )
+
+                    diff_start = time.monotonic()
+                    to_create: list[StockPriceDaily] = []
+                    to_update: list[StockPriceDaily] = []
+
                     for i in range(len(timestamps)):
                         ts = timestamps[i]
                         if ts is None:
@@ -561,12 +584,97 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                         high_val = Decimal(str(h)) if h is not None else close_val
                         low_val = Decimal(str(l_)) if l_ is not None else close_val
                         vol = int(v) if v is not None and v == v else None
-                        _, was_created = StockPriceDaily.objects.update_or_create(
-                            stock=stock, date=d,
-                            defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
+
+                        existing = existing_by_date.get(d)
+                        if existing is None:
+                            to_create.append(
+                                StockPriceDaily(
+                                    stock=stock,
+                                    date=d,
+                                    open_price=open_val,
+                                    high_price=high_val,
+                                    low_price=low_val,
+                                    close_price=close_val,
+                                    volume=vol,
+                                )
+                            )
+                        else:
+                            # 値が変わっている場合のみ更新対象に含める
+                            if (
+                                existing.open_price != open_val
+                                or existing.high_price != high_val
+                                or existing.low_price != low_val
+                                or existing.close_price != close_val
+                                or existing.volume != vol
+                            ):
+                                existing.open_price = open_val
+                                existing.high_price = high_val
+                                existing.low_price = low_val
+                                existing.close_price = close_val
+                                existing.volume = vol
+                                to_update.append(existing)
+
+                    diff_end = time.monotonic()
+                    logger.warning(
+                        "stocks.fetch-prices daily diff build done stock_id=%s ticker=%s duration=%.3f to_create=%d to_update=%d",
+                        stock.id,
+                        ticker,
+                        diff_end - diff_start,
+                        len(to_create),
+                        len(to_update),
+                    )
+
+                    # まとめて保存
+                    save_phase_start = time.monotonic()
+                    if to_create:
+                        bulk_start = time.monotonic()
+                        logger.warning(
+                            "stocks.fetch-prices daily bulk_create start stock_id=%s ticker=%s count=%d",
+                            stock.id,
+                            ticker,
+                            len(to_create),
                         )
-                    if was_created:
-                        created_daily += 1
+                        created_daily = len(
+                            StockPriceDaily.objects.bulk_create(to_create, ignore_conflicts=True)
+                        )
+                        bulk_end = time.monotonic()
+                        logger.warning(
+                            "stocks.fetch-prices daily bulk_create done stock_id=%s ticker=%s duration=%.3f created=%d",
+                            stock.id,
+                            ticker,
+                            bulk_end - bulk_start,
+                            created_daily,
+                        )
+
+                    if to_update:
+                        bulk_u_start = time.monotonic()
+                        logger.warning(
+                            "stocks.fetch-prices daily bulk_update start stock_id=%s ticker=%s count=%d",
+                            stock.id,
+                            ticker,
+                            len(to_update),
+                        )
+                        StockPriceDaily.objects.bulk_update(
+                            to_update,
+                            ["open_price", "high_price", "low_price", "close_price", "volume"],
+                        )
+                        bulk_u_end = time.monotonic()
+                        updated_daily = len(to_update)
+                        logger.warning(
+                            "stocks.fetch-prices daily bulk_update done stock_id=%s ticker=%s duration=%.3f updated=%d",
+                            stock.id,
+                            ticker,
+                            bulk_u_end - bulk_u_start,
+                            updated_daily,
+                        )
+
+                    save_phase_end = time.monotonic()
+                    logger.warning(
+                        "stocks.fetch-prices daily save total stock_id=%s ticker=%s duration=%.3f",
+                        stock.id,
+                        ticker,
+                        save_phase_end - save_phase_start,
+                    )
             except Exception as e:
                 logger.warning(
                     "stocks.fetch-prices daily error stock_id=%s ticker=%s error=%s",
@@ -576,9 +684,11 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                 )
             daily_end = time.monotonic()
             logger.info(
-                "stocks.fetch-prices daily duration=%.3f created=%d",
+                "stocks.fetch-prices daily duration=%.3f created=%d updated=%d existing_count=%d",
                 daily_end - daily_start,
                 created_daily,
+                updated_daily,
+                daily_existing_count,
             )
 
             # 5分足（直近約2ヶ月）
@@ -865,11 +975,12 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                 overall_end - overall_start,
                 total_created,
             )
+            overall_duration = overall_end - overall_start
             logger.info(
                 "stocks.fetch-prices finish stock_id=%s ticker=%s duration=%.3f total_created=%d",
                 stock.id,
                 ticker,
-                overall_end - overall_start,
+                overall_duration,
                 total_created,
             )
 
@@ -877,7 +988,12 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                 "stock_id": stock.id,
                 "ticker": stock.ticker,
                 "created": total_created,
-                "daily": {"created": created_daily},
+                "elapsed_seconds": round(overall_duration, 3),
+                "daily": {
+                    "created": created_daily,
+                    "updated": updated_daily,
+                    "existing_count": daily_existing_count,
+                },
                 "5m": {"created": created_5m},
                 "weekly": {"created": created_weekly},
                 "monthly": {"created": created_monthly},
