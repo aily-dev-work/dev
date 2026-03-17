@@ -100,11 +100,9 @@ export function normalizeThresholds(raw: unknown): ThresholdsFormValue {
   return result;
 }
 
-/** フォーム値を API 用のオブジェクトに変換（合計が100でない場合は100に正規化して送る） */
+/** フォーム値を API 用のオブジェクトに変換（そのまま送る。合計100チェックはサーバー側で実施） */
 export function weightsToApi(v: WeightsFormValue): Record<string, unknown> {
-  const buy = normalizeSideTo100(v.buy);
-  const sell = normalizeSideTo100(v.sell);
-  return { buy: { ...buy }, sell: { ...sell } };
+  return { buy: { ...v.buy }, sell: { ...v.sell } };
 }
 
 export function thresholdsToApi(v: ThresholdsFormValue): Record<string, unknown> {
@@ -134,7 +132,7 @@ export function ProfileWeightsForm({
     <div className="space-y-4">
       <p className="rounded bg-slate-100 px-3 py-2 text-xs text-slate-600">
         <strong>割合で配分：</strong>
-        各条件の<strong>重要度を％で配分</strong>します。買い・売りそれぞれ<strong>合計100％</strong>になるように入力してください。当てはまった条件の割合を足したものがスコア（0〜100）になり、％の大きい条件ほどその方向のシグナルに効きます。保存時に合計が100％でない場合は自動で按分します。
+        各条件の<strong>重要度を％で配分</strong>します。買い・売りそれぞれ<strong>合計100％</strong>になるように入力してください。当てはまった条件の割合を足したものがスコア（0〜100）になり、％の大きい条件ほどその方向のシグナルに効きます。保存時に合計が100％でない場合は<strong>保存できません</strong>。
       </p>
       <div>
         <div className="mb-2 flex items-center justify-between">
