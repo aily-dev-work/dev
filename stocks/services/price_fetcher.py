@@ -149,19 +149,29 @@ def fetch_and_save_5m_prices(stock: WatchStock, max_bars: int | None = None) -> 
         existing_count,
     )
 
+    # 差分用に既存の最新 datetime を取得し、新しいバーだけを一括作成
     save_start = datetime.now(timezone.utc)
     logger.warning(
-        "price_fetcher save loop start ticker=%s bars_to_save=%d",
+        "price_fetcher diff build start ticker=%s bars_to_save=%d",
         ticker,
         len(timestamps),
     )
-    created = 0
-    updated = 0
+    latest_dt = (
+        StockPrice5Min.objects.filter(stock=stock)
+        .order_by("-datetime")
+        .values_list("datetime", flat=True)
+        .first()
+    )
+
+    new_objects: list[StockPrice5Min] = []
     for i in range(len(timestamps)):
         ts = timestamps[i]
         if ts is None:
             continue
         dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+        if latest_dt is not None and dt <= latest_dt:
+            # 既に存在するとみなしてスキップ（古いバーは更新しない）
+            continue
         o = opens[i] if i < len(opens) else None
         h = highs[i] if i < len(highs) else None
         l_ = lows[i] if i < len(lows) else None
@@ -176,25 +186,53 @@ def fetch_and_save_5m_prices(stock: WatchStock, max_bars: int | None = None) -> 
         high_val = Decimal(str(h)) if h is not None else close_val
         low_val = Decimal(str(l_)) if l_ is not None else close_val
         vol = int(v) if v is not None and v == v else None
-        obj, was_created = StockPrice5Min.objects.update_or_create(
-            stock=stock,
-            datetime=dt,
-            defaults={
-                "open_price": open_val,
-                "high_price": high_val,
-                "low_price": low_val,
-                "close_price": close_val,
-                "volume": vol,
-            },
+        new_objects.append(
+            StockPrice5Min(
+                stock=stock,
+                datetime=dt,
+                open_price=open_val,
+                high_price=high_val,
+                low_price=low_val,
+                close_price=close_val,
+                volume=vol,
+            )
         )
-        if was_created:
-            created += 1
-        else:
-            updated += 1
-    save_end = datetime.now(timezone.utc)
+
+    diff_build_end = datetime.now(timezone.utc)
+    diff_build_duration = (diff_build_end - save_start).total_seconds()
+    logger.warning(
+        "price_fetcher diff build done ticker=%s duration=%.3f to_create=%d latest_dt=%s",
+        ticker,
+        diff_build_duration,
+        len(new_objects),
+        latest_dt,
+    )
+
+    created = 0
+    updated = 0  # 今回は更新は行わない
+    if new_objects:
+        bulk_start = datetime.now(timezone.utc)
+        logger.warning(
+            "price_fetcher bulk_create start ticker=%s count=%d",
+            ticker,
+            len(new_objects),
+        )
+        created = len(StockPrice5Min.objects.bulk_create(new_objects, ignore_conflicts=True))
+        bulk_end = datetime.now(timezone.utc)
+        bulk_duration = (bulk_end - bulk_start).total_seconds()
+        logger.warning(
+            "price_fetcher bulk_create done ticker=%s duration=%.3f created=%d",
+            ticker,
+            bulk_duration,
+            created,
+        )
+        save_end = bulk_end
+    else:
+        save_end = diff_build_end
+
     save_duration = (save_end - save_start).total_seconds()
     logger.warning(
-        "price_fetcher save loop done ticker=%s duration=%.3f created=%d updated=%d",
+        "price_fetcher save diff total ticker=%s duration=%.3f created=%d updated=%d",
         ticker,
         save_duration,
         created,
