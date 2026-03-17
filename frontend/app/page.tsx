@@ -33,9 +33,11 @@ export default function DashboardPage() {
   const [recentSignals, setRecentSignals] = useState<RecentSignalItem[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [scoresError, setScoresError] = useState<string | null>(null);
   async function load() {
     setLoading(true);
     setError(null);
+    setScoresError(null);
     try {
       const [statsResult, scoresResult, signalsResult] = await Promise.allSettled([
         getDashboardStats(),
@@ -63,6 +65,8 @@ export default function DashboardPage() {
           Array.isArray(scoresValue?.stocks) ? (scoresValue.stocks as StockScoreItem[]) : [],
         );
       } else {
+        console.error("[dashboard] getStocksScores failed", scoresResult.reason);
+        setScoresError("監視銘柄スコアの取得に失敗しました。Network タブをご確認ください。");
         setStockScores([]);
       }
 
@@ -272,6 +276,11 @@ export default function DashboardPage() {
       </section>
 
       {/* 監視銘柄のスコア（買い・売り・様子見 ％） */}
+      {scoresError && (
+        <section className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
+          {scoresError}
+        </section>
+      )}
       {stockScores && stockScores.length > 0 && (
         <section className="rounded-lg border bg-white p-4 shadow-sm">
           <h2 className="mb-3 text-lg font-semibold">監視銘柄のスコア（買い・売り・様子見）</h2>
