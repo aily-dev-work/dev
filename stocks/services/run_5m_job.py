@@ -28,6 +28,27 @@ def run_5m_fetch_and_evaluate(
     max_stocks: int | None = None,
     max_seconds: float | None = None,
 ) -> dict:
+    logger.warning(
+        "run_5m_fetch_and_evaluate entered skip_fetch=%s max_stocks=%s max_seconds=%s",
+        skip_fetch,
+        max_stocks,
+        max_seconds,
+    )
+    return {
+        "stocks_count": 0,
+        "processed_count": 0,
+        "success_count": 0,
+        "error_count": 0,
+        "remaining_count": 0,
+        "stopped_by_limit": False,
+        "elapsed_seconds": 0.0,
+        "5m_created": 0,
+        "signals_updated": 0,
+        "bar_start": None,
+        "errors": [],
+        "current_stock_ticker": None,
+        "stopped_at_step": None,
+    }
     """
     全監視銘柄の 5 分足を取得（省略可）し、各銘柄でテクニカル・スコア判定してシグナルを保存する。
     戻り値: {

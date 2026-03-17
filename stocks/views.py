@@ -1244,14 +1244,22 @@ class Run5mEvaluateView(APIView):
             method,
             query,
         )
-        return Response(
-            {
-                "ok": True,
-                "message": "entered Run5mEvaluateView.post",
-                "query_params": query,
-            },
-            status=status.HTTP_200_OK,
+        no_fetch = request.query_params.get("no_fetch", "").lower() in ("1", "true", "yes")
+        logger.warning(
+            "Run5mEvaluateView before service call no_fetch=%s",
+            no_fetch,
         )
+        result = run_5m_fetch_and_evaluate(
+            skip_fetch=no_fetch,
+            max_seconds=20.0,
+            max_stocks=1,
+        )
+        logger.warning(
+            "Run5mEvaluateView after service call elapsed_seconds=%s processed_count=%s",
+            result.get("elapsed_seconds"),
+            result.get("processed_count"),
+        )
+        return Response(result, status=status.HTTP_200_OK)
 
 
 class CronPingView(APIView):
