@@ -79,7 +79,7 @@ def _parse_quote(data: dict):
     )
 
 
-def fetch_and_save_5m_prices(stock: WatchStock) -> int:
+def fetch_and_save_5m_prices(stock: WatchStock, max_bars: int | None = None) -> int:
     """
     指定銘柄の 5 分足を Yahoo Finance から取得し StockPrice5Min に保存する。
     新規作成した件数を返す。失敗時は 0。
@@ -120,14 +120,41 @@ def fetch_and_save_5m_prices(stock: WatchStock) -> int:
         return 0
 
     timestamps, opens, highs, lows, closes, volumes = parsed
+    original_bars = len(timestamps)
+    if max_bars is not None and original_bars > max_bars:
+        # 直近 max_bars 本のみに絞る（末尾側が新しいと仮定）
+        timestamps = timestamps[-max_bars:]
+        opens = opens[-max_bars:] if opens else []
+        highs = highs[-max_bars:] if highs else []
+        lows = lows[-max_bars:] if lows else []
+        closes = closes[-max_bars:] if closes else []
+        volumes = volumes[-max_bars:] if volumes else []
     logger.warning(
-        "price_fetcher parse done ticker=%s duration=%.3f bars=%d",
+        "price_fetcher parse done ticker=%s duration=%.3f bars=%d limited_bars=%d",
         ticker,
         parse_duration,
+        original_bars,
         len(timestamps),
     )
 
+    # 既存行の件数だけ事前に確認（本体ロジックは update_or_create のまま）
+    existing_start = datetime.now(timezone.utc)
+    existing_count = StockPrice5Min.objects.filter(stock=stock).count()
+    existing_end = datetime.now(timezone.utc)
+    existing_duration = (existing_end - existing_start).total_seconds()
+    logger.warning(
+        "price_fetcher existing rows load done ticker=%s duration=%.3f existing_count=%d",
+        ticker,
+        existing_duration,
+        existing_count,
+    )
+
     save_start = datetime.now(timezone.utc)
+    logger.warning(
+        "price_fetcher save loop start ticker=%s bars_to_save=%d",
+        ticker,
+        len(timestamps),
+    )
     created = 0
     updated = 0
     for i in range(len(timestamps)):
@@ -167,7 +194,7 @@ def fetch_and_save_5m_prices(stock: WatchStock) -> int:
     save_end = datetime.now(timezone.utc)
     save_duration = (save_end - save_start).total_seconds()
     logger.warning(
-        "price_fetcher save done ticker=%s duration=%.3f created=%d updated=%d",
+        "price_fetcher save loop done ticker=%s duration=%.3f created=%d updated=%d",
         ticker,
         save_duration,
         created,

@@ -104,11 +104,12 @@ def run_5m_fetch_and_evaluate(
         try:
             fetch_start = time.monotonic()
             logger.warning(
-                "run_5m before fetch ticker=%s id=%s",
+                "run_5m before fetch ticker=%s id=%s max_bars=%d",
                 first.ticker,
                 first.id,
+                100,
             )
-            created = fetch_and_save_5m_prices(first)
+            created = fetch_and_save_5m_prices(first, max_bars=100)
             fetch_end = time.monotonic()
             fetch_duration = fetch_end - fetch_start
             logger.warning(
