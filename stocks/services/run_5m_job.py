@@ -52,6 +52,8 @@ def run_5m_fetch_and_evaluate(
     processed = 0
     success_count = 0
     error_count = 0
+    last_stock_ticker: str | None = None
+    stopped_at_step: str | None = None
 
     for stock in stocks:
         # 時間上限・件数上限チェック（次の銘柄に入る前に判定）
@@ -74,7 +76,7 @@ def run_5m_fetch_and_evaluate(
         processed += 1
         stock_start = time.monotonic()
         logger.info("run_5m stock start ticker=%s", stock.ticker)
-
+        last_stock_ticker = stock.ticker
         fetch_duration = 0.0
         save_duration = 0.0
         technical_duration = 0.0
@@ -95,6 +97,7 @@ def run_5m_fetch_and_evaluate(
                 break
             try:
                 fetch_start = time.monotonic()
+                stopped_at_step = "fetch"
                 created = fetch_and_save_5m_prices(stock)
                 fetch_end = time.monotonic()
                 fetch_duration = fetch_end - fetch_start
@@ -125,6 +128,7 @@ def run_5m_fetch_and_evaluate(
             break
         try:
             tech_start = time.monotonic()
+            stopped_at_step = "technical"
             summary = calculate_technical_summary_5m(stock)
             tech_end = time.monotonic()
             technical_duration = tech_end - tech_start
@@ -160,6 +164,7 @@ def run_5m_fetch_and_evaluate(
             break
         try:
             score_start = time.monotonic()
+            stopped_at_step = "score"
             score_result = score_from_technical(summary)
             score_end = time.monotonic()
             score_duration = score_end - score_start
@@ -186,6 +191,7 @@ def run_5m_fetch_and_evaluate(
             break
         try:
             signal_start = time.monotonic()
+            stopped_at_step = "signal"
             generate_trading_signal_5m(stock, summary, score_result, bar_start)
             signal_end = time.monotonic()
             signal_duration = signal_end - signal_start
@@ -227,6 +233,8 @@ def run_5m_fetch_and_evaluate(
         "success_count": success_count,
         "error_count": error_count,
         "remaining_count": remaining,
+        "current_stock_ticker": last_stock_ticker,
+        "stopped_at_step": stopped_at_step,
         "stopped_by_limit": stopped_by_limit,
         "elapsed_seconds": round(elapsed_total, 3),
         "5m_created": total_fetched,

@@ -17,7 +17,7 @@ from django.db import connection
 from ..models import StockPrice5Min, WatchStock
 
 
-def _fetch_yahoo_chart(ticker: str, interval: str, range_param: str, timeout: int = 15) -> Optional[dict]:
+def _fetch_yahoo_chart(ticker: str, interval: str, range_param: str, timeout: int = 8) -> Optional[dict]:
     url = (
         f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(ticker)}"
         f"?interval={interval}&range={range_param}"
@@ -29,6 +29,7 @@ def _fetch_yahoo_chart(ticker: str, interval: str, range_param: str, timeout: in
         },
     )
     try:
+        # timeout は接続+読み取りの上限秒数（長くなりすぎないよう 8 秒程度に制限）
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode())
     except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):

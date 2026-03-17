@@ -1253,7 +1253,7 @@ class Run5mEvaluateView(APIView):
             result = run_5m_fetch_and_evaluate(
                 skip_fetch=no_fetch,
                 max_seconds=20.0,
-                max_stocks=3,
+                max_stocks=1,
             )
             return Response(result, status=status.HTTP_200_OK)
         except Exception as e:
