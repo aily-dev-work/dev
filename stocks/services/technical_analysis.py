@@ -76,6 +76,56 @@ def _float_or_none(values: Iterable[Optional[int]]) -> Optional[float]:
     return float(sum(cleaned) / len(cleaned))
 
 
+def _classify_long_term_trend(
+    latest_close: Optional[Decimal],
+    ma75: Optional[Decimal],
+    ma75_prev: Optional[Decimal],
+) -> Optional[str]:
+    """
+    長期トレンド判定:
+    - MA75 の傾き（ma75 vs ma75_prev）
+    - 価格と MA75 の乖離率 (latest_close - ma75) / ma75
+    を組み合わせて up / down / neutral を返す。
+    """
+    if latest_close is None or ma75 is None or ma75_prev is None:
+        return "neutral"
+    if ma75 == 0:
+        return "neutral"
+
+    diff = (latest_close - ma75) / ma75
+
+    if latest_close > ma75 and ma75 > ma75_prev and diff > Decimal("0.02"):
+        return "up"
+    if latest_close < ma75 and ma75 < ma75_prev and diff < Decimal("-0.02"):
+        return "down"
+    return "neutral"
+
+
+def _classify_short_term_trend(
+    latest_close: Optional[Decimal],
+    ma25: Optional[Decimal],
+    ma25_prev: Optional[Decimal],
+) -> Optional[str]:
+    """
+    短期トレンド判定:
+    - MA25 の傾き（ma25 vs ma25_prev）
+    - 価格と MA25 の乖離率 (latest_close - ma25) / ma25
+    を組み合わせて up / down / neutral を返す。
+    """
+    if latest_close is None or ma25 is None or ma25_prev is None:
+        return "neutral"
+    if ma25 == 0:
+        return "neutral"
+
+    diff = (latest_close - ma25) / ma25
+
+    if latest_close > ma25 and ma25 > ma25_prev and diff > Decimal("0.01"):
+        return "up"
+    if latest_close < ma25 and ma25 < ma25_prev and diff < Decimal("-0.01"):
+        return "down"
+    return "neutral"
+
+
 def calculate_technical_summary(stock: WatchStock) -> TechnicalSummary:
     """
     指定した WatchStock について、日足データからテクニカル指標を集計する。
@@ -125,6 +175,9 @@ def calculate_technical_summary(stock: WatchStock) -> TechnicalSummary:
     ma5 = _decimal_or_none(closes[:5]) if len(closes) >= 5 else None
     ma25 = _decimal_or_none(closes[:25]) if len(closes) >= 25 else None
     ma75 = _decimal_or_none(closes[:75]) if len(closes) >= 75 else None
+    # 1 本前の MA25/MA75（短期・長期トレンド判定用）。十分な本数が無ければ None。
+    ma25_prev = _decimal_or_none(closes[1:26]) if len(closes) >= 26 else None
+    ma75_prev = _decimal_or_none(closes[1:76]) if len(closes) >= 76 else None
 
     moving_averages = MovingAverages(ma5=ma5, ma25=ma25, ma75=ma75)
 
@@ -147,7 +200,7 @@ def calculate_technical_summary(stock: WatchStock) -> TechnicalSummary:
         avg_volume_20=avg_volume_20,
     )
 
-    # シンプルなトレンド判定
+    # シンプルなトレンド判定（signals 用）
     latest_close = latest.close_price
 
     def _trend(ma: Optional[Decimal]) -> Optional[str]:
@@ -183,8 +236,9 @@ def calculate_technical_summary(stock: WatchStock) -> TechnicalSummary:
     )
 
     # 設計: 長期=75日( trend_long )、短期=25日( trend_mid )
-    long_term_trend = _trend_label(trend_long)
-    short_term_trend = _trend_label(trend_mid)
+    # long_term_trend / short_term_trend は MA75/MA25 の傾きと乖離率を加味して判定
+    long_term_trend = _classify_long_term_trend(latest_close, ma75, ma75_prev)
+    short_term_trend = _classify_short_term_trend(latest_close, ma25, ma25_prev)
 
     summary = TechnicalSummary(
         stock=stock,
