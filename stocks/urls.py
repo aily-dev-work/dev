@@ -5,6 +5,7 @@ from .views import (
     MarketSearchView,
     ProposalViewSet,
     Run5mEvaluateView,
+    CronPingView,
     ScoreProfileViewSet,
     SignalViewSet,
     StockPrice5MinViewSet,
@@ -29,5 +30,6 @@ router.register("proposals", ProposalViewSet, basename="proposal")
 urlpatterns = [
     path("market-search/", MarketSearchView.as_view(), name="market-search"),
     path("cron/run-5m-evaluate/", Run5mEvaluateView.as_view(), name="cron-run-5m-evaluate"),
+    path("cron/ping/", CronPingView.as_view(), name="cron-ping"),
 ] + router.urls
 

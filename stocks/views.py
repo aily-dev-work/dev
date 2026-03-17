@@ -1235,34 +1235,44 @@ class Run5mEvaluateView(APIView):
     """
 
     def post(self, request):
-        secret = getattr(settings, "RUN_5M_CRON_SECRET", "") or ""
-        if not secret:
-            return Response(
-                {"detail": "Cron endpoint is disabled (RUN_5M_CRON_SECRET not set)."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-        provided = request.headers.get("X-Cron-Secret") or request.query_params.get("secret") or ""
-        if provided != secret:
-            return Response(
-                {"detail": "Invalid or missing X-Cron-Secret."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-        no_fetch = request.query_params.get("no_fetch", "").lower() in ("1", "true", "yes")
-        try:
-            # cron-job.org の 30 秒制限を考慮し、リクエスト1回あたりの処理時間・銘柄数を抑える
-            result = run_5m_fetch_and_evaluate(
-                skip_fetch=no_fetch,
-                max_seconds=20.0,
-                max_stocks=1,
-            )
-            return Response(result, status=status.HTTP_200_OK)
-        except Exception as e:
-            import traceback
-            logger.exception("run_5m_fetch_and_evaluate failed: %s", e)
-            return Response(
-                {"detail": str(e), "traceback": traceback.format_exc()},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        path = getattr(request, "path", "")
+        method = getattr(request, "method", "")
+        query = dict(request.query_params)
+        logger.warning(
+            "Run5mEvaluateView.post entered path=%s method=%s query=%s",
+            path,
+            method,
+            query,
+        )
+        return Response(
+            {
+                "ok": True,
+                "message": "entered Run5mEvaluateView.post",
+                "query_params": query,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class CronPingView(APIView):
+    """
+    軽量な cron 用ヘルスチェックエンドポイント。
+    """
+
+    def post(self, request):
+        path = getattr(request, "path", "")
+        method = getattr(request, "method", "")
+        query = dict(request.query_params)
+        logger.info(
+            "CronPingView POST path=%s method=%s query=%s",
+            path,
+            method,
+            query,
+        )
+        return Response(
+            {"ok": True, "message": "cron endpoint reached"},
+            status=status.HTTP_200_OK,
+        )
 
 
 class MarketSearchView(APIView):
