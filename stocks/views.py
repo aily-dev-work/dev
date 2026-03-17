@@ -515,6 +515,8 @@ class WatchStockViewSet(viewsets.ModelViewSet):
             daily_existing_count = 0
             created_5m = 0
             created_weekly = 0
+            updated_weekly = 0
+            weekly_existing_count = 0
             created_monthly = 0
 
             # 日足
@@ -828,11 +830,21 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                 stock.id,
                 ticker,
             )
+            weekly_timestamps = weekly_opens = weekly_highs = weekly_lows = weekly_closes = weekly_volumes = None
+            weekly_range_used = None
             for range_param in ("5y", "2y", "1y"):
                 range_start = time.monotonic()
                 range_parsed_count = 0
                 try:
+                    logger.warning(
+                        'stocks.fetch-prices weekly fetch_yahoo interval="1wk" range="%s" before',
+                        range_param,
+                    )
                     data = fetch_yahoo("1wk", range_param)
+                    logger.warning(
+                        'stocks.fetch-prices weekly fetch_yahoo interval="1wk" range="%s" done',
+                        range_param,
+                    )
                     parsed = parse_quote(data)
                     if not parsed:
                         continue
@@ -840,37 +852,18 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     if not timestamps:
                         continue
                     range_parsed_count = len(timestamps)
-                    for i in range(len(timestamps)):
-                        ts = timestamps[i]
-                        if ts is None:
-                            continue
-                        ts_sec = _normalize_ts(ts)
-                        if ts_sec is None:
-                            continue
-                        d = date.fromtimestamp(ts_sec)
-                        o = opens[i] if i < len(opens) else None
-                        h = highs[i] if i < len(highs) else None
-                        l_ = lows[i] if i < len(lows) else None
-                        c = closes[i] if i < len(closes) else None
-                        v = volumes[i] if i < len(volumes) else None
-                        if c is None and o is None and h is None and l_ is None:
-                            continue
-                        close_val = Decimal(str(c)) if c is not None else (Decimal(str(o)) if o is not None else None)
-                        if close_val is None:
-                            continue
-                        open_val = Decimal(str(o)) if o is not None else close_val
-                        high_val = Decimal(str(h)) if h is not None else close_val
-                        low_val = Decimal(str(l_)) if l_ is not None else close_val
-                        vol = int(v) if v is not None and v == v else None
-                        _, was_created = StockPriceWeekly.objects.update_or_create(
-                            stock=stock, date=d,
-                            defaults={"open_price": open_val, "high_price": high_val, "low_price": low_val, "close_price": close_val, "volume": vol},
-                        )
-                        if was_created:
-                            created_weekly += 1
+                    weekly_timestamps = timestamps
+                    weekly_opens = opens
+                    weekly_highs = highs
+                    weekly_lows = lows
+                    weekly_closes = closes
+                    weekly_volumes = volumes
+                    weekly_range_used = range_param
                     range_end = time.monotonic()
                     logger.info(
-                        "stocks.fetch-prices weekly range=%s duration=%.3f parsed=%d",
+                        "stocks.fetch-prices weekly parsed stock_id=%s ticker=%s range=%s duration=%.3f bars=%d",
+                        stock.id,
+                        ticker,
                         range_param,
                         range_end - range_start,
                         range_parsed_count,
@@ -886,11 +879,150 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                         range_end - range_start,
                         e,
                     )
+
+            updated_weekly = 0
+            weekly_existing_count = 0
+            if weekly_timestamps:
+                # 既存データをまとめて取得し、差分だけを一括保存
+                existing_start = time.monotonic()
+                existing_qs = StockPriceWeekly.objects.filter(stock=stock)
+                existing_by_date: dict[date, StockPriceWeekly] = {
+                    row.date: row for row in existing_qs
+                }
+                weekly_existing_count = len(existing_by_date)
+                existing_end = time.monotonic()
+                logger.warning(
+                    "stocks.fetch-prices weekly existing rows load done stock_id=%s ticker=%s duration=%.3f existing_count=%d",
+                    stock.id,
+                    ticker,
+                    existing_end - existing_start,
+                    weekly_existing_count,
+                )
+
+                diff_start = time.monotonic()
+                to_create: list[StockPriceWeekly] = []
+                to_update: list[StockPriceWeekly] = []
+
+                for i in range(len(weekly_timestamps)):
+                    ts = weekly_timestamps[i]
+                    if ts is None:
+                        continue
+                    ts_sec = _normalize_ts(ts)
+                    if ts_sec is None:
+                        continue
+                    d = date.fromtimestamp(ts_sec)
+                    o = weekly_opens[i] if i < len(weekly_opens) else None
+                    h = weekly_highs[i] if i < len(weekly_highs) else None
+                    l_ = weekly_lows[i] if i < len(weekly_lows) else None
+                    c = weekly_closes[i] if i < len(weekly_closes) else None
+                    v = weekly_volumes[i] if i < len(weekly_volumes) else None
+                    if c is None and o is None and h is None and l_ is None:
+                        continue
+                    close_val = Decimal(str(c)) if c is not None else (Decimal(str(o)) if o is not None else None)
+                    if close_val is None:
+                        continue
+                    open_val = Decimal(str(o)) if o is not None else close_val
+                    high_val = Decimal(str(h)) if h is not None else close_val
+                    low_val = Decimal(str(l_)) if l_ is not None else close_val
+                    vol = int(v) if v is not None and v == v else None
+
+                    existing = existing_by_date.get(d)
+                    if existing is None:
+                        to_create.append(
+                            StockPriceWeekly(
+                                stock=stock,
+                                date=d,
+                                open_price=open_val,
+                                high_price=high_val,
+                                low_price=low_val,
+                                close_price=close_val,
+                                volume=vol,
+                            )
+                        )
+                    else:
+                        if (
+                            existing.open_price != open_val
+                            or existing.high_price != high_val
+                            or existing.low_price != low_val
+                            or existing.close_price != close_val
+                            or existing.volume != vol
+                        ):
+                            existing.open_price = open_val
+                            existing.high_price = high_val
+                            existing.low_price = low_val
+                            existing.close_price = close_val
+                            existing.volume = vol
+                            to_update.append(existing)
+
+                diff_end = time.monotonic()
+                logger.warning(
+                    "stocks.fetch-prices weekly diff build done stock_id=%s ticker=%s range=%s duration=%.3f to_create=%d to_update=%d",
+                    stock.id,
+                    ticker,
+                    weekly_range_used,
+                    diff_end - diff_start,
+                    len(to_create),
+                    len(to_update),
+                )
+
+                save_phase_start = time.monotonic()
+                if to_create:
+                    bulk_start = time.monotonic()
+                    logger.warning(
+                        "stocks.fetch-prices weekly bulk_create start stock_id=%s ticker=%s count=%d",
+                        stock.id,
+                        ticker,
+                        len(to_create),
+                    )
+                    created_weekly = len(
+                        StockPriceWeekly.objects.bulk_create(to_create, ignore_conflicts=True)
+                    )
+                    bulk_end = time.monotonic()
+                    logger.warning(
+                        "stocks.fetch-prices weekly bulk_create done stock_id=%s ticker=%s duration=%.3f created=%d",
+                        stock.id,
+                        ticker,
+                        bulk_end - bulk_start,
+                        created_weekly,
+                    )
+
+                if to_update:
+                    bulk_u_start = time.monotonic()
+                    logger.warning(
+                        "stocks.fetch-prices weekly bulk_update start stock_id=%s ticker=%s count=%d",
+                        stock.id,
+                        ticker,
+                        len(to_update),
+                    )
+                    StockPriceWeekly.objects.bulk_update(
+                        to_update,
+                        ["open_price", "high_price", "low_price", "close_price", "volume"],
+                    )
+                    bulk_u_end = time.monotonic()
+                    updated_weekly = len(to_update)
+                    logger.warning(
+                        "stocks.fetch-prices weekly bulk_update done stock_id=%s ticker=%s duration=%.3f updated=%d",
+                        stock.id,
+                        ticker,
+                        bulk_u_end - bulk_u_start,
+                        updated_weekly,
+                    )
+
+                save_phase_end = time.monotonic()
+                logger.warning(
+                    "stocks.fetch-prices weekly save total stock_id=%s ticker=%s duration=%.3f",
+                    stock.id,
+                    ticker,
+                    save_phase_end - save_phase_start,
+                )
+
             weekly_end = time.monotonic()
             logger.info(
-                "stocks.fetch-prices weekly duration=%.3f created=%d",
+                "stocks.fetch-prices weekly duration=%.3f created=%d updated=%d existing_count=%d",
                 weekly_end - weekly_start,
                 created_weekly,
+                updated_weekly,
+                weekly_existing_count,
             )
 
             # 月足（Yahoo は range に 10y まで。20y は無効で 500 の原因になる）
@@ -995,7 +1127,11 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                     "existing_count": daily_existing_count,
                 },
                 "5m": {"created": created_5m},
-                "weekly": {"created": created_weekly},
+                "weekly": {
+                    "created": created_weekly,
+                    "updated": updated_weekly,
+                    "existing_count": weekly_existing_count,
+                },
                 "monthly": {"created": created_monthly},
             })
         except Exception as e:
