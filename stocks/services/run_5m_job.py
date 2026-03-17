@@ -66,9 +66,40 @@ def run_5m_fetch_and_evaluate(
         len(stocks),
     )
 
+    if not stocks:
+        logger.warning("run_5m_fetch_and_evaluate no stocks found, returning early")
+        return {
+            "stocks_count": 0,
+            "processed_count": 0,
+            "success_count": 0,
+            "error_count": 0,
+            "remaining_count": 0,
+            "stopped_by_limit": False,
+            "elapsed_seconds": 0.0,
+            "5m_created": 0,
+            "signals_updated": 0,
+            "bar_start": None,
+            "errors": [],
+            "current_stock_ticker": None,
+            "stopped_at_step": "before_loop",
+        }
+
+    # 段階的切り分け: まずは先頭1件の選択と stock start まで戻す
+    first = stocks[0]
+    logger.warning(
+        "run_5m first stock selected ticker=%s id=%s",
+        first.ticker,
+        first.id,
+    )
+    logger.warning(
+        "run_5m stock start ticker=%s id=%s (debug stage: after_stock_start)",
+        first.ticker,
+        first.id,
+    )
+
     return {
         "stocks_count": len(stocks),
-        "processed_count": 0,
+        "processed_count": 0,  # まだループは実行していない
         "success_count": 0,
         "error_count": 0,
         "remaining_count": len(stocks),
@@ -78,8 +109,8 @@ def run_5m_fetch_and_evaluate(
         "signals_updated": 0,
         "bar_start": None,
         "errors": [],
-        "current_stock_ticker": None,
-        "stopped_at_step": "before_loop",
+        "current_stock_ticker": first.ticker,
+        "stopped_at_step": "after_stock_start",
     }
     """
     全監視銘柄の 5 分足を取得（省略可）し、各銘柄でテクニカル・スコア判定してシグナルを保存する。
