@@ -174,48 +174,98 @@ export default function DashboardPage() {
       </section>
 
       {/* 直近のシグナル発報（スコアの上に表示） */}
-      <section className="rounded-lg border bg-white p-4 shadow-sm">
+      <section className="rounded-lg border bg-white p-3 sm:p-4 shadow-sm">
         <h2 className="mb-3 text-lg font-semibold">直近のシグナル発報</h2>
         {recentSignals && recentSignals.length > 0 ? (
-          <div className="max-h-80 overflow-y-auto overflow-x-auto">
-            <table className="min-w-full border text-sm">
-              <thead className="bg-slate-100">
-                <tr>
-                  <th className="border px-2 py-1 text-center">発報日時</th>
-                  <th className="border px-2 py-1 text-left">銘柄</th>
-                  <th className="border px-2 py-1 text-center">シグナル</th>
-                  <th className="border px-2 py-1 text-center">強さ</th>
-                  <th className="border px-2 py-1 text-right">価格</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentSignals.map((sig) => (
-                  <tr key={sig.id} className="odd:bg-slate-50">
-                    <td className="border px-2 py-1 text-center text-slate-600">
+          <>
+            {/* モバイル: カード一覧（縦スクロール） */}
+            <div className="space-y-2 max-h-80 overflow-y-auto md:hidden">
+              {recentSignals.map((sig) => (
+                <div
+                  key={sig.id}
+                  className="rounded border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <div className="font-mono text-[11px] text-slate-600">
                       {sig.created_at
                         ? new Date(sig.created_at).toLocaleString("ja-JP")
                         : sig.signal_date}
-                    </td>
-                    <td className="border px-2 py-1">
-                      <span className="font-mono">{sig.ticker}</span>
-                      <span className="ml-1 text-slate-600">{sig.stock_name}</span>
-                    </td>
-                    <td className="border px-2 py-1 text-center font-medium">
-                      {sig.signal_type === "buy" && <span className="text-emerald-700">買い</span>}
-                      {sig.signal_type === "sell" && <span className="text-red-700">売り</span>}
-                      {sig.signal_type === "neutral" && <span className="text-slate-600">様子見</span>}
-                    </td>
-                    <td className="border px-2 py-1 text-center text-xs text-slate-600">
-                      {sig.score_strength}
-                    </td>
-                    <td className="border px-2 py-1 text-right font-mono text-slate-700">
+                    </div>
+                    <div className="text-[11px] text-slate-500">{sig.score_strength}</div>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="font-mono text-sm">{sig.ticker}</span>
+                      <span className="ml-1 truncate text-xs text-slate-600">
+                        {sig.stock_name}
+                      </span>
+                    </div>
+                    <div className="shrink-0 text-right font-mono text-sm text-slate-800">
                       {sig.signal_price ?? "—"}
-                    </td>
+                    </div>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-[11px]">
+                    <div>
+                      {sig.signal_type === "buy" && (
+                        <span className="font-medium text-emerald-700">買い</span>
+                      )}
+                      {sig.signal_type === "sell" && (
+                        <span className="font-medium text-red-700">売り</span>
+                      )}
+                      {sig.signal_type === "neutral" && (
+                        <span className="font-medium text-slate-600">様子見</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* タブレット以上: テーブル（縦スクロール） */}
+            <div className="hidden max-h-80 overflow-y-auto overflow-x-auto md:block">
+              <table className="min-w-full border text-sm">
+                <thead className="bg-slate-100">
+                  <tr>
+                    <th className="border px-2 py-1 text-center">発報日時</th>
+                    <th className="border px-2 py-1 text-left">銘柄</th>
+                    <th className="border px-2 py-1 text-center">シグナル</th>
+                    <th className="border px-2 py-1 text-center">強さ</th>
+                    <th className="border px-2 py-1 text-right">価格</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {recentSignals.map((sig) => (
+                    <tr key={sig.id} className="odd:bg-slate-50">
+                      <td className="border px-2 py-1 text-center text-slate-600">
+                        {sig.created_at
+                          ? new Date(sig.created_at).toLocaleString("ja-JP")
+                          : sig.signal_date}
+                      </td>
+                      <td className="border px-2 py-1">
+                        <span className="font-mono">{sig.ticker}</span>
+                        <span className="ml-1 text-slate-600">{sig.stock_name}</span>
+                      </td>
+                      <td className="border px-2 py-1 text-center font-medium">
+                        {sig.signal_type === "buy" && (
+                          <span className="text-emerald-700">買い</span>
+                        )}
+                        {sig.signal_type === "sell" && <span className="text-red-700">売り</span>}
+                        {sig.signal_type === "neutral" && (
+                          <span className="text-slate-600">様子見</span>
+                        )}
+                      </td>
+                      <td className="border px-2 py-1 text-center text-xs text-slate-600">
+                        {sig.score_strength}
+                      </td>
+                      <td className="border px-2 py-1 text-right font-mono text-slate-700">
+                        {sig.signal_price ?? "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <p className="text-sm text-slate-500">発報されたシグナルはありません。</p>
         )}
