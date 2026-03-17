@@ -624,12 +624,8 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                         ticker,
                         five_bars_total,
                     )
-                    logger.warning(
-                        "stocks.fetch-prices 5m save start stock_id=%s ticker=%s bars_total=%d",
-                        stock.id,
-                        ticker,
-                        five_bars_total,
-                    )
+                    # 差分対象バーをまとめて一括保存
+                    new_objects: list[StockPrice5Min] = []
                     for i in range(len(timestamps)):
                         ts = timestamps[i]
                         if ts is None:
@@ -657,35 +653,46 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                         high_val = Decimal(str(h)) if h is not None else close_val
                         low_val = Decimal(str(l_)) if l_ is not None else close_val
                         vol = int(v) if v is not None and v == v else None
-                        _, was_created = StockPrice5Min.objects.update_or_create(
-                            stock=stock,
-                            datetime=dt,
-                            defaults={
-                                "open_price": open_val,
-                                "high_price": high_val,
-                                "low_price": low_val,
-                                "close_price": close_val,
-                                "volume": vol,
-                            },
+
+                        new_objects.append(
+                            StockPrice5Min(
+                                stock=stock,
+                                datetime=dt,
+                                open_price=open_val,
+                                high_price=high_val,
+                                low_price=low_val,
+                                close_price=close_val,
+                                volume=vol,
+                            )
                         )
-                        if was_created:
-                            five_bars_saved += 1
-                        else:
-                            five_bars_updated += 1
 
                         # 進捗ログ: 最初の1件 + 10, 50, 100, 500, 1000, 2000, 3000, 4000... 付近
                         if i in (0, 9, 49, 99) or (i + 1) % 500 == 0:
                             logger.warning(
-                                "stocks.fetch-prices 5m save progress stock_id=%s ticker=%s idx=%d/%d saved=%d updated=%d",
+                                "stocks.fetch-prices 5m save progress stock_id=%s ticker=%s idx=%d/%d candidates=%d",
                                 stock.id,
                                 ticker,
                                 i + 1,
                                 five_bars_total,
-                                five_bars_saved,
-                                five_bars_updated,
+                                len(new_objects),
                             )
-                    if five_bars_saved:
-                        created_5m += 1
+
+                    candidate_count = len(new_objects)
+                    logger.warning(
+                        "stocks.fetch-prices 5m save start stock_id=%s ticker=%s bars_total=%d candidates=%d",
+                        stock.id,
+                        ticker,
+                        five_bars_total,
+                        candidate_count,
+                    )
+                    if candidate_count:
+                        created_objs = StockPrice5Min.objects.bulk_create(
+                            new_objects,
+                            ignore_conflicts=True,
+                        )
+                        five_bars_saved = len(created_objs)
+                        if five_bars_saved:
+                            created_5m += 1
             except Exception as e:
                 logger.warning(
                     "stocks.fetch-prices 5m error stock_id=%s ticker=%s error=%s",
@@ -695,11 +702,11 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                 )
             five_end = time.monotonic()
             logger.info(
-                "stocks.fetch-prices 5m duration=%.3f bars_total=%d bars_saved=%d bars_updated=%d created=%d",
+                "stocks.fetch-prices 5m duration=%.3f bars_total=%d candidates=%d bars_saved=%d created=%d",
                 five_end - five_start,
                 five_bars_total,
+                candidate_count if 'candidate_count' in locals() else 0,
                 five_bars_saved,
-                five_bars_updated,
                 created_5m,
             )
 
