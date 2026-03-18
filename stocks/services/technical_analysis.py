@@ -136,7 +136,8 @@ def calculate_technical_summary(stock: WatchStock) -> TechnicalSummary:
     qs = StockPriceDaily.objects.filter(stock=stock).order_by("-date")
 
     t1 = time.monotonic()
-    prices = list(qs[: max(75, 20)])  # 最大 75 日分あれば十分
+    # 1 本前の MA75/MA25 を計算するため、最大 76 本取得する
+    prices = list(qs[: max(76, 20)])
     t2 = time.monotonic()
     logger.info(
         "technical_summary daily_fetch stock_id=%s ticker=%s duration=%.3f count=%d",
@@ -268,7 +269,8 @@ def calculate_technical_summary_5m(stock: WatchStock) -> TechnicalSummary:
     high_20/low_20 は直近20本の高値・安値）。データが足りない指標は None。
     """
     qs = StockPrice5Min.objects.filter(stock=stock).order_by("-datetime")
-    prices = list(qs[: max(75, 20)])
+    # 1 本前の MA75/MA25 を計算するため、最大 76 本取得する
+    prices = list(qs[: max(76, 20)])
 
     if not prices:
         empty_ma = MovingAverages(ma5=None, ma25=None, ma75=None)

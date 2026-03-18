@@ -1033,12 +1033,13 @@ class TechnicalAnalysisMultiTimeframeTests(TestCase):
     """長期・短期トレンド（long_term_trend / short_term_trend）の算出をテストする。"""
 
     def test_calculate_technical_summary_sets_long_short_trends(self) -> None:
-        """75日分の日足があり終値がMAより上なら長期・短期とも上昇になる。"""
+        """MA の傾き + 乖離条件を満たすと long/short とも up になる。"""
         stock = WatchStock.objects.create(ticker="MTF", name="MultiTF", market="JP")
-        # 75日分: 終値は全て 100、直近のみ 120 にすると close > ma75, ma25, ma5 → 全て up
+        # ma*_prev を算出するために 76 日分用意する。
+        # 後半で終値を上げて MA の傾きと乖離を作り、up 判定条件を満たす。
         from datetime import timedelta
         base = date(2025, 1, 1)
-        for i in range(75):
+        for i in range(76):
             d = base + timedelta(days=i)
             StockPriceDaily.objects.create(
                 stock=stock,
@@ -1046,7 +1047,7 @@ class TechnicalAnalysisMultiTimeframeTests(TestCase):
                 open_price=Decimal("100"),
                 high_price=Decimal("101"),
                 low_price=Decimal("99"),
-                close_price=Decimal("120") if i == 74 else Decimal("100"),
+                close_price=Decimal("120") if i == 75 else (Decimal("110") if i == 74 else Decimal("100")),
                 volume=10000,
             )
         summary = calculate_technical_summary(stock)

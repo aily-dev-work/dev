@@ -91,6 +91,223 @@ class WatchStockViewSet(viewsets.ModelViewSet):
     serializer_class = WatchStockSerializer
 
 
+    def list(self, request, *args, **kwargs):
+        path = getattr(request, "path", "")
+        query = dict(request.query_params)
+        start = time.monotonic()
+        logger.info("watch-stocks list start path=%s query=%s", path, query)
+        response = None
+        try:
+            # B: queryset 構築
+            qs_build_start = time.monotonic()
+            queryset = self.filter_queryset(self.get_queryset())
+            qs_build_end = time.monotonic()
+            logger.info(
+                "watch-stocks list queryset_built duration=%.3f",
+                qs_build_end - qs_build_start,
+            )
+
+            # C: queryset 評価（DB から実体取得）＋件数
+            eval_start = time.monotonic()
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                objects = list(page)
+            else:
+                objects = list(queryset)
+            eval_end = time.monotonic()
+            logger.info(
+                "watch-stocks list queryset_evaluated duration=%.3f count=%d",
+                eval_end - eval_start,
+                len(objects),
+            )
+
+            # D: serializer 初期化
+            ser_init_start = time.monotonic()
+            serializer = self.get_serializer(objects, many=True)
+            ser_init_end = time.monotonic()
+            logger.info(
+                "watch-stocks list serializer_init duration=%.3f",
+                ser_init_end - ser_init_start,
+            )
+
+            # E: serializer.data 評価
+            ser_data_start = time.monotonic()
+            data = serializer.data
+            ser_data_end = time.monotonic()
+            logger.info(
+                "watch-stocks list serializer_data duration=%.3f",
+                ser_data_end - ser_data_start,
+            )
+
+            # F: response 生成
+            if page is not None:
+                response = self.get_paginated_response(data)
+            else:
+                response = Response(data)
+            return response
+        except Exception:
+            logger.exception("watch-stocks list error path=%s query=%s", path, query)
+            raise
+        finally:
+            total = time.monotonic() - start
+            logger.info(
+                "watch-stocks list finish path=%s duration=%.3f",
+                path,
+                total,
+            )
+
+    @action(detail=False, methods=["get"], url_path="scores")
+    def scores(self, request):
+        """
+        全監視銘柄について、現在アクティブなプロファイルで買い/売りスコアを計算し、
+        買い％・売り％・様子見％を返す。ダッシュボード表示用。
+        GET /api/v1/stocks/scores/
+        """
+        start = time.monotonic()
+        path = getattr(request, "path", "")
+        query_params = dict(request.query_params)
+        include_breakdown = str(request.query_params.get("include_breakdown", "")).lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        logger.info("stocks.scores start path=%s query=%s", path, query_params)
+        response = None
+        try:
+            section_start = time.monotonic()
+            try:
+                get_active_score_profile()
+            except ImproperlyConfigured:
+                response = Response(
+                    {"detail": "アクティブなプロファイルがありません。プロファイルをアクティブにしてください。"},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+                logger.info(
+                    "stocks.scores active_profile duration=%.3f result=none",
+                    time.monotonic() - section_start,
+                )
+                return response
+            logger.info(
+                "stocks.scores active_profile duration=%.3f result=ok",
+                time.monotonic() - section_start,
+            )
+
+            # breakdown を構築するための重み設定（アクティブ ScoreProfile から取得）
+            scoring_config = get_active_scoring_config()
+            buy_weights = scoring_config.buy_weights
+            sell_weights = scoring_config.sell_weights
+
+            section_start = time.monotonic()
+            stocks = WatchStock.objects.all().order_by("ticker")
+            stocks_list = list(stocks)
+            logger.info(
+                "stocks.scores load_stocks duration=%.3f count=%d",
+                time.monotonic() - section_start,
+                len(stocks_list),
+            )
+
+            loop_start = time.monotonic()
+            results = []
+            for idx, stock in enumerate(stocks_list, start=1):
+                per_stock_start = time.monotonic()
+                try:
+                    summary = calculate_technical_summary(stock)
+                    score_result = score_from_technical(summary)
+                except Exception as e:
+                    logger.exception(
+                        "stocks.scores per-stock error stock_id=%s ticker=%s",
+                        getattr(stock, "id", None),
+                        getattr(stock, "ticker", None),
+                    )
+                    results.append(
+                        {
+                            "stock_id": stock.id,
+                            "ticker": stock.ticker,
+                            "name": stock.name or "",
+                            "buy_score": None,
+                            "sell_score": None,
+                            "bias": None,
+                            "strength": None,
+                            "buy_pct": None,
+                            "sell_pct": None,
+                            "wait_pct": None,
+                            "long_term_trend": None,
+                            "short_term_trend": None,
+                            "insufficient_data": True,
+                            "insufficient_reason": None,
+                            "error": str(e),
+                        }
+                    )
+                    continue
+                buy_score = score_result.buy_score
+                sell_score = score_result.sell_score
+                total = buy_score + sell_score + 100.0
+                buy_pct = round(100.0 * buy_score / total, 1) if total > 0 else 0
+                sell_pct = round(100.0 * sell_score / total, 1) if total > 0 else 0
+                wait_pct = round(100.0 - buy_pct - sell_pct, 1)
+                item = {
+                    "stock_id": stock.id,
+                    "ticker": stock.ticker,
+                    "name": stock.name or "",
+                    "buy_score": buy_score,
+                    "sell_score": sell_score,
+                    "bias": score_result.bias,
+                    "strength": score_result.strength,
+                    "buy_pct": buy_pct,
+                    "sell_pct": sell_pct,
+                    "wait_pct": wait_pct,
+                    "long_term_trend": summary.long_term_trend,
+                    "short_term_trend": summary.short_term_trend,
+                    "insufficient_data": score_result.insufficient_data,
+                    "insufficient_reason": score_result.insufficient_reason,
+                }
+                if include_breakdown:
+                    item["buy_breakdown"] = _build_breakdown_response(
+                        score_result.breakdown_buy,
+                        buy_weights,
+                    )
+                    item["sell_breakdown"] = _build_breakdown_response(
+                        score_result.breakdown_sell,
+                        sell_weights,
+                    )
+                results.append(item)
+                per_stock_duration = time.monotonic() - per_stock_start
+                if idx <= 5 or idx % 20 == 0:
+                    logger.info(
+                        "stocks.scores stock_loop idx=%d stock_id=%s ticker=%s duration=%.3f",
+                        idx,
+                        getattr(stock, "id", None),
+                        getattr(stock, "ticker", None),
+                        per_stock_duration,
+                    )
+            logger.info(
+                "stocks.scores stock_loop total_duration=%.3f count=%d",
+                time.monotonic() - loop_start,
+                len(stocks_list),
+            )
+            response = Response({"stocks": results}, status=status.HTTP_200_OK)
+            return response
+        except Exception:
+            logger.exception("stocks.scores error path=%s query=%s", path, query_params)
+            raise
+        finally:
+            duration = time.monotonic() - start
+            result_count = 0
+            try:
+                if response is not None and isinstance(response.data, dict):
+                    stocks_data = response.data.get("stocks")
+                    if isinstance(stocks_data, list):
+                        result_count = len(stocks_data)
+            except Exception:
+                result_count = -1
+            logger.info(
+                "stocks.scores finish path=%s duration=%.3f result_count=%s",
+                path,
+                duration,
+                result_count,
+            )
+
+
 def _build_breakdown_response(breakdown: dict, weights: dict) -> list[dict]:
     """
     breakdown(dict[key, points]) と weights(dict[key, weight]) から
