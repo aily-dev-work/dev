@@ -28,7 +28,7 @@ export function DashboardCharts({
           評価期間はプロファイルのトレードスタイル別（デイトレ=5営業日・短期=10営業日・長期=20営業日）
         </p>
         {successRateData.length > 0 ? (
-          <div className="h-64">
+          <div className="h-64 min-h-[256px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={successRateData} margin={{ left: 8, right: 8, bottom: 80 }}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -61,7 +61,7 @@ export function DashboardCharts({
           評価期間はプロファイルのトレードスタイル別（デイトレ=5営業日・短期=10営業日・長期=20営業日）
         </p>
         {avgReturnData.length > 0 ? (
-          <div className="h-64">
+          <div className="h-64 min-h-[256px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={avgReturnData} margin={{ left: 8, right: 8, bottom: 80 }}>
                 <CartesianGrid strokeDasharray="3 3" />
