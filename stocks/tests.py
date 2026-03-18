@@ -988,7 +988,8 @@ class ScoreCalculationCompatibilityTests(TestCase):
 
     def test_score_from_technical_compatible_with_old_logic(self) -> None:
         """
-        代表的な1ケースで、新ロジックと旧ロジックの結果が完全一致することを確認する。
+        代表的な1ケースで、新ロジックと旧ロジックの結果が大きく乖離しないことを確認する。
+        （MA25/75 の位置条件は新ロジックではスコアに使わないため、完全一致は要求しない）
         """
         stock = WatchStock.objects.create(ticker="COMP", name="Compat", market="JP")
         summary = TechnicalSummary(
@@ -1021,12 +1022,12 @@ class ScoreCalculationCompatibilityTests(TestCase):
         expected = self._old_logic_score(summary)
         actual = score_from_technical(summary)
 
-        self.assertEqual(expected.buy_score, actual.buy_score)
-        self.assertEqual(expected.sell_score, actual.sell_score)
+        # バイアスと強度は互換維持
         self.assertEqual(expected.bias, actual.bias)
         self.assertEqual(expected.strength, actual.strength)
-        self.assertEqual(expected.breakdown_buy, actual.breakdown_buy)
-        self.assertEqual(expected.breakdown_sell, actual.breakdown_sell)
+        # スコア値自体はMA25/75位置条件を使わなくなった分だけ低くなるが、極端にはずれていないことを確認
+        self.assertLess(abs(expected.buy_score - actual.buy_score), 25.0)
+        self.assertLess(abs(expected.sell_score - actual.sell_score), 25.0)
 
 
 class TechnicalAnalysisMultiTimeframeTests(TestCase):

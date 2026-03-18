@@ -99,37 +99,12 @@ def score_from_technical(summary: TechnicalSummary) -> ScoreResult:
         insufficient_reasons.append("volume_trend_missing")
 
     # ---------- 移動平均との位置関係 ----------
-    # ma25
-    if latest_close is not None and ma.ma25 is not None:
-        if latest_close > ma.ma25:
-            breakdown_buy["above_ma25"] = buy_weights.get("above_ma25", 0.0)
-            breakdown_sell["below_ma25"] = 0.0
-        elif latest_close < ma.ma25:
-            breakdown_sell["below_ma25"] = sell_weights.get("below_ma25", 0.0)
-            breakdown_buy["above_ma25"] = 0.0
-        else:
-            breakdown_buy["above_ma25"] = 0.0
-            breakdown_sell["below_ma25"] = 0.0
-    else:
-        breakdown_buy["above_ma25"] = 0.0
-        breakdown_sell["below_ma25"] = 0.0
-        insufficient_reasons.append("ma25_or_latest_missing")
-
-    # ma75
-    if latest_close is not None and ma.ma75 is not None:
-        if latest_close > ma.ma75:
-            breakdown_buy["above_ma75"] = buy_weights.get("above_ma75", 0.0)
-            breakdown_sell["below_ma75"] = 0.0
-        elif latest_close < ma.ma75:
-            breakdown_sell["below_ma75"] = sell_weights.get("below_ma75", 0.0)
-            breakdown_buy["above_ma75"] = 0.0
-        else:
-            breakdown_buy["above_ma75"] = 0.0
-            breakdown_sell["below_ma75"] = 0.0
-    else:
-        breakdown_buy["above_ma75"] = 0.0
-        breakdown_sell["below_ma75"] = 0.0
-        insufficient_reasons.append("ma75_or_latest_missing")
+    # 25日 / 75日移動平均に対する位置は、現在の長期プロファイルではスコアに使用しない。
+    # breakdown には常に 0 として残し、既存データとの互換性のみ維持する。
+    breakdown_buy["above_ma25"] = 0.0
+    breakdown_sell["below_ma25"] = 0.0
+    breakdown_buy["above_ma75"] = 0.0
+    breakdown_sell["below_ma75"] = 0.0
 
     # ---------- 20日高値・安値との位置関係 ----------
     # 高値圏（high_20 付近）は利確・売り警戒 → 売り加点
