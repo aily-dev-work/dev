@@ -53,6 +53,7 @@ from .services.signal_scoring import score_from_technical
 from .services.scoring_profile import get_active_scoring_config
 from .services.technical_analysis import calculate_technical_summary
 from .services.run_5m_job import run_5m_fetch_and_evaluate
+from .services.price_fetcher import fetch_and_save_5m_prices
 from .services.profile_proposal import save_profile_proposal
 from .services.profile_proposal_review import (
     can_delete,
@@ -306,6 +307,143 @@ class WatchStockViewSet(viewsets.ModelViewSet):
                 duration,
                 result_count,
             )
+
+    @action(detail=True, methods=["get"], url_path="prices")
+    def prices(self, request, pk=None):
+        """
+        銘柄の価格データを resolution で取得。
+        ?resolution=5m|1d|1w|1m &limit=500（省略時 500）
+        返却: { resolution, stock_id, ticker, bars: [...] }（時系列昇順）
+        """
+        stock = self.get_object()
+        resolution = (request.query_params.get("resolution") or "1d").strip().lower()
+        limit = min(int(request.query_params.get("limit") or 500), 2000)
+
+        if resolution == "1d":
+            qs = list(
+                StockPriceDaily.objects.filter(stock=stock)
+                .order_by("-date")
+                .values_list("date", "open_price", "high_price", "low_price", "close_price", "volume")[:limit]
+            )
+            rows = [
+                {
+                    "date": d.isoformat(),
+                    "open": float(o),
+                    "high": float(h),
+                    "low": float(l),
+                    "close": float(c),
+                    "volume": v if v is not None else None,
+                }
+                for d, o, h, l, c, v in reversed(qs)
+            ]
+        elif resolution == "5m":
+            qs = list(
+                StockPrice5Min.objects.filter(stock=stock)
+                .order_by("-datetime")
+                .values_list("datetime", "open_price", "high_price", "low_price", "close_price", "volume")[:limit]
+            )
+            rows = [
+                {
+                    "datetime": dt.isoformat(),
+                    "open": float(o),
+                    "high": float(h),
+                    "low": float(l),
+                    "close": float(c),
+                    "volume": v if v is not None else None,
+                }
+                for dt, o, h, l, c, v in reversed(qs)
+            ]
+        elif resolution == "1m":
+            qs = list(
+                StockPriceMonthly.objects.filter(stock=stock)
+                .order_by("-date")
+                .values_list("date", "open_price", "high_price", "low_price", "close_price", "volume")[:limit]
+            )
+            rows = [
+                {
+                    "date": d.isoformat(),
+                    "open": float(o),
+                    "high": float(h),
+                    "low": float(l),
+                    "close": float(c),
+                    "volume": v if v is not None else None,
+                }
+                for d, o, h, l, c, v in reversed(qs)
+            ]
+        elif resolution == "1w":
+            qs = list(
+                StockPriceWeekly.objects.filter(stock=stock)
+                .order_by("-date")
+                .values_list("date", "open_price", "high_price", "low_price", "close_price", "volume")[:limit]
+            )
+            rows = [
+                {
+                    "date": d.isoformat(),
+                    "open": float(o),
+                    "high": float(h),
+                    "low": float(l),
+                    "close": float(c),
+                    "volume": v if v is not None else None,
+                }
+                for d, o, h, l, c, v in reversed(qs)
+            ]
+        else:
+            return Response(
+                {"detail": "resolution must be 5m, 1d, 1w, or 1m"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {
+                "resolution": resolution,
+                "stock_id": stock.id,
+                "ticker": stock.ticker,
+                "bars": rows,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["post"], url_path="fetch-prices")
+    def fetch_prices(self, request, pk=None):
+        """
+        互換用: 価格取得を実行して保存する。
+        まずは 5 分足の取得/保存を確実に動かしつつ、レスポンス形式は既存互換を維持する。
+        """
+        stock = self.get_object()
+        ticker = (stock.ticker or "").strip()
+        if not ticker:
+            return Response(
+                {"detail": "銘柄に銘柄コードが設定されていません。"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        start = time.monotonic()
+        created_5m = 0
+        try:
+            created_5m = fetch_and_save_5m_prices(stock)
+        except Exception:
+            logger.exception(
+                "stocks.fetch-prices 5m error stock_id=%s ticker=%s",
+                getattr(stock, "id", None),
+                getattr(stock, "ticker", None),
+            )
+            raise
+
+        elapsed = time.monotonic() - start
+        # 既存レスポンス互換: created と daily/weekly/monthly/5m の created を返す
+        return Response(
+            {
+                "stock_id": stock.id,
+                "ticker": stock.ticker,
+                "created": int(created_5m),
+                "daily": {"created": 0},
+                "weekly": {"created": 0},
+                "monthly": {"created": 0},
+                "5m": {"created": int(created_5m)},
+                "elapsed_seconds": round(float(elapsed), 3),
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 def _build_breakdown_response(breakdown: dict, weights: dict) -> list[dict]:

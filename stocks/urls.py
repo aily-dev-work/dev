@@ -37,5 +37,16 @@ urlpatterns = [
         WatchStockViewSet.as_view({"get": "scores"}),
         name="watchstock-scores",
     ),
+    # 同様に prices / fetch-prices も明示的に配線しておく（本番での @action 未反映/崩れ対策）
+    path(
+        "stocks/<int:pk>/prices/",
+        WatchStockViewSet.as_view({"get": "prices"}),
+        name="watchstock-prices",
+    ),
+    path(
+        "stocks/<int:pk>/fetch-prices/",
+        WatchStockViewSet.as_view({"post": "fetch_prices"}),
+        name="watchstock-fetch-prices",
+    ),
 ] + router.urls
 
