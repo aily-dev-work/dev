@@ -7,8 +7,9 @@ export const metadata = {
   title: "株価スコア管理",
   description: "スコアプロファイル管理ダッシュボード",
   icons: { icon: "/icon.svg" },
-  viewport: { width: "device-width", initialScale: 1 },
 };
+
+export const viewport = { width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
