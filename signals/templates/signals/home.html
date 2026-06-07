@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}検知記事一覧 | premium_monitor{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+  <div>
+    <h1 class="h3 mb-1">検知記事一覧</h1>
+    <p class="text-secondary mb-0">最新の検知結果を新しい順に表示します。</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/sources/new/" class="btn btn-outline-primary">監視サイトを追加</a>
+    <form method="post" action="{% url 'signals:fetch-signals' %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary">データ取得</button>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>タイトル</th>
+            <th>サイト名</th>
+            <th>検知キーワード</th>
+            <th>スコア</th>
+            <th>判定</th>
+            <th>日時</th>
+            <th>詳細</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+            <tr>
+              <td class="fw-semibold">{{ item.title }}</td>
+              <td>{{ item.source.name }}</td>
+              <td>
+                {% if item.matched_keywords %}
+                  {% for keyword in item.matched_keywords %}
+                    <span class="badge text-bg-secondary me-1 mb-1">{{ keyword }}</span>
+                  {% endfor %}
+                {% else %}
+                  <span class="text-secondary">なし</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if item.total_score >= 80 %}
+                  <span class="badge text-bg-danger">{{ item.total_score }}</span>
+                {% elif item.total_score >= 50 %}
+                  <span class="badge text-bg-warning">{{ item.total_score }}</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">{{ item.total_score }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if item.is_alert %}
+                  {% if item.total_score >= 80 %}
+                    <span class="badge text-bg-danger">強い警告</span>
+                  {% else %}
+                    <span class="badge text-bg-warning text-dark">アラート</span>
+                  {% endif %}
+                {% else %}
+                  <span class="badge text-bg-secondary">通常</span>
+                {% endif %}
+              </td>
+              <td>{{ item.published_at|default:item.created_at|date:"Y-m-d H:i" }}</td>
+              <td><a href="/items/{{ item.id }}/" class="btn btn-sm btn-outline-primary">詳細</a></td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="7" class="text-center text-secondary py-5">
+                まだ検知記事はありません。<br>
+                先に監視サイトとキーワードを登録してから
+                <code>python manage.py fetch_signals</code> を実行するか、
+                上の <strong>データ取得</strong> ボタンを押してください。
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

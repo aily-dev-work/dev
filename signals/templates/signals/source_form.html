@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}監視サイト登録 | premium_monitor{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h1 class="h3 mb-3">監視サイト登録</h1>
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.name.id_for_label }}">name</label>
+            {{ form.name }}
+            {% for error in form.name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.url.id_for_label }}">url</label>
+            {{ form.url }}
+            {% for error in form.url.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.source_type.id_for_label }}">source_type</label>
+            {{ form.source_type }}
+            {% for error in form.source_type.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="form-check mb-4">
+            {{ form.is_active }}
+            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">is_active</label>
+            {% for error in form.is_active.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+          {% endif %}
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">登録する</button>
+            <a href="/sources/" class="btn btn-outline-secondary">一覧へ戻る</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,18 +1,5 @@
-# Django 6.x (latest stable)
-Django>=6.0,<7
-# Django REST Framework
-djangorestframework>=3.16,<4
-# CORS (フロント localhost:3000 から API へアクセスするため)
-django-cors-headers>=4.3,<5
-
-# 本番 WSGI サーバー（Docker デプロイ用）
+Django>=5.2,<6.1
+requests>=2.32,<3
+beautifulsoup4>=4.12,<5
+feedparser>=6.0,<7
 gunicorn>=23.0,<24
-# 本番で静的ファイル（admin CSS 等）を配信
-whitenoise>=6.6,<7
-
-# Supabase 等 PostgreSQL に切り替える場合（DATABASE_URL で接続）
-psycopg2-binary>=2.9,<3
-dj-database-url>=2.1,<3
-
-# 将来 MariaDB に切り替える場合:
-# mysqlclient>=2.2
