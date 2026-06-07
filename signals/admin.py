@@ -35,10 +35,19 @@ class DetectedItemAdmin(admin.ModelAdmin):
         "source",
         "total_score",
         "premium_probability",
+        "google_trend_score",
+        "social_buzz_score",
         "is_alert",
         "published_at",
         "created_at",
     )
     list_filter = ("is_alert", "source", "product")
-    search_fields = ("title", "url", "summary", "matched_keywords", "prevalue_reason")
+    search_fields = (
+        "title",
+        "url",
+        "summary",
+        "matched_keywords",
+        "prevalue_reason",
+        "external_signal_summary",
+    )
     ordering = ("-published_at", "-created_at")

@@ -4,15 +4,23 @@
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
   <div>
     <h1 class="h3 mb-1">検知記事一覧</h1>
-    <p class="text-secondary mb-0">商品名に紐づいた検知結果だけを表示します。</p>
+    <p class="text-secondary mb-0">ページタイトルから自動抽出した商品名に対して、Google Trends と SNS の外部信号を加味して判定します。</p>
   </div>
   <div class="d-flex gap-2">
-    <a href="/products/new/" class="btn btn-outline-secondary">監視商品を追加</a>
+    <a href="/products/" class="btn btn-outline-secondary">商品候補を見る</a>
     <a href="/sources/new/" class="btn btn-outline-primary">監視サイトを追加</a>
     <form method="post" action="{% url 'signals:fetch-signals' %}">
       {% csrf_token %}
       <button type="submit" class="btn btn-primary">データ取得</button>
     </form>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-body">
+    <div class="alert alert-info mb-0">
+      商品名は事前登録しません。巡回時にページタイトルや見出しから自動抽出し、Google Trends の上昇や SNS 言及の増加を外部信号として加点します。
+    </div>
   </div>
 </div>
 
@@ -26,6 +34,8 @@
             <th>タイトル</th>
             <th>理由</th>
             <th>確率</th>
+            <th>Google</th>
+            <th>SNS</th>
             <th>キーワード</th>
             <th>スコア</th>
             <th>判定</th>
@@ -47,6 +57,18 @@
                 {% else %}
                   <span class="badge text-bg-secondary">{{ item.premium_probability }}%</span>
                 {% endif %}
+              </td>
+              <td>
+                <div class="small">
+                  <div>Trend: {{ item.google_trend_score }}</div>
+                  <div>Growth: {{ item.google_trend_growth_pct }}%</div>
+                </div>
+              </td>
+              <td>
+                <div class="small">
+                  <div>Buzz: {{ item.social_buzz_score }}</div>
+                  <div>Mention: {{ item.social_mentions }}</div>
+                </div>
               </td>
               <td>
                 {% if item.matched_keywords %}
@@ -82,9 +104,9 @@
             </tr>
           {% empty %}
             <tr>
-              <td colspan="9" class="text-center text-secondary py-5">
+              <td colspan="11" class="text-center text-secondary py-5">
                 まだ検知記事はありません。<br>
-                先に監視商品と監視サイトを登録してから
+                先に監視サイトを登録してから
                 <code>python manage.py fetch_signals</code> を実行するか、
                 上の <strong>データ取得</strong> ボタンを押してください。
               </td>

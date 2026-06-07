@@ -76,6 +76,11 @@ class DetectedItem(models.Model):
     total_score = models.PositiveIntegerField(default=0)
     is_alert = models.BooleanField(default=False)
     premium_probability = models.PositiveIntegerField(default=0)
+    google_trend_score = models.PositiveIntegerField(default=0)
+    google_trend_growth_pct = models.IntegerField(default=0)
+    social_buzz_score = models.PositiveIntegerField(default=0)
+    social_mentions = models.PositiveIntegerField(default=0)
+    external_signal_summary = models.TextField(blank=True, default="")
     prevalue_reason = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
 

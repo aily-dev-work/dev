@@ -34,6 +34,21 @@
       <dt class="col-sm-3">商品名</dt>
       <dd class="col-sm-9">{{ item.product.name }}</dd>
 
+      <dt class="col-sm-3">理由</dt>
+      <dd class="col-sm-9">{{ item.prevalue_reason|linebreaksbr }}</dd>
+
+      <dt class="col-sm-3">Google Trends</dt>
+      <dd class="col-sm-9">
+        <div>Trend score: {{ item.google_trend_score }}</div>
+        <div>Growth: {{ item.google_trend_growth_pct }}%</div>
+      </dd>
+
+      <dt class="col-sm-3">SNS 言及</dt>
+      <dd class="col-sm-9">
+        <div>Buzz score: {{ item.social_buzz_score }}</div>
+        <div>Mentions: {{ item.social_mentions }}</div>
+      </dd>
+
       <dt class="col-sm-3">タイトル</dt>
       <dd class="col-sm-9">{{ item.title }}</dd>
 
@@ -42,9 +57,6 @@
 
       <dt class="col-sm-3">サイト名</dt>
       <dd class="col-sm-9">{{ item.source.name }}</dd>
-
-      <dt class="col-sm-3">理由</dt>
-      <dd class="col-sm-9">{{ item.prevalue_reason|linebreaksbr }}</dd>
 
       <dt class="col-sm-3">概要</dt>
       <dd class="col-sm-9">{{ item.summary|linebreaksbr }}</dd>
@@ -63,6 +75,9 @@
 
       <dt class="col-sm-3">確率</dt>
       <dd class="col-sm-9">{{ item.premium_probability }}%</dd>
+
+      <dt class="col-sm-3">外部信号</dt>
+      <dd class="col-sm-9">{{ item.external_signal_summary|default:"-" }}</dd>
 
       <dt class="col-sm-3">登録日時</dt>
       <dd class="col-sm-9">{{ item.created_at|date:"Y-m-d H:i:s" }}</dd>

@@ -12,10 +12,45 @@ import requests
 from bs4 import BeautifulSoup
 
 from .models import DetectedItem, SignalKeyword, TrackedProduct, WatchSource
+from .external_signals import ExternalSignalSummary, collect_external_signals
 
 
 REQUEST_TIMEOUT = 15
 MAX_SUMMARY_LENGTH = 500
+
+GENERIC_TERMS = {
+    "お知らせ",
+    "ニュース",
+    "プレスリリース",
+    "公式",
+    "告知",
+    "発表",
+    "キャンペーン",
+    "イベント",
+    "商品情報",
+}
+
+ANNOUNCEMENT_TERMS = [
+    "予約開始",
+    "予約受付開始",
+    "予約受付中",
+    "予約終了",
+    "受注開始",
+    "受注終了",
+    "販売開始",
+    "販売終了",
+    "発売",
+    "再販",
+    "再入荷",
+    "抽選販売",
+    "在庫切れ",
+    "完売",
+    "新商品",
+    "限定",
+]
+
+ANNOUNCEMENT_RE = re.compile("|".join(map(re.escape, ANNOUNCEMENT_TERMS)))
+GENERIC_RE = re.compile("|".join(map(re.escape, GENERIC_TERMS)))
 
 
 @dataclass
@@ -57,10 +92,6 @@ def load_active_keywords() -> list[SignalKeyword]:
     return list(SignalKeyword.objects.filter(is_active=True).order_by("-score", "keyword"))
 
 
-def load_active_products() -> list[TrackedProduct]:
-    return list(TrackedProduct.objects.filter(is_active=True).order_by("name"))
-
-
 def detect_keywords(text: str, keywords: Iterable[SignalKeyword]) -> tuple[list[str], int]:
     haystack = clean_text(text).lower()
     matched: list[str] = []
@@ -73,57 +104,19 @@ def detect_keywords(text: str, keywords: Iterable[SignalKeyword]) -> tuple[list[
     return matched, total_score
 
 
-def _product_terms(product: TrackedProduct) -> list[str]:
-    terms = [clean_text(product.name)]
-    for alias in product.aliases or []:
-        alias_text = clean_text(str(alias))
-        if alias_text:
-            terms.append(alias_text)
-    return [term for term in terms if term]
-
-
-def match_product(text: str, products: Iterable[TrackedProduct]) -> tuple[TrackedProduct | None, str, int]:
-    """
-    Return (product, matched_term, confidence).
-    Confidence is a heuristic 0-100 value describing how likely the article is tied to the product.
-    """
-    haystack = clean_text(text).lower()
-    best_product: TrackedProduct | None = None
-    best_term = ""
-    best_confidence = 0
-
-    for product in products:
-        for term in _product_terms(product):
-            needle = term.lower()
-            if not needle or needle not in haystack:
-                continue
-
-            confidence = 70
-            if needle == clean_text(product.name).lower():
-                confidence = 90
-            elif len(needle) >= 8:
-                confidence = 82
-            elif len(needle) >= 4:
-                confidence = 75
-
-            if confidence > best_confidence:
-                best_product = product
-                best_term = term
-                best_confidence = confidence
-
-    return best_product, best_term, best_confidence
-
-
-def estimate_probability(total_score: int, matched_keywords: list[str], product_confidence: int) -> int:
-    """
-    Heuristic estimate for premium value probability.
-    This is a rule-based score, not a statistical model.
-    """
-    probability = 20 + int(total_score * 0.8)
+def estimate_probability(
+    total_score: int,
+    matched_keywords: list[str],
+    product_confidence: int,
+    external_signals: ExternalSignalSummary | None = None,
+) -> int:
+    external_score = external_signals.external_score if external_signals else 0
+    probability = 15 + int(total_score * 0.55)
     probability += max(0, product_confidence - 70) // 2
+    probability += int(external_score * 0.35)
 
     if len(matched_keywords) >= 2:
-        probability += 8
+        probability += 6
     if any(keyword in {"再販なし", "生産終了", "販売終了", "完売"} for keyword in matched_keywords):
         probability += 10
     if any(keyword in {"抽選販売", "限定"} for keyword in matched_keywords):
@@ -133,14 +126,15 @@ def estimate_probability(total_score: int, matched_keywords: list[str], product_
 
 
 def build_reason(
-    product: TrackedProduct,
+    product_name: str,
     matched_keywords: list[str],
     matched_term: str,
     product_confidence: int,
+    external_signals: ExternalSignalSummary | None = None,
 ) -> str:
-    parts = [f"商品名一致: {product.name}"]
-    if matched_term and clean_text(matched_term) != clean_text(product.name):
-        parts.append(f"別名一致: {matched_term}")
+    parts = [f"商品名候補: {product_name}"]
+    if matched_term and clean_text(matched_term) != clean_text(product_name):
+        parts.append(f"抽出元: {matched_term}")
     if matched_keywords:
         parts.append("検知キーワード: " + ", ".join(matched_keywords))
     if product_confidence >= 90:
@@ -149,7 +143,72 @@ def build_reason(
         parts.append("商品との紐づきが中程度")
     else:
         parts.append("商品との紐づきが弱め")
+    if external_signals:
+        parts.append(external_signals.summary)
     return " / ".join(parts)
+
+
+def sanitize_candidate(value: str | None) -> str:
+    text = clean_text(value)
+    if not text:
+        return ""
+
+    text = GENERIC_RE.sub("", text)
+    text = ANNOUNCEMENT_RE.sub("", text)
+    text = re.sub(r"\b(?:news|info|release)\b", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+", " ", text).strip(" -–—:：|｜/／[]（）()【】")
+    text = re.sub(r"\s*(?:の)?(?:予約開始|予約受付開始|予約受付中|受注開始|受注終了|販売開始|販売終了|発売|再販|再入荷|抽選販売|在庫切れ|完売|新商品|限定)\s*$", "", text)
+    text = re.sub(r"^[・■◆◇★☆※\s]+", "", text)
+
+    if len(text) < 2:
+        return ""
+    if text in GENERIC_TERMS:
+        return ""
+    return text
+
+
+def split_on_separators(value: str) -> str:
+    parts = re.split(r"[｜|/:：・\-–—]", clean_text(value))
+    parts = [sanitize_candidate(part) for part in parts]
+    parts = [part for part in parts if part]
+    if not parts:
+        return ""
+    return max(parts, key=len)
+
+
+def discover_product_name(entry: ParsedEntry, source: WatchSource) -> tuple[str | None, str, int]:
+    """
+    Return (product_name, matched_term, confidence).
+    We infer product names from page/feed titles so users do not need to pre-register products.
+    """
+    title = clean_text(entry.title)
+    summary = clean_text(entry.summary)
+    source_name = clean_text(source.name)
+    candidates = [text for text in [title, summary] if text]
+
+    # Bracketed names are usually the strongest signal.
+    for text in candidates:
+        for match in re.finditer(r"[【\[\(（](.+?)[】\]\)）]", text):
+            candidate = sanitize_candidate(match.group(1))
+            if candidate:
+                return candidate, match.group(1), 95
+
+    # Remove boilerplate and take the most product-like segment.
+    for text in candidates:
+        candidate = sanitize_candidate(text)
+        if not candidate:
+            continue
+        candidate = split_on_separators(candidate) or candidate
+        if candidate and candidate not in GENERIC_TERMS:
+            confidence = 80 if candidate.lower() != source_name.lower() else 60
+            return candidate, text, confidence
+
+    raw = sanitize_candidate(title)
+    if raw:
+        confidence = 78 if source_name.lower() not in raw.lower() else 65
+        return raw, title, confidence
+
+    return None, "", 0
 
 
 def save_detected_item(
@@ -160,30 +219,53 @@ def save_detected_item(
     total_score: int,
     matched_term: str = "",
     product_confidence: int = 0,
+    external_signals: ExternalSignalSummary | None = None,
 ) -> tuple[DetectedItem | None, bool]:
     if not matched_keywords:
         return None, False
 
+    premium_probability = estimate_probability(
+        total_score,
+        matched_keywords,
+        product_confidence,
+        external_signals=external_signals,
+    )
+    defaults = {
+        "source": source,
+        "product": product,
+        "title": entry.title or source.name,
+        "summary": entry.summary,
+        "published_at": entry.published_at,
+        "matched_keywords": matched_keywords,
+        "total_score": total_score,
+        "is_alert": total_score >= 50,
+        "premium_probability": premium_probability,
+        "google_trend_score": external_signals.google_trend_score if external_signals else 0,
+        "google_trend_growth_pct": external_signals.google_growth_pct if external_signals else 0,
+        "social_buzz_score": external_signals.social_buzz_score if external_signals else 0,
+        "social_mentions": external_signals.social_mentions if external_signals else 0,
+        "external_signal_summary": external_signals.summary if external_signals else "",
+        "prevalue_reason": build_reason(
+            product_name=product.name,
+            matched_keywords=matched_keywords,
+            matched_term=matched_term,
+            product_confidence=product_confidence,
+            external_signals=external_signals,
+        ),
+    }
+
     item, created = DetectedItem.objects.get_or_create(
         url=entry.url,
-        defaults={
-            "source": source,
-            "product": product,
-            "title": entry.title or source.name,
-            "summary": entry.summary,
-            "published_at": entry.published_at,
-            "matched_keywords": matched_keywords,
-            "total_score": total_score,
-            "is_alert": total_score >= 50,
-            "premium_probability": estimate_probability(total_score, matched_keywords, product_confidence),
-            "prevalue_reason": build_reason(
-                product=product,
-                matched_keywords=matched_keywords,
-                matched_term=matched_term,
-                product_confidence=product_confidence,
-            ),
-        },
+        defaults=defaults,
     )
+    if not created:
+        changed_fields = []
+        for field, value in defaults.items():
+            if getattr(item, field) != value:
+                setattr(item, field, value)
+                changed_fields.append(field)
+        if changed_fields:
+            item.save(update_fields=changed_fields)
     return item, created
 
 
@@ -219,9 +301,7 @@ def fetch_html_entry(source: WatchSource) -> ParsedEntry:
     response = requests.get(
         source.url,
         timeout=REQUEST_TIMEOUT,
-        headers={
-            "User-Agent": "Mozilla/5.0 (compatible; premium-monitor/1.0)",
-        },
+        headers={"User-Agent": "Mozilla/5.0 (compatible; premium-monitor/1.0)"},
     )
     response.raise_for_status()
 
@@ -256,33 +336,49 @@ def fetch_source_entries(source: WatchSource) -> list[ParsedEntry]:
     raise ValueError(f"Unsupported source_type: {source.source_type}")
 
 
+def get_or_create_discovered_product(product_name: str) -> TrackedProduct:
+    product, _ = TrackedProduct.objects.get_or_create(
+        name=product_name,
+        defaults={"is_active": True},
+    )
+    if not product.is_active:
+        product.is_active = True
+        product.save(update_fields=["is_active", "updated_at"])
+    return product
+
+
 def process_source(source: WatchSource) -> dict:
     keywords = load_active_keywords()
-    products = load_active_products()
     entries = fetch_source_entries(source)
     created_count = 0
     skipped_count = 0
     matched_count = 0
     unmatched_product_count = 0
+    discovered_products: set[str] = set()
+    external_signal_cache: dict[str, ExternalSignalSummary] = {}
 
     for entry in entries:
-        product, matched_term, product_confidence = match_product(
-            f"{entry.title}\n{entry.summary}\n{entry.text}",
-            products,
-        )
-        if product is None:
+        product_name, matched_term, product_confidence = discover_product_name(entry, source)
+        if not product_name:
             unmatched_product_count += 1
             continue
 
+        product = get_or_create_discovered_product(product_name)
+        discovered_products.add(product.name)
+        external_signals = external_signal_cache.get(product.name)
+        if external_signals is None:
+            external_signals = collect_external_signals(product.name)
+            external_signal_cache[product.name] = external_signals
+
         matched_keywords, total_score = detect_keywords(
-            f"{entry.title}\n{entry.text}",
+            f"{entry.title}\n{entry.summary}\n{entry.text}",
             keywords,
         )
         if not matched_keywords:
             skipped_count += 1
             continue
 
-        item, created = save_detected_item(
+        _, created = save_detected_item(
             source,
             product,
             entry,
@@ -290,6 +386,7 @@ def process_source(source: WatchSource) -> dict:
             total_score,
             matched_term=matched_term,
             product_confidence=product_confidence,
+            external_signals=external_signals,
         )
         if created:
             created_count += 1
@@ -304,4 +401,6 @@ def process_source(source: WatchSource) -> dict:
         "matched": matched_count,
         "skipped": skipped_count,
         "unmatched_products": unmatched_product_count,
+        "discovered_products": len(discovered_products),
+        "external_signals": {name: external_signal_cache[name].summary for name in discovered_products},
     }

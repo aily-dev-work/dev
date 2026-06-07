@@ -1,14 +1,9 @@
 {% extends "base.html" %}
-{% block title %}監視商品一覧 | premium_monitor{% endblock %}
+{% block title %}商品候補一覧 | premium_monitor{% endblock %}
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-  <div>
-    <h1 class="h3 mb-1">監視商品一覧</h1>
-    <p class="text-secondary mb-0">記事と紐づける商品を登録します。</p>
-  </div>
-  <div class="d-flex gap-2">
-    <a href="/products/new/" class="btn btn-primary">新規登録</a>
-  </div>
+<div class="mb-3">
+  <h1 class="h3 mb-1">商品候補一覧</h1>
+  <p class="text-secondary mb-0">巡回時に自動抽出された商品名を一覧表示します。</p>
 </div>
 
 <div class="card shadow-sm border-0">
@@ -18,7 +13,6 @@
         <thead class="table-light">
           <tr>
             <th>商品名</th>
-            <th>別名</th>
             <th>状態</th>
             <th>更新日時</th>
           </tr>
@@ -28,17 +22,8 @@
             <tr>
               <td class="fw-semibold">{{ product.name }}</td>
               <td>
-                {% if product.aliases %}
-                  {% for alias in product.aliases %}
-                    <span class="badge text-bg-secondary me-1 mb-1">{{ alias }}</span>
-                  {% endfor %}
-                {% else %}
-                  <span class="text-secondary">なし</span>
-                {% endif %}
-              </td>
-              <td>
                 {% if product.is_active %}
-                  <span class="badge text-bg-success">有効</span>
+                  <span class="badge text-bg-success">自動取得済み</span>
                 {% else %}
                   <span class="badge text-bg-secondary">無効</span>
                 {% endif %}
@@ -47,7 +32,7 @@
             </tr>
           {% empty %}
             <tr>
-              <td colspan="4" class="text-center text-secondary py-5">監視商品はまだ登録されていません。</td>
+              <td colspan="3" class="text-center text-secondary py-5">まだ商品候補はありません。データ取得を実行すると自動で増えます。</td>
             </tr>
           {% endfor %}
         </tbody>
