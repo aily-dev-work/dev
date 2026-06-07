@@ -5,6 +5,8 @@ from .views import (
     HomeView,
     ItemDetailView,
     KeywordListView,
+    ProductCreateView,
+    ProductListView,
     SourceCreateView,
     SourceListView,
 )
@@ -18,5 +20,7 @@ urlpatterns = [
     path("sources/", SourceListView.as_view(), name="source-list"),
     path("sources/new/", SourceCreateView.as_view(), name="source-create"),
     path("keywords/", KeywordListView.as_view(), name="keyword-list"),
+    path("products/", ProductListView.as_view(), name="product-list"),
+    path("products/new/", ProductCreateView.as_view(), name="product-create"),
     path("fetch-signals/", FetchSignalsView.as_view(), name="fetch-signals"),
 ]

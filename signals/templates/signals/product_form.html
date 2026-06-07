@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}監視商品登録 | premium_monitor{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h1 class="h3 mb-3">監視商品登録</h1>
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.name.id_for_label }}">name</label>
+            {{ form.name }}
+            {% for error in form.name.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.aliases.id_for_label }}">aliases</label>
+            {{ form.aliases }}
+            <div class="form-text">JSON 配列で登録してください。例: ["商品A", "型番123"]</div>
+            {% for error in form.aliases.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="form-check mb-4">
+            {{ form.is_active }}
+            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">is_active</label>
+            {% for error in form.is_active.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+          {% endif %}
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">登録する</button>
+            <a href="/products/" class="btn btn-outline-secondary">一覧へ戻る</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

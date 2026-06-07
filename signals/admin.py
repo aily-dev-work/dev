@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from .models import DetectedItem, SignalKeyword, WatchSource
+from .models import DetectedItem, SignalKeyword, TrackedProduct, WatchSource
+
+
+@admin.register(TrackedProduct)
+class TrackedProductAdmin(admin.ModelAdmin):
+    list_display = ("name", "is_active", "updated_at")
+    list_filter = ("is_active",)
+    search_fields = ("name", "aliases")
+    ordering = ("name",)
 
 
 @admin.register(WatchSource)
@@ -21,7 +29,16 @@ class SignalKeywordAdmin(admin.ModelAdmin):
 
 @admin.register(DetectedItem)
 class DetectedItemAdmin(admin.ModelAdmin):
-    list_display = ("title", "source", "total_score", "is_alert", "published_at", "created_at")
-    list_filter = ("is_alert", "source")
-    search_fields = ("title", "url", "summary", "matched_keywords")
+    list_display = (
+        "title",
+        "product",
+        "source",
+        "total_score",
+        "premium_probability",
+        "is_alert",
+        "published_at",
+        "created_at",
+    )
+    list_filter = ("is_alert", "source", "product")
+    search_fields = ("title", "url", "summary", "matched_keywords", "prevalue_reason")
     ordering = ("-published_at", "-created_at")

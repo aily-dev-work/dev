@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from signals.models import WatchSource
+from signals.models import TrackedProduct, WatchSource
 from signals.services import process_source
 
 
@@ -8,6 +8,10 @@ class Command(BaseCommand):
     help = "Fetch RSS/HTML sources and store detected items."
 
     def handle(self, *args, **options):
+        if not TrackedProduct.objects.filter(is_active=True).exists():
+            self.stdout.write(self.style.WARNING("no active products found"))
+            return
+
         sources = WatchSource.objects.filter(is_active=True).order_by("name")
         if not sources.exists():
             self.stdout.write(self.style.WARNING("no active sources found"))
@@ -26,7 +30,7 @@ class Command(BaseCommand):
                 total_skipped += result["skipped"]
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f"[DONE] {source.name}: entries={result['entries']} created={result['created']} matched={result['matched']} skipped={result['skipped']}"
+                        f"[DONE] {source.name}: entries={result['entries']} created={result['created']} matched={result['matched']} skipped={result['skipped']} unmatched_products={result['unmatched_products']}"
                     )
                 )
             except Exception as exc:

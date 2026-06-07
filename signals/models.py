@@ -1,6 +1,22 @@
 from django.db import models
 
 
+class TrackedProduct(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    aliases = models.JSONField(default=list, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "監視商品"
+        verbose_name_plural = "監視商品"
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class WatchSource(models.Model):
     SOURCE_TYPE_RSS = "rss"
     SOURCE_TYPE_HTML = "html"
@@ -45,6 +61,13 @@ class SignalKeyword(models.Model):
 
 class DetectedItem(models.Model):
     source = models.ForeignKey(WatchSource, on_delete=models.CASCADE, related_name="detected_items")
+    product = models.ForeignKey(
+        TrackedProduct,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="detected_items",
+    )
     title = models.CharField(max_length=500)
     url = models.URLField(unique=True)
     summary = models.TextField(blank=True)
@@ -52,6 +75,8 @@ class DetectedItem(models.Model):
     matched_keywords = models.JSONField(default=list, blank=True)
     total_score = models.PositiveIntegerField(default=0)
     is_alert = models.BooleanField(default=False)
+    premium_probability = models.PositiveIntegerField(default=0)
+    prevalue_reason = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

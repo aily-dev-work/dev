@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.http import HttpRequest, HttpResponse
-from django.urls import reverse_lazy
 from django.shortcuts import redirect
+from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import CreateView, DetailView, ListView
 
-from .forms import WatchSourceForm
-from .models import DetectedItem, SignalKeyword, WatchSource
+from .forms import TrackedProductForm, WatchSourceForm
+from .models import DetectedItem, SignalKeyword, TrackedProduct, WatchSource
 from .services import process_source
 
 
@@ -20,7 +20,8 @@ class HomeView(ListView):
 
     def get_queryset(self):
         return (
-            DetectedItem.objects.select_related("source")
+            DetectedItem.objects.select_related("source", "product")
+            .filter(product__isnull=False)
             .order_by("-published_at", "-created_at")
         )
 
@@ -54,8 +55,29 @@ class KeywordListView(ListView):
     context_object_name = "keywords"
 
 
+class ProductListView(ListView):
+    model = TrackedProduct
+    template_name = "signals/product_list.html"
+    context_object_name = "products"
+
+
+class ProductCreateView(CreateView):
+    model = TrackedProduct
+    form_class = TrackedProductForm
+    template_name = "signals/product_form.html"
+    success_url = reverse_lazy("signals:product-list")
+
+    def form_valid(self, form):
+        messages.success(self.request, "監視商品を登録しました。")
+        return super().form_valid(form)
+
+
 class FetchSignalsView(View):
     def post(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
+        if not TrackedProduct.objects.filter(is_active=True).exists():
+            messages.warning(request, "有効な監視商品がありません。先に監視商品を登録してください。")
+            return redirect("signals:home")
+
         sources = WatchSource.objects.filter(is_active=True).order_by("name")
         if not sources.exists():
             messages.warning(request, "有効な監視サイトがありません。先に監視サイトを登録してください。")
@@ -65,6 +87,7 @@ class FetchSignalsView(View):
         total_matched = 0
         total_skipped = 0
         total_errors = 0
+        total_unmatched_products = 0
 
         for source in sources:
             try:
@@ -72,9 +95,10 @@ class FetchSignalsView(View):
                 total_created += result["created"]
                 total_matched += result["matched"]
                 total_skipped += result["skipped"]
+                total_unmatched_products += result["unmatched_products"]
                 messages.success(
                     request,
-                    f"{source.name}: created={result['created']} matched={result['matched']} skipped={result['skipped']}",
+                    f"{source.name}: created={result['created']} matched={result['matched']} skipped={result['skipped']} unmatched_products={result['unmatched_products']}",
                 )
             except Exception as exc:
                 total_errors += 1
@@ -82,6 +106,6 @@ class FetchSignalsView(View):
 
         messages.info(
             request,
-            f"巡回完了: created={total_created} matched={total_matched} skipped={total_skipped} errors={total_errors}",
+            f"巡回完了: created={total_created} matched={total_matched} skipped={total_skipped} unmatched_products={total_unmatched_products} errors={total_errors}",
         )
         return redirect("signals:home")

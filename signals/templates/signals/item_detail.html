@@ -8,18 +8,32 @@
         <h1 class="h4 mb-1">{{ item.title }}</h1>
         <div class="text-secondary">{{ item.source.name }}</div>
       </div>
-      <div>
-        {% if item.total_score >= 80 %}
-          <span class="badge text-bg-danger fs-6">強い警告 {{ item.total_score }}</span>
-        {% elif item.total_score >= 50 %}
-          <span class="badge text-bg-warning text-dark fs-6">アラート {{ item.total_score }}</span>
-        {% else %}
-          <span class="badge text-bg-secondary fs-6">{{ item.total_score }}</span>
-        {% endif %}
+      <div class="d-flex flex-column gap-2 align-items-end">
+        <div>
+          {% if item.premium_probability >= 80 %}
+            <span class="badge text-bg-danger fs-6">{{ item.premium_probability }}%</span>
+          {% elif item.premium_probability >= 50 %}
+            <span class="badge text-bg-warning text-dark fs-6">{{ item.premium_probability }}%</span>
+          {% else %}
+            <span class="badge text-bg-secondary fs-6">{{ item.premium_probability }}%</span>
+          {% endif %}
+        </div>
+        <div>
+          {% if item.total_score >= 80 %}
+            <span class="badge text-bg-danger fs-6">強い警告 {{ item.total_score }}</span>
+          {% elif item.total_score >= 50 %}
+            <span class="badge text-bg-warning text-dark fs-6">アラート {{ item.total_score }}</span>
+          {% else %}
+            <span class="badge text-bg-secondary fs-6">{{ item.total_score }}</span>
+          {% endif %}
+        </div>
       </div>
     </div>
 
     <dl class="row">
+      <dt class="col-sm-3">商品名</dt>
+      <dd class="col-sm-9">{{ item.product.name }}</dd>
+
       <dt class="col-sm-3">タイトル</dt>
       <dd class="col-sm-9">{{ item.title }}</dd>
 
@@ -28,6 +42,9 @@
 
       <dt class="col-sm-3">サイト名</dt>
       <dd class="col-sm-9">{{ item.source.name }}</dd>
+
+      <dt class="col-sm-3">理由</dt>
+      <dd class="col-sm-9">{{ item.prevalue_reason|linebreaksbr }}</dd>
 
       <dt class="col-sm-3">概要</dt>
       <dd class="col-sm-9">{{ item.summary|linebreaksbr }}</dd>
@@ -43,6 +60,9 @@
 
       <dt class="col-sm-3">スコア</dt>
       <dd class="col-sm-9">{{ item.total_score }}</dd>
+
+      <dt class="col-sm-3">確率</dt>
+      <dd class="col-sm-9">{{ item.premium_probability }}%</dd>
 
       <dt class="col-sm-3">登録日時</dt>
       <dd class="col-sm-9">{{ item.created_at|date:"Y-m-d H:i:s" }}</dd>
