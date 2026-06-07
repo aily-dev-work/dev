@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}{{ item.title }} | premium_monitor{% endblock %}
 {% block content %}
 <div class="card shadow-sm border-0">
@@ -24,7 +24,7 @@
           {% elif item.total_score >= 50 %}
             <span class="badge text-bg-warning text-dark fs-6">アラート {{ item.total_score }}</span>
           {% else %}
-            <span class="badge text-bg-secondary fs-6">{{ item.total_score }}</span>
+            <span class="badge text-bg-secondary fs-6">通常 {{ item.total_score }}</span>
           {% endif %}
         </div>
       </div>
@@ -66,14 +66,14 @@
         {% for keyword in item.matched_keywords %}
           <span class="badge text-bg-secondary me-1 mb-1">{{ keyword }}</span>
         {% empty %}
-          <span class="text-secondary">なし</span>
+          <span class="text-secondary">-</span>
         {% endfor %}
       </dd>
 
       <dt class="col-sm-3">スコア</dt>
       <dd class="col-sm-9">{{ item.total_score }}</dd>
 
-      <dt class="col-sm-3">確率</dt>
+      <dt class="col-sm-3">バズ確率</dt>
       <dd class="col-sm-9">{{ item.premium_probability }}%</dd>
 
       <dt class="col-sm-3">外部信号</dt>

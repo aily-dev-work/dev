@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import math
 import re
@@ -29,7 +29,7 @@ class ExternalSignalSummary:
     summary: str = ""
 
 
-def _search_result_count(query: str) -> int:
+def _search_result_count_google(query: str) -> int:
     url = "https://www.google.com/search"
     headers = {
         "User-Agent": "Mozilla/5.0 (compatible; premium-monitor/1.0)",
@@ -52,6 +52,18 @@ def _search_result_count(query: str) -> int:
         if match:
             return int(match.group(1).replace(",", ""))
     return len(soup.select("div.g"))
+
+
+def _search_result_count_duckduckgo(query: str) -> int:
+    url = "https://html.duckduckgo.com/html/"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; premium-monitor/1.0)",
+        "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+    }
+    resp = requests.get(url, params={"q": query}, headers=headers, timeout=REQUEST_TIMEOUT)
+    resp.raise_for_status()
+    soup = BeautifulSoup(resp.content, "html.parser")
+    return len(soup.select("a.result__a"))
 
 
 def _collect_google_trends(term: str) -> tuple[int, int, int]:
@@ -89,15 +101,30 @@ def _collect_google_trends(term: str) -> tuple[int, int, int]:
 
 
 def _collect_social_buzz(term: str) -> tuple[int, int]:
-    total_mentions = 0
-    combined_query = f'("{term}") (' + " OR ".join(f"site:{domain}" for domain in SOCIAL_DOMAINS) + ")"
-    try:
-        total_mentions = _search_result_count(combined_query)
-    except Exception:
-        total_mentions = 0
+    queries = [
+        f'{term} (' + " OR ".join(f'site:{domain}' for domain in SOCIAL_DOMAINS) + ')',
+        f'{term} 予約 OR 発売 OR 再販 (' + " OR ".join(f'site:{domain}' for domain in SOCIAL_DOMAINS) + ')',
+        f'{term} 話題 OR 感想 OR 口コミ (' + " OR ".join(f'site:{domain}' for domain in SOCIAL_DOMAINS) + ')',
+        f'{term} (' + " OR ".join(SOCIAL_DOMAINS) + ')',
+    ]
 
-    social_score = int(min(40, math.log10(total_mentions + 1) * 20))
-    return total_mentions, social_score
+    best_count = 0
+    for query in queries:
+        try:
+            count = _search_result_count_google(query)
+        except Exception:
+            count = 0
+
+        if count <= 0:
+            try:
+                count = _search_result_count_duckduckgo(query)
+            except Exception:
+                count = 0
+
+        best_count = max(best_count, count)
+
+    social_score = int(min(40, math.log10(best_count + 1) * 20))
+    return best_count, social_score
 
 
 def collect_external_signals(product_name: str) -> ExternalSignalSummary:

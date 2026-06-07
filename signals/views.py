@@ -9,21 +9,25 @@ from django.views.generic import CreateView, DetailView, ListView
 
 from .forms import WatchSourceForm
 from .models import DetectedItem, SignalKeyword, TrackedProduct, WatchSource
-from .services import process_source
+from .services import looks_like_product_name, process_source
 
 
 class HomeView(ListView):
     model = DetectedItem
     template_name = "signals/home.html"
     context_object_name = "items"
-    paginate_by = 50
 
     def get_queryset(self):
-        return (
+        items = (
             DetectedItem.objects.select_related("source", "product")
             .filter(product__isnull=False)
             .order_by("-published_at", "-created_at")
         )
+        return [
+            item
+            for item in items
+            if item.product and looks_like_product_name(item.product.name, item.source.name)
+        ]
 
 
 class ItemDetailView(DetailView):
@@ -59,6 +63,10 @@ class ProductListView(ListView):
     model = TrackedProduct
     template_name = "signals/product_list.html"
     context_object_name = "products"
+
+    def get_queryset(self):
+        products = TrackedProduct.objects.filter(is_active=True).order_by("name")
+        return [product for product in products if looks_like_product_name(product.name)]
 
 
 class FetchSignalsView(View):

@@ -1,14 +1,14 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% block title %}検知記事一覧 | premium_monitor{% endblock %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
   <div>
     <h1 class="h3 mb-1">検知記事一覧</h1>
-    <p class="text-secondary mb-0">ページタイトルから自動抽出した商品名に対して、Google Trends と SNS の外部信号を加味して判定します。</p>
+    <p class="text-secondary mb-0">タイトルから自動抽出した商品候補に対して、Google Trends と SNS の外部信号を加味してバズ確率を表示します。</p>
   </div>
   <div class="d-flex gap-2">
     <a href="/products/" class="btn btn-outline-secondary">商品候補を見る</a>
-    <a href="/sources/new/" class="btn btn-outline-primary">監視サイトを追加</a>
+    <a href="/sources/new/" class="btn btn-outline-primary">監視サイトを登録</a>
     <form method="post" action="{% url 'signals:fetch-signals' %}">
       {% csrf_token %}
       <button type="submit" class="btn btn-primary">データ取得</button>
@@ -19,7 +19,7 @@
 <div class="card shadow-sm border-0 mb-3">
   <div class="card-body">
     <div class="alert alert-info mb-0">
-      商品名は事前登録しません。巡回時にページタイトルや見出しから自動抽出し、Google Trends の上昇や SNS 言及の増加を外部信号として加点します。
+      商品名は事前登録しません。ニュースリリースや商品告知の本文から候補を自動抽出し、キーワードと外部信号をもとにバズ判定します。
     </div>
   </div>
 </div>
@@ -27,28 +27,28 @@
 <div class="card shadow-sm border-0">
   <div class="card-body">
     <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0">
+      <table class="table table-hover align-middle mb-0" style="table-layout: fixed; min-width: 1600px;">
         <thead class="table-light">
           <tr>
-            <th>商品名</th>
-            <th>タイトル</th>
-            <th>理由</th>
-            <th>確率</th>
-            <th>Google</th>
-            <th>SNS</th>
-            <th>キーワード</th>
-            <th>スコア</th>
-            <th>判定</th>
-            <th>日時</th>
-            <th>詳細</th>
+            <th style="width: 180px;">商品名</th>
+            <th style="width: 320px;">タイトル</th>
+            <th style="width: 360px;">理由</th>
+            <th style="width: 110px;">バズ確率</th>
+            <th style="width: 130px;">Google</th>
+            <th style="width: 130px;">SNS</th>
+            <th style="width: 220px;">キーワード</th>
+            <th style="width: 100px;">スコア</th>
+            <th style="width: 110px;">判定</th>
+            <th style="width: 150px;">日時</th>
+            <th style="width: 90px;">詳細</th>
           </tr>
         </thead>
         <tbody>
           {% for item in items %}
             <tr>
-              <td class="fw-semibold">{{ item.product.name }}</td>
-              <td>{{ item.title }}</td>
-              <td class="text-break" style="max-width: 360px;">{{ item.prevalue_reason }}</td>
+              <td class="fw-semibold text-break">{{ item.product.name }}</td>
+              <td class="text-break">{{ item.title }}</td>
+              <td class="text-break">{{ item.prevalue_reason|linebreaksbr }}</td>
               <td>
                 {% if item.premium_probability >= 80 %}
                   <span class="badge text-bg-danger">{{ item.premium_probability }}%</span>
@@ -76,7 +76,7 @@
                     <span class="badge text-bg-secondary me-1 mb-1">{{ keyword }}</span>
                   {% endfor %}
                 {% else %}
-                  <span class="text-secondary">なし</span>
+                  <span class="text-secondary">-</span>
                 {% endif %}
               </td>
               <td>
@@ -105,10 +105,8 @@
           {% empty %}
             <tr>
               <td colspan="11" class="text-center text-secondary py-5">
-                まだ検知記事はありません。<br>
-                先に監視サイトを登録してから
-                <code>python manage.py fetch_signals</code> を実行するか、
-                上の <strong>データ取得</strong> ボタンを押してください。
+                まだ検知結果はありません。<br>
+                先に監視サイトを登録してから <code>python manage.py fetch_signals</code> を実行するか、<strong>データ取得</strong> ボタンを押してください。
               </td>
             </tr>
           {% endfor %}
