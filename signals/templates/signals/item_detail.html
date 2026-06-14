@@ -9,7 +9,7 @@
         <div class="text-secondary">{{ item.source.name }}</div>
       </div>
       <div class="d-flex flex-column gap-2 align-items-end">
-        <div>
+        <div class="text-end">
           {% if item.premium_probability >= 80 %}
             <span class="badge text-bg-danger fs-6">{{ item.premium_probability }}%</span>
           {% elif item.premium_probability >= 50 %}
@@ -17,14 +17,17 @@
           {% else %}
             <span class="badge text-bg-secondary fs-6">{{ item.premium_probability }}%</span>
           {% endif %}
+          <span class="badge text-bg-light text-dark border fs-6 ms-1">{{ item.total_score }}</span>
         </div>
-        <div>
-          {% if item.total_score >= 80 %}
-            <span class="badge text-bg-danger fs-6">強い警告 {{ item.total_score }}</span>
-          {% elif item.total_score >= 50 %}
-            <span class="badge text-bg-warning text-dark fs-6">アラート {{ item.total_score }}</span>
+        <div class="text-end">
+          {% if item.is_alert %}
+            {% if item.total_score >= 80 %}
+              <span class="badge text-bg-danger fs-6">強い警告</span>
+            {% else %}
+              <span class="badge text-bg-warning text-dark fs-6">アラート</span>
+            {% endif %}
           {% else %}
-            <span class="badge text-bg-secondary fs-6">通常 {{ item.total_score }}</span>
+            <span class="badge text-bg-secondary fs-6">通常</span>
           {% endif %}
         </div>
       </div>

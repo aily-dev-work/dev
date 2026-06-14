@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>お問い合わせ｜夏前メンズボディメイクナビ</title>
+  <meta name="description" content="夏前メンズボディメイクナビへのお問い合わせページ。記事内容や広告掲載に関するご質問はこちらからどうぞ。">
+  <link rel="canonical" href="https://mens-body.com/contact.html">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="site-logo">
+        夏前メンズボディメイクナビ
+        <span>mens-body.com｜清潔感と体型づくりのガイド</span>
+      </a>
+      <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-hidden="true">
+      <label for="nav-toggle" class="nav-toggle-label" aria-label="メニューを開く">
+        <span></span>
+      </label>
+      <nav class="site-nav" aria-label="メインナビゲーション">
+        <ul>
+          <li><a href="index.html">ホーム</a></li>
+          <li><a href="articles/summer-bodymake.html">夏の準備</a></li>
+          <li><a href="articles/mens-hair-removal.html">脱毛・除毛</a></li>
+          <li><a href="articles/gym-before-summer.html">ジム</a></li>
+          <li><a href="about.html">サイトについて</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <nav class="breadcrumb" aria-label="パンくずリスト">
+        <a href="index.html">ホーム</a> &gt; お問い合わせ
+      </nav>
+
+      <article class="page-content">
+        <h1>お問い合わせ</h1>
+        <p>記事内容や広告掲載に関するお問い合わせは、以下のフォームよりご連絡ください。<br>※このフォームはデモ用です。実際の送信機能はありません。</p>
+
+        <!-- 静的フォーム（送信機能なし） -->
+        <form id="contact-form" class="contact-form" action="#" method="post" novalidate>
+          <div class="form-group">
+            <label for="name">お名前 <span aria-label="必須">*</span></label>
+            <input type="text" id="name" name="name" required placeholder="山田 太郎">
+          </div>
+          <div class="form-group">
+            <label for="email">メールアドレス <span aria-label="必須">*</span></label>
+            <input type="email" id="email" name="email" required placeholder="example@email.com">
+          </div>
+          <div class="form-group">
+            <label for="category">お問い合わせ種別</label>
+            <select id="category" name="category">
+              <option value="general">記事内容について</option>
+              <option value="ad">広告・提携について</option>
+              <option value="other">その他</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="message">お問い合わせ内容 <span aria-label="必須">*</span></label>
+            <textarea id="message" name="message" required placeholder="お問い合わせ内容をご記入ください"></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">送信する</button>
+          <p class="form-note">送信ボタンを押すとデモメッセージが表示されます。</p>
+          <p id="form-message" class="form-note" hidden role="status"></p>
+        </form>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <h3>記事カテゴリ</h3>
+          <ul>
+            <li><a href="articles/summer-bodymake.html">夏のボディメイク</a></li>
+            <li><a href="articles/mens-hair-removal.html">脱毛・除毛</a></li>
+            <li><a href="articles/gym-before-summer.html">ジム・トレーニング</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3>サイト情報</h3>
+          <ul>
+            <li><a href="about.html">サイトについて</a></li>
+            <li><a href="contact.html">お問い合わせ</a></li>
+          </ul>
+        </div>
+        <div>
+          <h3>ポリシー</h3>
+          <ul>
+            <li><a href="privacy.html">プライバシーポリシー</a></li>
+            <li><a href="ad-policy.html">広告掲載ポリシー</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2026 <a href="https://mens-body.com/" style="color: inherit;">mens-body.com</a> 夏前メンズボディメイクナビ</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- お問い合わせページのみJS読み込み -->
+  <script src="js/main.js" defer></script>
+</body>
+</html>

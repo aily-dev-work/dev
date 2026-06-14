@@ -1,46 +1,44 @@
 ﻿{% extends "base.html" %}
 {% block title %}検知記事一覧 | premium_monitor{% endblock %}
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
   <div>
-    <h1 class="h3 mb-1">検知記事一覧</h1>
-    <p class="text-secondary mb-0">タイトルから自動抽出した商品候補に対して、Google Trends と SNS の外部信号を加味してバズ確率を表示します。</p>
+    <h1 class="h4 mb-0">検知記事一覧</h1>
+    <p class="text-secondary small mb-0">商品候補と外部信号を1画面で確認できるように、情報を詰めたコンパクト表示にしています。</p>
   </div>
-  <div class="d-flex gap-2">
-    <a href="/products/" class="btn btn-outline-secondary">商品候補を見る</a>
-    <a href="/sources/new/" class="btn btn-outline-primary">監視サイトを登録</a>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="/products/" class="btn btn-outline-secondary btn-sm">商品候補</a>
+    <a href="/sources/new/" class="btn btn-outline-primary btn-sm">監視サイト登録</a>
     <form method="post" action="{% url 'signals:fetch-signals' %}">
       {% csrf_token %}
-      <button type="submit" class="btn btn-primary">データ取得</button>
+      <button type="submit" class="btn btn-primary btn-sm">データ取得</button>
     </form>
   </div>
 </div>
 
-<div class="card shadow-sm border-0 mb-3">
-  <div class="card-body">
-    <div class="alert alert-info mb-0">
+<div class="card shadow-sm border-0 mb-2">
+  <div class="card-body py-2">
+    <div class="alert alert-info py-2 mb-0 small">
       商品名は事前登録しません。ニュースリリースや商品告知の本文から候補を自動抽出し、キーワードと外部信号をもとにバズ判定します。
     </div>
   </div>
 </div>
 
 <div class="card shadow-sm border-0">
-  <div class="card-body">
+  <div class="card-body p-2">
     <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0" style="table-layout: fixed; min-width: 1600px;">
+      <table class="table table-hover table-sm align-middle small mb-0" style="table-layout: fixed; min-width: 1080px;">
         <thead class="table-light">
           <tr>
-            <th style="width: 180px;">商品名</th>
-            <th style="width: 320px;">タイトル</th>
-            <th style="width: 360px;">理由</th>
-            <th style="width: 110px;">バズ確率</th>
-            <th style="width: 130px;">Google</th>
-            <th style="width: 130px;">SNS</th>
-            <th style="width: 220px;">キーワード</th>
-            <th style="width: 100px;">スコア</th>
-            <th style="width: 110px;">判定</th>
-            <th style="width: 150px;">日時</th>
-            <th style="width: 90px;">詳細</th>
+            <th style="width: 120px;">商品名</th>
+            <th style="width: 180px;">タイトル</th>
+            <th style="width: 230px;">理由</th>
+            <th style="width: 145px;">判定</th>
+            <th style="width: 92px;">Google</th>
+            <th style="width: 92px;">SNS</th>
+            <th style="width: 150px;">キーワード</th>
+            <th style="width: 110px;">日時</th>
+            <th style="width: 60px;">詳細</th>
           </tr>
         </thead>
         <tbody>
@@ -48,24 +46,40 @@
             <tr>
               <td class="fw-semibold text-break">{{ item.product.name }}</td>
               <td class="text-break">{{ item.title }}</td>
-              <td class="text-break">{{ item.prevalue_reason|linebreaksbr }}</td>
-              <td>
-                {% if item.premium_probability >= 80 %}
-                  <span class="badge text-bg-danger">{{ item.premium_probability }}%</span>
-                {% elif item.premium_probability >= 50 %}
-                  <span class="badge text-bg-warning text-dark">{{ item.premium_probability }}%</span>
-                {% else %}
-                  <span class="badge text-bg-secondary">{{ item.premium_probability }}%</span>
-                {% endif %}
+              <td class="text-break" style="white-space: pre-line;">{{ item.prevalue_reason }}</td>
+              <td class="text-nowrap">
+                <div class="d-flex flex-column gap-1">
+                  <div>
+                    {% if item.premium_probability >= 80 %}
+                      <span class="badge text-bg-danger">{{ item.premium_probability }}%</span>
+                    {% elif item.premium_probability >= 50 %}
+                      <span class="badge text-bg-warning text-dark">{{ item.premium_probability }}%</span>
+                    {% else %}
+                      <span class="badge text-bg-secondary">{{ item.premium_probability }}%</span>
+                    {% endif %}
+                    <span class="badge text-bg-light text-dark border ms-1">{{ item.total_score }}</span>
+                  </div>
+                  <div>
+                    {% if item.is_alert %}
+                      {% if item.total_score >= 80 %}
+                        <span class="badge text-bg-danger">強い警告</span>
+                      {% else %}
+                        <span class="badge text-bg-warning text-dark">アラート</span>
+                      {% endif %}
+                    {% else %}
+                      <span class="badge text-bg-secondary">通常</span>
+                    {% endif %}
+                  </div>
+                </div>
               </td>
               <td>
-                <div class="small">
+                <div class="small lh-sm">
                   <div>Trend: {{ item.google_trend_score }}</div>
                   <div>Growth: {{ item.google_trend_growth_pct }}%</div>
                 </div>
               </td>
               <td>
-                <div class="small">
+                <div class="small lh-sm">
                   <div>Buzz: {{ item.social_buzz_score }}</div>
                   <div>Mention: {{ item.social_mentions }}</div>
                 </div>
@@ -79,34 +93,14 @@
                   <span class="text-secondary">-</span>
                 {% endif %}
               </td>
-              <td>
-                {% if item.total_score >= 80 %}
-                  <span class="badge text-bg-danger">{{ item.total_score }}</span>
-                {% elif item.total_score >= 50 %}
-                  <span class="badge text-bg-warning text-dark">{{ item.total_score }}</span>
-                {% else %}
-                  <span class="badge text-bg-secondary">{{ item.total_score }}</span>
-                {% endif %}
-              </td>
-              <td>
-                {% if item.is_alert %}
-                  {% if item.total_score >= 80 %}
-                    <span class="badge text-bg-danger">強い警告</span>
-                  {% else %}
-                    <span class="badge text-bg-warning text-dark">アラート</span>
-                  {% endif %}
-                {% else %}
-                  <span class="badge text-bg-secondary">通常</span>
-                {% endif %}
-              </td>
               <td>{{ item.published_at|default:item.created_at|date:"Y-m-d H:i" }}</td>
-              <td><a href="/items/{{ item.id }}/" class="btn btn-sm btn-outline-primary">詳細</a></td>
+              <td><a href="/items/{{ item.id }}/" class="btn btn-sm btn-outline-primary py-0 px-2">詳細</a></td>
             </tr>
           {% empty %}
             <tr>
-              <td colspan="11" class="text-center text-secondary py-5">
+              <td colspan="9" class="text-center text-secondary py-4">
                 まだ検知結果はありません。<br>
-                先に監視サイトを登録してから <code>python manage.py fetch_signals</code> を実行するか、<strong>データ取得</strong> ボタンを押してください。
+                先に監視サイトを登録してから <code>python manage.py fetch_signals</code> を実行するか、<strong>データ取得</strong> を押してください。
               </td>
             </tr>
           {% endfor %}
