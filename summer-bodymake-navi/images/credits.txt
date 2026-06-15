@@ -1,0 +1,27 @@
+画像クレジット（mens-body.com / 夏前メンズボディメイクナビ）
+
+本サイトの images/ 内画像は、サイト制作時に AI 画像生成ツールで作成したオリジナル素材です。
+第三者の写真・イラストの転載は行っていません。
+
+■ 人物イメージ（AI生成オリジナル）
+- ideal-man-beach-hero.webp … ビーチ・夏の理想ボディ（トップ、about、ジム記事）
+- ideal-man-swimwear.webp … おしゃれな水着姿の男性（水着セクション、contact、脱毛記事）
+- ideal-man-smooth-body.webp … ムダ毛が整った清潔感の男性（脱毛・除毛）
+- ideal-man-gym-toned.webp … 適度に引き締まった体型の男性（ジム・トレーニング）
+
+■ カテゴリ補助（AI生成オリジナル）
+- category-sunscreen.webp … 日焼け対策・スキンケア
+
+■ 旧カテゴリ素材（必要に応じて参照）
+- hero-summer.webp
+- category-hair-removal.webp
+- category-gym.webp
+- category-swimwear.webp
+
+利用上の注意：
+- 当サイト内での表示用途に限定して利用しています。
+- 人物画像はイメージ・参考目的であり、特定の個人・サービスを保証するものではありません。
+- 実在のブランドロゴは意図的に含めていません。
+- A8.net 等の審査・掲載時も、上記オリジナル素材として扱ってください。
+
+更新日：2026年6月15日
