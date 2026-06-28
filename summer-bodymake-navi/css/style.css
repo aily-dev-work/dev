@@ -1017,6 +1017,201 @@ main {
   margin-top: 0.5rem;
 }
 
+/* サイト導線（3ステップ） */
+.site-flow {
+  margin: 2.5rem 0;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.site-flow > h2 {
+  margin-top: 0;
+  text-align: center;
+  font-size: 1.25rem;
+}
+
+.site-flow-steps {
+  display: grid;
+  gap: 1rem;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-flow-step {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  align-items: start;
+  padding: 1rem;
+  background: var(--color-white);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+}
+
+.site-flow-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-white);
+  background: var(--color-primary);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.site-flow-step h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.site-flow-step p {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}
+
+.site-flow-step .btn {
+  margin-top: 0.75rem;
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+/* 必要性セクション（トップページ） */
+.why-pillar-grid {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+}
+
+.why-pillar {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.why-pillar-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+}
+
+.why-pillar-body {
+  padding: 1.25rem;
+}
+
+.why-pillar-body h3 {
+  margin-top: 0;
+  font-size: 1.125rem;
+}
+
+.why-pillar-points {
+  margin: 0.75rem 0 0;
+  padding-left: 1.25rem;
+  font-size: 0.9375rem;
+}
+
+.why-pillar-points li {
+  margin-bottom: 0.35rem;
+}
+
+.why-pillar-link {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+}
+
+/* 準備ロードマップ（スケジュール表） */
+.prep-timeline {
+  margin: 1.5rem 0;
+}
+
+.prep-timeline-row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.prep-timeline-row:last-child {
+  border-bottom: none;
+}
+
+.prep-timeline-when {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1.4;
+}
+
+.prep-timeline-what h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.prep-timeline-what p {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+}
+
+.prep-next-cards {
+  display: grid;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.prep-next-card {
+  padding: 1.25rem;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.prep-next-card h3 {
+  margin-top: 0;
+  font-size: 1.0625rem;
+}
+
+.prep-next-card p:last-of-type {
+  margin-bottom: 0.75rem;
+}
+
+@media (min-width: 768px) {
+  .site-flow-steps {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .site-flow-step {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .site-flow-num {
+    margin: 0 auto;
+  }
+
+  .site-flow-step .btn {
+    justify-self: center;
+  }
+
+  .why-pillar-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .prep-next-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 /* 広告表記 */
 .ad-notice {
   background: var(--color-ad-notice);
