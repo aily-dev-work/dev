@@ -19,6 +19,16 @@
   <meta name="twitter:description" content="メンズ男磨きナビへのお問い合わせページ。">
   <meta name="twitter:image" content="https://mens-body.com/images/ideal-man-swimwear.webp">
   <link rel="stylesheet" href="css/style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "ContactPage",
+    "name": "お問い合わせ",
+    "url": "https://mens-body.com/contact.html",
+    "isPartOf": { "@type": "WebSite", "name": "メンズ男磨きナビ", "url": "https://mens-body.com/" },
+    "publisher": { "@type": "Organization", "name": "mens-body.com", "url": "https://mens-body.com/" }
+  }
+  </script>
 </head>
 <body>
   <header class="site-header">
@@ -55,33 +65,50 @@
           <img src="images/ideal-man-swimwear.webp" alt="男磨きを始める男性のイメージ" width="960" height="640" loading="eager" decoding="async">
         </figure>
         <h1>お問い合わせ</h1>
-        <p>記事内容や広告掲載に関するお問い合わせは、以下のフォームよりご連絡ください。<br>※このフォームはデモ用です。実際の送信機能はありません。</p>
+        <p>記事内容・サイトのご意見・広告掲載に関するお問い合わせは、以下のフォームよりご連絡ください。通常<strong>3営業日以内</strong>にご返信いたします。</p>
 
-        <!-- 静的フォーム（送信機能なし） -->
-        <form id="contact-form" class="contact-form" action="#" method="post" novalidate>
+        <form
+          id="contact-form"
+          class="contact-form"
+          action="https://formsubmit.co/yuki.haruka.11150331@gmail.com"
+          method="POST"
+          novalidate>
+          <input type="hidden" name="_subject" value="【メンズ男磨きナビ】お問い合わせ">
+          <input type="hidden" name="_next" value="https://mens-body.com/contact-thanks.html">
+          <input type="hidden" name="_template" value="table">
+          <input type="hidden" name="_captcha" value="false">
+
           <div class="form-group">
-            <label for="name">お名前 <span aria-label="必須">*</span></label>
-            <input type="text" id="name" name="name" required placeholder="山田 太郎">
+            <label for="name">お名前 <span class="form-required" aria-label="必須">*</span></label>
+            <input type="text" id="name" name="name" required maxlength="80" autocomplete="name" placeholder="山田 太郎">
           </div>
           <div class="form-group">
-            <label for="email">メールアドレス <span aria-label="必須">*</span></label>
-            <input type="email" id="email" name="email" required placeholder="example@email.com">
+            <label for="email">メールアドレス <span class="form-required" aria-label="必須">*</span></label>
+            <input type="email" id="email" name="email" required maxlength="254" autocomplete="email" placeholder="example@email.com">
           </div>
           <div class="form-group">
-            <label for="category">お問い合わせ種別</label>
-            <select id="category" name="category">
-              <option value="general">記事内容について</option>
-              <option value="ad">広告・提携について</option>
-              <option value="other">その他</option>
+            <label for="category">お問い合わせ種別 <span class="form-required" aria-label="必須">*</span></label>
+            <select id="category" name="category" required>
+              <option value="">選択してください</option>
+              <option value="記事内容について">記事内容について</option>
+              <option value="広告・提携について">広告・提携について</option>
+              <option value="サイトの不具合">サイトの不具合</option>
+              <option value="その他">その他</option>
             </select>
           </div>
           <div class="form-group">
-            <label for="message">お問い合わせ内容 <span aria-label="必須">*</span></label>
-            <textarea id="message" name="message" required placeholder="お問い合わせ内容をご記入ください"></textarea>
+            <label for="message">お問い合わせ内容 <span class="form-required" aria-label="必須">*</span></label>
+            <textarea id="message" name="message" required maxlength="2000" placeholder="お問い合わせ内容をご記入ください"></textarea>
           </div>
-          <button type="submit" class="btn btn-primary">送信する</button>
-          <p class="form-note">送信ボタンを押すとデモメッセージが表示されます。</p>
-          <p id="form-message" class="form-note" hidden role="status"></p>
+          <div class="form-group form-group--checkbox">
+            <label class="form-checkbox-label">
+              <input type="checkbox" id="privacy" name="privacy_agreed" value="同意済み" required>
+              <a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>に同意する
+            </label>
+          </div>
+          <button type="submit" class="btn btn-primary" id="contact-submit">送信する</button>
+          <p class="form-note">送信いただいた情報は、お問い合わせへの対応目的のみに利用します（<a href="privacy.html">プライバシーポリシー</a>）。</p>
+          <p id="form-message" class="form-feedback" hidden role="alert"></p>
         </form>
       </article>
     </div>
@@ -103,7 +130,7 @@
           <h3>サイト情報</h3>
           <ul>
             <li><a href="about.html">サイトについて</a></li>
-            <li><a href="contact.html">お問い合わせ</a></li>
+            <li><a href="contact.html" aria-current="page">お問い合わせ</a></li>
           </ul>
         </div>
         <div>
@@ -120,7 +147,6 @@
     </div>
   </footer>
 
-  <!-- お問い合わせページのみJS読み込み -->
   <script src="js/main.js" defer></script>
 </body>
 </html>

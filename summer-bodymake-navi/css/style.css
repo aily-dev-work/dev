@@ -1020,7 +1020,7 @@ main {
 /* サイト導線（3ステップ） */
 .site-flow {
   margin: 2.5rem 0;
-  padding: 1.5rem;
+  padding: 2rem 1.75rem;
   background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -1034,8 +1034,8 @@ main {
 
 .site-flow-steps {
   display: grid;
-  gap: 1rem;
-  margin: 1.25rem 0 0;
+  gap: 1.25rem;
+  margin: 1.5rem 0 0;
   padding: 0;
   list-style: none;
 }
@@ -1043,9 +1043,9 @@ main {
 .site-flow-step {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 1rem;
+  gap: 1.125rem;
   align-items: start;
-  padding: 1rem;
+  padding: 1.35rem 1.5rem;
   background: var(--color-white);
   border-radius: var(--radius);
   border: 1px solid var(--color-border);
@@ -1065,9 +1065,23 @@ main {
   flex-shrink: 0;
 }
 
-.site-flow-step h3 {
+.site-flow-step h3,
+.site-flow-step-title {
   margin: 0 0 0.35rem;
   font-size: 1rem;
+  line-height: 1.45;
+}
+
+.site-flow-step-where::after {
+  content: "｜";
+}
+
+.site-flow-step-what {
+  display: block;
+}
+
+.site-flow-step-body {
+  min-width: 0;
 }
 
 .site-flow-step p {
@@ -1186,13 +1200,29 @@ main {
 }
 
 @media (min-width: 768px) {
+  .site-flow {
+    padding: 2.25rem 2rem;
+  }
+
   .site-flow-steps {
     grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
   }
 
   .site-flow-step {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
+    padding: 1.5rem 1rem;
+    min-height: 100%;
+  }
+
+  .site-flow-step-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    width: 100%;
   }
 
   .site-flow-num {
@@ -1201,6 +1231,9 @@ main {
 
   .site-flow-step .btn {
     justify-self: center;
+    align-self: center;
+    margin-top: auto;
+    padding-top: 0.75rem;
   }
 
   .why-pillar-grid {
@@ -1366,7 +1399,7 @@ main {
   margin-bottom: 1.25rem;
 }
 
-.form-group label {
+.form-group > label:not(.form-checkbox-label) {
   display: block;
   font-size: 0.875rem;
   font-weight: 600;
@@ -1374,7 +1407,7 @@ main {
   color: var(--color-primary);
 }
 
-.form-group input,
+.form-group input:not([type="checkbox"]),
 .form-group textarea,
 .form-group select {
   width: 100%;
@@ -1395,6 +1428,66 @@ main {
   font-size: 0.8125rem;
   color: var(--color-text-muted);
   margin-top: 0.5rem;
+}
+
+.form-required {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.form-group--checkbox {
+  margin-bottom: 1.5rem;
+}
+
+.form-group--checkbox .form-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--color-text);
+  cursor: pointer;
+  margin-bottom: 0;
+}
+
+.form-group--checkbox input[type="checkbox"] {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.form-feedback {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+}
+
+.form-feedback--success {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+}
+
+.form-feedback--error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.contact-form .btn[disabled] {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.contact-thanks h1 {
+  margin-top: 0;
 }
 
 /* --- パンくず --- */
