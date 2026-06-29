@@ -1,1 +1,5 @@
-# aaa
+RewriteEngine On
+
+# Legacy URLs → renamed articles (SEO 301)
+RewriteRule ^articles/summer-bodymake\.html$ /articles/grooming-guide.html [R=301,L]
+RewriteRule ^articles/gym-before-summer\.html$ /articles/mens-gym-guide.html [R=301,L]
