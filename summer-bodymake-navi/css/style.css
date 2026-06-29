@@ -324,6 +324,75 @@ main {
   text-underline-offset: 2px;
 }
 
+.hero-action-grid {
+  display: grid;
+  gap: 0.65rem;
+  margin: 1.25rem 0 0;
+}
+
+.hero-action-card {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.85rem 1rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--color-white);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.hero-action-card:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--color-white);
+}
+
+.hero-action-card--primary {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.hero-action-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  opacity: 0.85;
+  letter-spacing: 0.03em;
+}
+
+.hero-action-card strong {
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.hero-action-card span:last-child {
+  font-size: 0.8125rem;
+  opacity: 0.88;
+}
+
+.hero-action-or {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 0.8125rem;
+  opacity: 0.85;
+}
+
+.why-pillar-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.why-pillar-cta .btn {
+  font-size: 0.875rem;
+  padding: 0.5rem 0.85rem;
+}
+
+@media (min-width: 640px) {
+  .hero-action-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 /* トップ：即比較導線 */
 .quick-pickup {
   margin: 0 0 2rem;
@@ -1524,6 +1593,49 @@ main {
 
 .experience-note p {
   margin: 0;
+  font-size: 0.9375rem;
+}
+
+.editor-order-list {
+  margin: 1rem 0;
+  padding-left: 1.25rem;
+  line-height: 1.7;
+}
+
+.editor-order-list li + li {
+  margin-top: 0.65rem;
+}
+
+.author-story {
+  margin: 2rem 0;
+}
+
+.check-options {
+  margin: 0.75rem 0 1.5rem;
+  padding-left: 1.25rem;
+  line-height: 1.65;
+}
+
+.check-results {
+  display: grid;
+  gap: 1rem;
+  margin: 1rem 0 1.5rem;
+}
+
+.check-result-card {
+  padding: 1.15rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.check-result-card h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.0625rem;
+}
+
+.check-result-card p {
+  margin: 0 0 0.75rem;
   font-size: 0.9375rem;
 }
 
