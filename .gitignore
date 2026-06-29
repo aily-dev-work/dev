@@ -55,3 +55,6 @@ htmlcov/
 
 # Docker (optional: uncomment if you don't want to track)
 # docker-compose.override.yml
+
+# Site project — separate git repo (aily-dev-work/summer-bodymake-navi)
+summer-bodymake-navi/
