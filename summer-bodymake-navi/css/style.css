@@ -295,6 +295,157 @@ main {
   margin-bottom: 0.25rem;
 }
 
+.hero .btn-secondary.hero-btn-outline {
+  background: transparent;
+  color: var(--color-white);
+  border-color: rgba(255, 255, 255, 0.75);
+}
+
+.hero .btn-secondary.hero-btn-outline:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--color-white);
+  border-color: var(--color-white);
+}
+
+.hero-pickup-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.6875rem;
+  opacity: 0.85;
+}
+
+.hero-secondary-cta {
+  margin: 0.75rem 0 0;
+  font-size: 0.8125rem;
+}
+
+.hero-secondary-cta a {
+  color: rgba(255, 255, 255, 0.95);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* トップ：即比較導線 */
+.quick-pickup {
+  margin: 0 0 2rem;
+  padding: 1.75rem 0;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.quick-pickup h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+  text-align: center;
+}
+
+.quick-pickup-lead {
+  margin: 0 0 1.25rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.quick-pickup-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+.quick-pickup-card {
+  display: grid;
+  gap: 0.2rem;
+  padding: 1rem 1.1rem;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+  box-shadow: var(--shadow);
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.quick-pickup-card:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+}
+
+.quick-pickup-card--accent {
+  border-color: var(--color-primary);
+  background: linear-gradient(135deg, #eff6ff 0%, #fff 100%);
+}
+
+.quick-pickup-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: 0.04em;
+}
+
+.quick-pickup-card strong {
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.quick-pickup-card span:last-child {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.quick-pickup-more {
+  margin: 1rem 0 0;
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+.popular-articles {
+  margin-bottom: 2.5rem;
+}
+
+.article-link-grid {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.article-link-grid a {
+  display: block;
+  padding: 0.75rem 1rem;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--color-primary);
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.article-link-grid a:hover {
+  background: #eff6ff;
+}
+
+.article-link-more {
+  margin: 1rem 0 0;
+  font-size: 0.875rem;
+}
+
+@media (min-width: 640px) {
+  .quick-pickup-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .article-link-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 992px) {
+  .quick-pickup-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 /* ヒーロー内ボタン（暗い背景用） */
 .hero .btn-primary {
   background: var(--color-white);
@@ -737,6 +888,7 @@ main {
 }
 
 .cta-group--hero {
+  flex-wrap: wrap;
   margin-bottom: 0;
 }
 
@@ -1013,6 +1165,18 @@ main {
   line-height: 1.5;
 }
 
+.affiliate-pickup-note--top {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+}
+
+.table-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+}
+
 .category-card .affiliate-pickup-note {
   margin-top: 0.5rem;
 }
@@ -1254,6 +1418,120 @@ main {
   font-size: 0.8125rem;
   color: #92400e;
   margin-bottom: 1.5rem;
+}
+
+.pickup-subheading {
+  margin: 2rem 0 1rem;
+  font-size: 1.0625rem;
+  color: var(--color-primary);
+}
+
+.pickup-subheading:first-of-type {
+  margin-top: 0;
+}
+
+/* 記事一覧ハブ */
+.article-hub-section {
+  margin: 2rem 0;
+}
+
+.article-hub-section h2 {
+  font-size: 1.125rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 2px solid var(--color-primary);
+}
+
+.article-hub-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.article-hub-list a {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.85rem 1rem;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+}
+
+.article-hub-list a:hover {
+  border-color: var(--color-primary);
+  background: #eff6ff;
+}
+
+.article-hub-list span {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+/* 運営者プロフィール（E-E-A-T） */
+.author-profile-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.author-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-white);
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.author-name {
+  margin: 0 0 0.5rem;
+}
+
+.author-profile-meta {
+  margin: 0.75rem 0 0;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+}
+
+.experience-notes {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.experience-note {
+  padding: 1rem 1.15rem;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.experience-note h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.experience-note p {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+@media (min-width: 640px) {
+  .author-profile-card {
+    grid-template-columns: auto 1fr;
+    align-items: start;
+  }
 }
 
 /* 目次 */
