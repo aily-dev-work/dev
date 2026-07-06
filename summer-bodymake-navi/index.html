@@ -19,6 +19,7 @@
   <meta name="twitter:title" content="メンズ男磨き｜脱毛・筋トレ・スキンケアが必要な理由">
   <meta name="twitter:description" content="清潔感と印象を整えたい男性へ。ムダ毛・筋トレ・スキンケアの必要性と進め方を解説。">
   <meta name="twitter:image" content="https://mens-body.com/images/ideal-man-beach-hero.webp">
+  <link rel="preload" as="image" href="images/ideal-man-beach-hero.webp" fetchpriority="high">
   <link rel="stylesheet" href="css/style.css">
   <script type="application/ld+json">
   {
@@ -80,7 +81,7 @@
       <label for="nav-toggle" class="nav-toggle-label" aria-label="メニューを開く">
         <span></span>
       </label>
-      <nav class="site-nav" aria-label="メインナビゲーション">
+      <nav class="site-nav" id="site-nav" aria-label="メインナビゲーション">
         <ul>
           <li><a href="index.html" aria-current="page">ホーム</a></li>
           <li><a href="articles/grooming-guide.html">整え方ガイド</a></li>
@@ -109,7 +110,7 @@
         </a>
         <a href="articles/roadmap-30s-summer.html" class="hero-action-card">
           <span class="hero-action-label">スケジュール付き</span>
-          <strong>夏までのロードマップを見る</strong>
+          <strong>8週間ロードマップを見る</strong>
           <span>8週間の進め方がわかる</span>
         </a>
         <a href="articles/grooming-guide.html#schedule" class="hero-action-card">
@@ -186,7 +187,7 @@
         <h2 id="popular-heading" class="section-title">人気の記事（検索意図別）</h2>
         <ul class="article-link-grid">
           <li><a href="articles/mens-hair-removal-first-time.html">メンズ脱毛は初めてでも大丈夫？</a></li>
-          <li><a href="articles/roadmap-30s-summer.html">30代男性が夏までに変わるロードマップ</a></li>
+          <li><a href="articles/roadmap-30s-summer.html">30代男性の男磨きロードマップ</a></li>
           <li><a href="articles/mens-sunscreen-recommend.html">男性向け日焼け止めおすすめ</a></li>
           <li><a href="articles/gym-beginner-men.html">ジム初心者男性向け入門</a></li>
           <li><a href="articles/chest-hair-removal.html">胸毛の処理方法</a></li>
@@ -388,5 +389,8 @@
       </div>
     </div>
   </footer>
+  <script src="js/site-config.js"></script>
+  <script src="js/analytics.js" defer></script>
+  <script src="js/site.js" defer></script>
 </body>
 </html>

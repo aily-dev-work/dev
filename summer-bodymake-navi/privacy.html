@@ -31,7 +31,7 @@
       <label for="nav-toggle" class="nav-toggle-label" aria-label="メニューを開く">
         <span></span>
       </label>
-      <nav class="site-nav" aria-label="メインナビゲーション">
+      <nav class="site-nav" id="site-nav" aria-label="メインナビゲーション">
         <ul>
           <li><a href="index.html">ホーム</a></li>
           <li><a href="articles/grooming-guide.html">整え方ガイド</a></li>
@@ -61,10 +61,10 @@
         <p>当サイトでは、お問い合わせフォーム等を通じて、氏名・メールアドレス等の個人情報を取得する場合があります。取得した情報は、お問い合わせへの対応目的のみに利用します。</p>
 
         <h2>2. Cookieの利用</h2>
-        <p>当サイトでは、利便性向上やアクセス解析のためCookieを使用する場合があります。ブラウザの設定によりCookieを無効にすることが可能です。</p>
+        <p>当サイトでは、アクセス解析（Google Analytics 4）のためCookieを使用します。ブラウザの設定によりCookieを無効にすることが可能です。</p>
 
-        <h2>3. アクセス解析ツール</h2>
-        <p>当サイトでは、Google Analytics等のアクセス解析ツールを利用する場合があります。これらのツールはCookieを使用してトラフィックデータを収集しますが、個人を特定する情報は含まれません。</p>
+        <h2>3. アクセス解析ツール（Google Analytics 4）</h2>
+        <p>当サイトでは、Google Analytics 4を利用してアクセス状況を分析しています。収集されるデータには個人を特定する情報は含まれず、IPアドレスは匿名化された状態で処理されます。Google Analyticsの利用規約・プライバシーポリシーは<a href="https://policies.google.com/privacy" rel="noopener noreferrer" target="_blank">Googleのサイト</a>をご確認ください。</p>
 
         <h2>4. 第三者への提供</h2>
         <p>法令に基づく場合を除き、ユーザーの同意なく個人情報を第三者に提供することはありません。</p>
@@ -110,5 +110,8 @@
       </div>
     </div>
   </footer>
+  <script src="js/site-config.js"></script>
+  <script src="js/analytics.js" defer></script>
+  <script src="js/site.js" defer></script>
 </body>
 </html>

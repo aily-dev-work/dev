@@ -1,4 +1,2 @@
-﻿.DS_Store
-Thumbs.db
-desktop.ini
-*.log
+﻿# デプロイ用シークレット（Git管理外）
+.deploy.env
