@@ -56,6 +56,8 @@ foreach ($key in $ConfigKeys) {
     }
 }
 
+$FTP_REMOTE_DIR = "/" + $FTP_REMOTE_DIR.Trim("/")
+
 $UseSsl = $false
 $ftpUseSsl = [System.Environment]::GetEnvironmentVariable("FTP_USE_SSL")
 if ($ftpUseSsl) {
@@ -262,6 +264,7 @@ function Walk-RemoteDirs {
 }
 
 Write-Host "Deploy to ftp://$FTP_HOST$FTP_REMOTE_DIR"
+Write-Host "FTP SSL enabled: $UseSsl"
 $eventPath = [System.Environment]::GetEnvironmentVariable("GITHUB_EVENT_PATH")
 $changedFiles = Get-ChangedDeployFiles
 if ($changedFiles.Count -gt 0) {
