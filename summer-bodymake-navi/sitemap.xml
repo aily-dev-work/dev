@@ -2,7 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://mens-body.com/</loc>
-    <lastmod>2026-07-01</lastmod>
+    <lastmod>2026-07-09</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
@@ -37,8 +37,8 @@
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://mens-body.com/articles/index.html</loc>
-    <lastmod>2026-06-18</lastmod>
+    <loc>https://mens-body.com/articles/</loc>
+    <lastmod>2026-07-09</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -50,19 +50,19 @@
   </url>
   <url>
     <loc>https://mens-body.com/articles/mens-hair-removal.html</loc>
-    <lastmod>2026-06-29</lastmod>
+    <lastmod>2026-07-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://mens-body.com/articles/mens-gym-guide.html</loc>
-    <lastmod>2026-06-29</lastmod>
+    <lastmod>2026-07-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://mens-body.com/articles/mens-sunscreen.html</loc>
-    <lastmod>2026-06-18</lastmod>
+    <lastmod>2026-07-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
@@ -79,6 +79,36 @@
     <priority>0.85</priority>
   </url>
   <url>
+    <loc>https://mens-body.com/articles/mens-hair-removal-start.html</loc>
+    <lastmod>2026-07-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://mens-body.com/articles/mens-hair-removal-cost.html</loc>
+    <lastmod>2026-07-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://mens-body.com/articles/hair-removal-before-summer.html</loc>
+    <lastmod>2026-07-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://mens-body.com/articles/hair-removal-pain-men.html</loc>
+    <lastmod>2026-07-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.82</priority>
+  </url>
+  <url>
+    <loc>https://mens-body.com/articles/hair-removal-how-many-times.html</loc>
+    <lastmod>2026-07-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.82</priority>
+  </url>
+  <url>
     <loc>https://mens-body.com/articles/mens-sunscreen-recommend.html</loc>
     <lastmod>2026-06-18</lastmod>
     <changefreq>monthly</changefreq>
@@ -86,7 +116,25 @@
   </url>
   <url>
     <loc>https://mens-body.com/articles/gym-beginner-men.html</loc>
-    <lastmod>2026-06-18</lastmod>
+    <lastmod>2026-07-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://mens-body.com/articles/cellulite-men.html</loc>
+    <lastmod>2026-07-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.82</priority>
+  </url>
+  <url>
+    <loc>https://mens-body.com/articles/gym-week2-effect-men.html</loc>
+    <lastmod>2026-07-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.82</priority>
+  </url>
+  <url>
+    <loc>https://mens-body.com/articles/gym-not-continue-men.html</loc>
+    <lastmod>2026-07-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.85</priority>
   </url>
@@ -104,9 +152,21 @@
   </url>
   <url>
     <loc>https://mens-body.com/articles/roadmap-30s-summer.html</loc>
-    <lastmod>2026-07-01</lastmod>
+    <lastmod>2026-07-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://mens-body.com/articles/clean-impression-men.html</loc>
+    <lastmod>2026-07-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://mens-body.com/articles/body-shape-30s-men.html</loc>
+    <lastmod>2026-07-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.82</priority>
   </url>
   <url>
     <loc>https://mens-body.com/articles/grooming-check.html</loc>
@@ -121,14 +181,44 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://mens-body.com/articles/leg-hair-removal-men.html</loc>
+    <lastmod>2026-07-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://mens-body.com/articles/beard-hair-removal-men.html</loc>
     <lastmod>2026-06-18</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://mens-body.com/articles/beard-hair-removal-regret.html</loc>
+    <lastmod>2026-07-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://mens-body.com/articles/sunscreen-men-daily.html</loc>
     <lastmod>2026-06-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://mens-body.com/articles/sunscreen-sticky-men.html</loc>
+    <lastmod>2026-07-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://mens-body.com/articles/sunscreen-white-cast-men.html</loc>
+    <lastmod>2026-07-09</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://mens-body.com/articles/men-skincare-start.html</loc>
+    <lastmod>2026-07-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
