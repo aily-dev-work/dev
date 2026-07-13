@@ -274,7 +274,8 @@ if ($changedFiles.Count -gt 0) {
     }
 }
 elseif ($eventPath -and (Test-Path $eventPath)) {
-    Write-Host "No deployable changed files detected. Skipping FTP upload."
+    Write-Host "No deployable changed files detected. Running full deploy."
+    Walk-RemoteDirs ""
 }
 else {
     Write-Host "No deployable changed files detected. Running full deploy."
