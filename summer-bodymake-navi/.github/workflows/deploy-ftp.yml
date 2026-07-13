@@ -1,0 +1,46 @@
+name: Deploy site via FTP
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check FTP configuration
+        shell: pwsh
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+          FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+        run: |
+          $hasConfig = $env:FTP_HOST -and $env:FTP_USER -and $env:FTP_PASS -and $env:FTP_REMOTE_DIR
+          if ($hasConfig) {
+            "HAS_FTP_CONFIG=true" >> $env:GITHUB_ENV
+          } else {
+            "HAS_FTP_CONFIG=false" >> $env:GITHUB_ENV
+            Write-Warning "FTP secrets are not fully configured. Skipping FTP deploy."
+          }
+
+      - name: Deploy to Xserver
+        if: env.HAS_FTP_CONFIG == 'true'
+        shell: pwsh
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+          FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+          FTP_USE_SSL: ${{ secrets.FTP_USE_SSL }}
+        run: ./scripts/deploy-ftp.ps1
