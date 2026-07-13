@@ -9,6 +9,23 @@ $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $EnvFile = Join-Path $Root ".deploy.env"
 $ConfigKeys = @("FTP_HOST", "FTP_USER", "FTP_PASS", "FTP_REMOTE_DIR")
 
+$RepoRoot = $Root
+try {
+    $candidateRoot = git -C $Root rev-parse --show-toplevel
+    if ($LASTEXITCODE -eq 0 -and $candidateRoot) {
+        $RepoRoot = (Resolve-Path $candidateRoot.Trim()).Path
+    }
+}
+catch {
+    $RepoRoot = $Root
+}
+
+$SitePathPrefix = ""
+if ($RepoRoot -ne $Root) {
+    $relativeRoot = [System.IO.Path]::GetRelativePath($RepoRoot, $Root)
+    $SitePathPrefix = ($relativeRoot -replace "\\", "/").Trim("/")
+}
+
 function Set-ConfigValue {
     param(
         [string]$Name,
@@ -139,12 +156,27 @@ function Get-ChangedDeployFiles {
         return @()
     }
 
-    $changed = git -C $Root diff --name-only --diff-filter=ACMRT $event.before $event.after
+    $changed = git -C $RepoRoot diff --name-only --diff-filter=ACMRT $event.before $event.after
     if ($LASTEXITCODE -ne 0) {
         return @()
     }
 
-    return @($changed | Where-Object { Test-IsDeployablePath $_ })
+    $siteChanged = @()
+    foreach ($file in $changed) {
+        $normalized = $file -replace "\\", "/"
+        if ($SitePathPrefix) {
+            $prefix = $SitePathPrefix.TrimEnd("/") + "/"
+            if (-not $normalized.StartsWith($prefix)) {
+                continue
+            }
+            $normalized = $normalized.Substring($prefix.Length)
+        }
+        if (Test-IsDeployablePath $normalized) {
+            $siteChanged += $normalized
+        }
+    }
+
+    return @($siteChanged)
 }
 
 function Upload-FtpFile {
