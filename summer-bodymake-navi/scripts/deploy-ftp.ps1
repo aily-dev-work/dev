@@ -58,7 +58,7 @@ foreach ($key in $ConfigKeys) {
 
 $FTP_REMOTE_DIR = "/" + $FTP_REMOTE_DIR.Trim("/")
 
-$UseSsl = $false
+$UseSsl = $true
 $ftpUseSsl = [System.Environment]::GetEnvironmentVariable("FTP_USE_SSL")
 if ($ftpUseSsl) {
     $UseSsl = @("1", "true", "yes", "on") -contains $ftpUseSsl.ToString().ToLowerInvariant()

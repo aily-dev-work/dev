@@ -1,4 +1,4 @@
-name: Deploy summer-bodymake-navi via FTP
+name: Deploy summer-bodymake-navi to XServer Static
 
 on:
   push:
@@ -37,7 +37,7 @@ jobs:
             Write-Warning "FTP secrets are not fully configured. Skipping FTP deploy."
           }
 
-      - name: Deploy summer-bodymake-navi to Xserver
+      - name: Deploy summer-bodymake-navi to XServer Static
         if: env.HAS_FTP_CONFIG == 'true'
         shell: pwsh
         env:

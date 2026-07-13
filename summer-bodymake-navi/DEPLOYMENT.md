@@ -1,16 +1,16 @@
 # GitHub Actions Deploy
 
-This site is deployed to Xserver through GitHub Actions using the FTP or FTPS connection configured in the repository secrets.
+This site is deployed to XServer Static through GitHub Actions using the FTPS connection configured in the repository secrets.
 
 ## Required secrets
 
 Set these in GitHub:
 
-- `FTP_HOST`
-- `FTP_USER`
-- `FTP_PASS`
-- `FTP_REMOTE_DIR`
-- `FTP_USE_SSL` is optional. Set it to `true` if your Xserver account uses FTPS.
+- `FTP_HOST`: XServer Static FTP server name, for example `staticXX.xserver.jp`
+- `FTP_USER`: XServer Static FTP account name
+- `FTP_PASS`: XServer Static FTP password
+- `FTP_REMOTE_DIR`: normally `/public_html`
+- `FTP_USE_SSL`: normally `true` for XServer Static FTPS
 
 ## How it works
 
