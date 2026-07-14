@@ -9,6 +9,10 @@ on:
       - ".github/workflows/deploy-summer-bodymake-navi.yml"
   workflow_dispatch:
 
+concurrency:
+  group: deploy-summer-bodymake-navi
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -17,33 +21,43 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
+        uses: actions/checkout@v4
 
-      - name: Check FTP configuration
-        shell: pwsh
+      - name: Verify FTP secrets
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
           FTP_USER: ${{ secrets.FTP_USER }}
           FTP_PASS: ${{ secrets.FTP_PASS }}
-          FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
         run: |
-          $hasConfig = $env:FTP_HOST -and $env:FTP_USER -and $env:FTP_PASS -and $env:FTP_REMOTE_DIR
-          if ($hasConfig) {
-            "HAS_FTP_CONFIG=true" >> $env:GITHUB_ENV
-          } else {
-            "HAS_FTP_CONFIG=false" >> $env:GITHUB_ENV
-            Write-Warning "FTP secrets are not fully configured. Skipping FTP deploy."
-          }
+          missing=()
+          [ -z "$FTP_HOST" ] && missing+=("FTP_HOST")
+          [ -z "$FTP_USER" ] && missing+=("FTP_USER")
+          [ -z "$FTP_PASS" ] && missing+=("FTP_PASS")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing GitHub Actions secrets: ${missing[*]}"
+            echo "Set them at: Settings → Secrets and variables → Actions"
+            echo "See summer-bodymake-navi/DEPLOYMENT.md"
+            exit 1
+          fi
 
-      - name: Deploy summer-bodymake-navi to XServer Static
-        if: env.HAS_FTP_CONFIG == 'true'
-        shell: pwsh
-        env:
-          FTP_HOST: ${{ secrets.FTP_HOST }}
-          FTP_USER: ${{ secrets.FTP_USER }}
-          FTP_PASS: ${{ secrets.FTP_PASS }}
-          FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
-          FTP_USE_SSL: ${{ secrets.FTP_USE_SSL }}
-        run: ./summer-bodymake-navi/scripts/deploy-ftp.ps1
+      - name: Deploy to XServer Static (FTPS)
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASS }}
+          protocol: ftps
+          local-dir: ./summer-bodymake-navi/
+          server-dir: ${{ secrets.FTP_REMOTE_DIR || '/public_html/' }}
+          dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/.github/**
+            **/scripts/**
+            **/_partials/**
+            **/.deploy.env*
+            **/.gitignore
+            **/DEPLOYMENT.md
+            **/README.md
+            **/deploy-site.zip
+            **/Untitled
