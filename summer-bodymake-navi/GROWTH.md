@@ -20,10 +20,17 @@ URL検査 → 各URLを開き「インデックス登録をリクエスト」：
 3. `https://mens-body.com/articles/mens-hair-removal-cost.html`
 4. `https://mens-body.com/articles/mens-sunscreen-recommend.html`
 5. `https://mens-body.com/articles/beard-hair-removal-men.html`
-6. `https://mens-body.com/articles/gym-beginner-men.html`
-7. `https://mens-body.com/articles/clean-impression-men.html`
-8. `https://mens-body.com/articles/grooming-check.html`
-9. `https://mens-body.com/sitemap.xml`（サイトマップ画面で送信済みか確認）
+6. `https://mens-body.com/articles/beard-hair-removal-regret.html`
+7. `https://mens-body.com/articles/leg-hair-removal-men.html`
+8. `https://mens-body.com/articles/gym-beginner-men.html`
+9. `https://mens-body.com/articles/clean-impression-men.html`
+10. `https://mens-body.com/articles/grooming-check.html`
+11. `https://mens-body.com/sitemap.xml`（サイトマップ画面で送信済みか確認）
+
+### 平均掲載順位について
+
+50位前後は「まだ上位争いに入れていない」状態です。記事の肉付け・内部リンクだけでは翌日に上がりません。  
+**インデックス済み URL が増え、クリックが付き始めてから** 順位は動きます。上記の再リクエストと、薄いページを増やさないことが最短ルートです。
 
 ### 2. 無料の外部露出（週3本で十分）
 
